@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   MapPin, 
   Calendar, 
@@ -19,6 +19,12 @@ import {
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
+import { NimetClimateReport } from './NimetClimateReport';
+import { FutureRecommendationSection } from './FutureRecommendationSection';
+import { SoilwiseAiAssistant } from './SoilwiseAiAssistant';
+import { AgronomistConsultationModal } from './AgronomistConsultationModal';
+import { PartnershipModal } from './PartnershipModal';
+import { FarmerFeedbackSection } from './FarmerFeedbackSection';
 
 interface FarmAnalysisViewProps {
   analysis: FarmAnalysisResult;
@@ -34,6 +40,9 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   onOpenDocs,
 }) => {
   const { soilData, location, soilTexture, rainfallOutlook, environmentalInfo, analysisDate } = analysis;
+
+  const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false);
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
 
   const handlePrint = () => {
     window.print();
@@ -380,7 +389,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
         {rainfallOutlook.isAvailable ? (
           <>
-            {/* Highlighted Remaining Rainy-Season Days (Section 14 & 15) */}
+            {/* Highlighted Remaining Rainy-Season Days */}
             <div className="p-4 sm:p-5 bg-[#f0f5ee] rounded-2xl border border-[#1b4332]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-[#1b4332] uppercase tracking-wider block">
@@ -406,7 +415,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
             {/* Structured Grid of Rainfall Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {/* Expected Onset (Section 10) */}
+              {/* Expected Onset */}
               <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
@@ -424,7 +433,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 </p>
               </div>
 
-              {/* Expected Cessation (Section 12) */}
+              {/* Expected Cessation */}
               <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
@@ -442,7 +451,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 </p>
               </div>
 
-              {/* Approximate Peak Period (Section 9) */}
+              {/* Approximate Peak Period */}
               <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
                 <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
                   Approximate Peak Period
@@ -455,7 +464,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 </p>
               </div>
 
-              {/* Rainfall Onset Status (Section 16) */}
+              {/* Rainfall Onset Status */}
               <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
                 <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
                   Rainfall Onset Status
@@ -525,12 +534,24 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </div>
         )}
 
-        {/* Source Note (Section 21) */}
+        {/* Source Note */}
         <div className="text-[11px] text-stone-500 border-t border-stone-200 pt-3">
           <span className="font-semibold text-stone-700">Source: </span>
           {rainfallOutlook.source}. Open-Meteo seasonal forecasts are model-based and not described as official NiMet predictions.
         </div>
       </div>
+
+      {/* NEW SECTION 1: NIMET CLIMATE REPORT (Immediately after Monthly Precipitation Distribution) */}
+      <NimetClimateReport location={location} />
+
+      {/* NEW SECTION 2: RECOMMENDATION (From farm data to locally relevant agricultural decisions) */}
+      <FutureRecommendationSection onOpenPartnerModal={() => setIsPartnerModalOpen(true)} />
+
+      {/* NEW SECTION 3: SOILWISE AI ASSISTANT (Interactive chat context) */}
+      <SoilwiseAiAssistant
+        analysis={analysis}
+        onRequestConsultation={() => setIsConsultationModalOpen(true)}
+      />
 
       {/* 27. ENVIRONMENTAL INFORMATION */}
       <div className="bg-white rounded-2xl p-5 sm:p-7 border border-stone-200/80 shadow-xs space-y-4">
@@ -551,7 +572,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
         {environmentalInfo.isAvailable ? (
           <div className="space-y-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
-              {/* Mean Annual Temperature (Section 17) */}
+              {/* Mean Annual Temperature */}
               <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
                 <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
                   Mean Annual Temperature
@@ -566,7 +587,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 </p>
               </div>
 
-              {/* Total Annual Precipitation (Section 18) */}
+              {/* Total Annual Precipitation */}
               <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
                 <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
                   Total Annual Precipitation
@@ -597,7 +618,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
               </div>
             </div>
 
-            {/* Climate Classification (Section 19) */}
+            {/* Climate Classification */}
             <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
               <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
                 Climate Classification (Köppen-Geiger)
@@ -677,6 +698,21 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           Inspect JSON Schema &rarr;
         </button>
       </div>
+
+      {/* NEW SECTION 5: FEEDBACK & EARLY ACCESS (Final section of the result page) */}
+      <FarmerFeedbackSection location={location} />
+
+      {/* NEW SECTION 4 MODALS */}
+      <AgronomistConsultationModal
+        isOpen={isConsultationModalOpen}
+        onClose={() => setIsConsultationModalOpen(false)}
+        location={location}
+      />
+
+      <PartnershipModal
+        isOpen={isPartnerModalOpen}
+        onClose={() => setIsPartnerModalOpen(false)}
+      />
     </div>
   );
 };

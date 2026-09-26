@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "Feedback": {
+      "title": "SoilWise Feedback Submission",
+      "description": "Public product validation and waiting list submission from farmers and agricultural stakeholders.",
+      "type": "object",
+      "properties": {
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Firestore server timestamp of submission."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of respondent."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of respondent."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of respondent."
+        },
+        "userType": {
+          "type": "string",
+          "description": "Category of respondent (Farmer, Agronomist, etc.)."
+        },
+        "location": {
+          "type": "string",
+          "description": "Farm location or state/town."
+        },
+        "likesSoilwise": {
+          "type": "string",
+          "description": "Overall experience response (Yes, Somewhat, Not yet)."
+        },
+        "wouldUse": {
+          "type": "string",
+          "description": "Usage intent response."
+        },
+        "willingnessToPay": {
+          "type": "string",
+          "description": "Selected price tier."
+        },
+        "removeOrModify": {
+          "type": "string",
+          "description": "Features or elements to change or remove."
+        },
+        "desiredFeatures": {
+          "type": "string",
+          "description": "Features desired in future versions."
+        },
+        "mostValuableFeature": {
+          "type": "string",
+          "description": "Most valuable feature identified."
+        },
+        "joinWaitingList": {
+          "type": "boolean",
+          "description": "Whether respondent joined the early access list."
+        },
+        "consent": {
+          "type": "boolean",
+          "description": "Consent to receive product updates."
+        }
+      },
+      "required": ["submittedAt", "likesSoilwise", "wouldUse", "willingnessToPay"]
+    }
+  },
+  "firestore": {
+    "/soilwise_feedback/{feedbackId}": {
+      "entity": "Feedback",
+      "description": "Collection of all SoilWise AI feedback submissions. Public write-only, admin read/manage."
+    }
+  }
+}

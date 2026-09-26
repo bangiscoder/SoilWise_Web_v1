@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == 'bangiscoder@gmail.com';
+    }
+
+    function isValidFeedback() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['submittedAt', 'likesSoilwise', 'wouldUse', 'willingnessToPay']) &&
+             data.likesSoilwise is string && data.likesSoilwise.size() <= 50 &&
+             data.wouldUse is string && data.wouldUse.size() <= 50 &&
+             data.willingnessToPay is string && data.willingnessToPay.size() <= 100 &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 150)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
+             (!('userType' in data) || (data.userType is string && data.userType.size() <= 80)) &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 200)) &&
+             (!('removeOrModify' in data) || (data.removeOrModify is string && data.removeOrModify.size() <= 2500)) &&
+             (!('desiredFeatures' in data) || (data.desiredFeatures is string && data.desiredFeatures.size() <= 2500)) &&
+             (!('mostValuableFeature' in data) || (data.mostValuableFeature is string && data.mostValuableFeature.size() <= 100)) &&
+             (!('joinWaitingList' in data) || data.joinWaitingList is bool) &&
+             (!('consent' in data) || data.consent is bool);
+    }
+
+    match /soilwise_feedback/{feedbackId} {
+      // Public can only create valid feedback documents
+      allow create: if isValidFeedback();
+
+      // Only authorized admin (bangiscoder@gmail.com) can read, update, or delete
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
