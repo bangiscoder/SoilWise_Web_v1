@@ -1,0 +1,10 @@
+{
+  "name": "SoilWise AI Web",
+  "description": "Decision-support agricultural intelligence platform combining farmer soil-test data, location, ISRIC SoilGrids, and Open-Meteo climate information for comprehensive farm analysis.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
