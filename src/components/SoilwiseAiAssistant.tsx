@@ -4,9 +4,8 @@ import {
   Send, 
   User, 
   Sparkles, 
-  UserCheck, 
   AlertCircle,
-  HelpCircle
+  X
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 
@@ -19,7 +18,9 @@ interface ChatMessage {
 
 interface SoilwiseAiAssistantProps {
   analysis: FarmAnalysisResult;
-  onRequestConsultation: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onRequestConsultation?: () => void;
 }
 
 // Architectural flag ensuring no external model or API is queried during MVP validation
@@ -34,13 +35,15 @@ const SUGGESTED_QUESTIONS = [
 
 export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   analysis,
+  isOpen = true,
+  onClose,
   onRequestConsultation,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'init-1',
       role: 'assistant',
-      text: "Hello! I'm your SoilWise AI Assistant. Here you can chat with your tailored AI Assistant for more information on any question you may need.",
+      text: "Hello! I'm your SoilWise AI Assistant. Here you can chat with your tailored AI Assistant for more information on any question you may have.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -55,6 +58,8 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  if (!isOpen) return null;
 
   /**
    * Prepares the full agricultural analysis context for the assistant architecture.
@@ -88,10 +93,6 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
     climateZone: analysis.environmentalInfo.climateZone,
   };
 
-  /**
-   * Generates a grounded prototype response strictly using displayed farm data.
-   * NEVER invents soil measurements, NiMet findings, seed varieties, or fertilizer recommendations.
-   */
   const generateMockResponse = (userQuery: string): string => {
     const q = userQuery.toLowerCase();
 
@@ -153,25 +154,37 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
     }, 450);
   };
 
-  return (
-    <div className="bg-white rounded-2xl p-5 sm:p-7 border border-stone-200/80 shadow-xs space-y-6">
+  const content = (
+    <div className="space-y-4">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-[#1b4332]">
-            SoilWise AI Assistant
-          </span>
-          <span className="text-stone-300">&bull;</span>
-          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-            AI Assistant Preview &mdash; Prototype
-          </span>
+      <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#1b4332]">
+              SoilWise AI Assistant
+            </span>
+            <span className="text-stone-300">&bull;</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+              AI Assistant Preview &mdash; Prototype
+            </span>
+          </div>
+          <h2 className="text-xl font-bold text-stone-900 tracking-tight mt-1">
+            SoilWise Assistant
+          </h2>
+          <p className="text-xs text-stone-600 mt-0.5">
+            Here you can chat with your tailored AI Assistant for more information on any question you may have.
+          </p>
         </div>
-        <h2 className="text-2xl font-bold text-stone-900 tracking-tight mt-1">
-          SoilWise AI Assistant
-        </h2>
-        <p className="text-xs sm:text-sm text-stone-600 mt-1">
-          Here you can chat with your tailored AI Assistant for more information on any question you may need.
-        </p>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+            title="Close Assistant"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Chat Container */}
@@ -280,35 +293,24 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
           Information is displayed for interaction preview purposes and does not replace advice from a qualified agricultural professional.
         </p>
       </div>
+    </div>
+  );
 
-      {/* Human Expert Consultation Callout */}
-      <div className="mt-6 p-5 sm:p-6 bg-[#f0f5ee] rounded-2xl border border-[#1b4332]/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1.5 max-w-xl">
-          <div className="flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-[#1b4332]" />
-            <h3 className="text-base font-bold text-stone-900">
-              Talk to a Certified Agronomist
-            </h3>
-            <span className="text-[10px] bg-stone-200/80 text-stone-700 px-2 py-0.5 rounded font-medium">
-              Demo Feature
-            </span>
-          </div>
-          <p className="text-xs text-stone-700 leading-relaxed">
-            Need professional guidance? In future versions, SoilWise AI will connect farmers with qualified agricultural experts for human consultation.
-          </p>
-          <p className="text-xs font-semibold text-[#1b4332]">
-            &ldquo;AI helps make information accessible. Experts help provide professional judgement.&rdquo;
-          </p>
+  // If used as modal (when onClose is provided)
+  if (onClose) {
+    return (
+      <div className="fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl border border-stone-200 my-8">
+          {content}
         </div>
-
-        <button
-          onClick={onRequestConsultation}
-          className="px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-[0.98]"
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>Request Expert Consultation</span>
-        </button>
       </div>
+    );
+  }
+
+  // Fallback inline container
+  return (
+    <div className="bg-white rounded-2xl p-5 sm:p-7 border border-stone-200/80 shadow-xs">
+      {content}
     </div>
   );
 };

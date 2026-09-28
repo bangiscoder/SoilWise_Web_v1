@@ -28,7 +28,7 @@ export function isAdmin(user: any): boolean {
   );
 }
 
-// Interface for feedback submission
+// Interface for feedback submission (backward compatible with older records)
 export interface FeedbackSubmission {
   id?: string;
   submittedAt?: any;
@@ -36,7 +36,17 @@ export interface FeedbackSubmission {
   phone?: string;
   email?: string;
   userType?: string;
+  respondentRole?: string;
+  isFarmer?: boolean;
   location?: string;
+  cropsGrown?: string[];
+  otherCrop?: string;
+  soilTested?: string;
+  soilTestMethod?: string;
+  otherSoilTestMethod?: string;
+  weatherInformationSource?: string;
+  otherWeatherInformationSource?: string;
+  farmDecisionChallenge?: string;
   likesSoilwise: string;
   wouldUse: string;
   willingnessToPay: string;
@@ -97,9 +107,81 @@ if (isFirebaseConfigured) {
 
 export { app, auth, db };
 
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth?.currentUser?.uid || null,
+      email: auth?.currentUser?.email || null,
+      emailVerified: auth?.currentUser?.emailVerified || null,
+      isAnonymous: auth?.currentUser?.isAnonymous || null,
+      tenantId: auth?.currentUser?.tenantId || null,
+      providerInfo: auth?.currentUser?.providerData?.map((provider) => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+/**
+ * Strips all undefined fields recursively so Firestore addDoc/setDoc never throws
+ * "Unsupported field value: undefined".
+ */
+export function sanitizeForFirestore<T extends Record<string, any>>(data: T): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        !(value instanceof Date) &&
+        !(value instanceof Timestamp)
+      ) {
+        clean[key] = sanitizeForFirestore(value);
+      } else {
+        clean[key] = value;
+      }
+    }
+  }
+  return clean;
+}
+
 /**
  * Public feedback submission function.
  * Creates a brand new document in 'soilwise_feedback' using serverTimestamp().
+ * Safely strips any undefined properties to guarantee compatibility with Firestore.
  */
 export async function submitFarmerFeedback(data: Omit<FeedbackSubmission, 'submittedAt'>): Promise<{ success: boolean; id?: string; error?: string }> {
   if (!db || !isFirebaseConfigured) {
@@ -109,10 +191,12 @@ export async function submitFarmerFeedback(data: Omit<FeedbackSubmission, 'submi
     };
   }
 
+  const path = 'soilwise_feedback';
   try {
-    const feedbackCol = collection(db, 'soilwise_feedback');
+    const feedbackCol = collection(db, path);
+    const sanitized = sanitizeForFirestore(data as Record<string, any>);
     const docRef = await addDoc(feedbackCol, {
-      ...data,
+      ...sanitized,
       submittedAt: serverTimestamp(),
     });
 
@@ -122,6 +206,16 @@ export async function submitFarmerFeedback(data: Omit<FeedbackSubmission, 'submi
     };
   } catch (err: any) {
     console.error('Firestore feedback submission error:', err);
+    if (err?.message?.includes('Missing or insufficient permissions')) {
+      try {
+        handleFirestoreError(err, OperationType.CREATE, path);
+      } catch (formattedError: any) {
+        return {
+          success: false,
+          error: formattedError.message,
+        };
+      }
+    }
     return {
       success: false,
       error: err?.message || 'Feedback could not be recorded. Please try again.',

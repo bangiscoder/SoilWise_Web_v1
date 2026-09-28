@@ -20,9 +20,19 @@ service cloud.firestore {
              (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
              (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
              (!('userType' in data) || (data.userType is string && data.userType.size() <= 80)) &&
+             (!('respondentRole' in data) || (data.respondentRole is string && data.respondentRole.size() <= 80)) &&
+             (!('isFarmer' in data) || data.isFarmer is bool) &&
              (!('location' in data) || (data.location is string && data.location.size() <= 200)) &&
-             (!('removeOrModify' in data) || (data.removeOrModify is string && data.removeOrModify.size() <= 2500)) &&
-             (!('desiredFeatures' in data) || (data.desiredFeatures is string && data.desiredFeatures.size() <= 2500)) &&
+             (!('cropsGrown' in data) || data.cropsGrown is list) &&
+             (!('otherCrop' in data) || (data.otherCrop is string && data.otherCrop.size() <= 200)) &&
+             (!('soilTested' in data) || (data.soilTested is string && data.soilTested.size() <= 50)) &&
+             (!('soilTestMethod' in data) || (data.soilTestMethod is string && data.soilTestMethod.size() <= 150)) &&
+             (!('otherSoilTestMethod' in data) || (data.otherSoilTestMethod is string && data.otherSoilTestMethod.size() <= 250)) &&
+             (!('weatherInformationSource' in data) || (data.weatherInformationSource is string && data.weatherInformationSource.size() <= 100)) &&
+             (!('otherWeatherInformationSource' in data) || (data.otherWeatherInformationSource is string && data.otherWeatherInformationSource.size() <= 250)) &&
+             (!('farmDecisionChallenge' in data) || (data.farmDecisionChallenge is string && data.farmDecisionChallenge.size() <= 3000)) &&
+             (!('removeOrModify' in data) || (data.removeOrModify is string && data.removeOrModify.size() <= 3000)) &&
+             (!('desiredFeatures' in data) || (data.desiredFeatures is string && data.desiredFeatures.size() <= 3000)) &&
              (!('mostValuableFeature' in data) || (data.mostValuableFeature is string && data.mostValuableFeature.size() <= 100)) &&
              (!('joinWaitingList' in data) || data.joinWaitingList is bool) &&
              (!('consent' in data) || data.consent is bool);

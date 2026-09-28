@@ -73,7 +73,8 @@ export default function App() {
   const handleFormSubmit = async (
     soilData: SoilData,
     coordinates: { latitude: number; longitude: number },
-    analysisDate: string
+    analysisDate: string,
+    locationDetails?: { state?: string; lga?: string }
   ) => {
     setIsSubmitting(true);
     setAppError(null);
@@ -84,7 +85,8 @@ export default function App() {
         soilData,
         coordinates,
         analysisDate,
-        (step) => setAnalysisStep(step)
+        (step) => setAnalysisStep(step),
+        locationDetails
       );
 
       setAnalysisResult(result);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CloudSun, AlertCircle, Building2, ExternalLink, ShieldCheck } from 'lucide-react';
+import { CloudSun, AlertCircle, Building2, Droplets, Calendar, Flame, ThermometerSun, Sprout } from 'lucide-react';
 import { FarmLocation } from '../types/soilwise';
 
 interface NimetClimateReportProps {
@@ -15,7 +15,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
     : 'Southern Rainforest / Derived Savanna Zone';
 
   return (
-    <div className="bg-white rounded-2xl p-5 sm:p-7 border border-stone-200/80 shadow-xs space-y-5">
+    <div className="bg-white rounded-2xl p-5 sm:p-7 border border-stone-200/80 shadow-xs space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
@@ -48,7 +48,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
         </div>
       </div>
 
-      {/* Honest MVP Connection State */}
+      {/* NiMet Climate Report Connection Notice */}
       <div className="p-4 bg-[#f8f9f6] rounded-xl border border-stone-200 text-xs text-stone-700 space-y-2">
         <div className="flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
@@ -61,67 +61,91 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
         </div>
       </div>
 
-      {/* Structured Farmer-Friendly NiMet Summary (3–5 concise points) */}
-      <div className="space-y-3">
+      {/* Consolidated Climate Outlook Card */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between text-xs border-b border-stone-100 pb-2">
           <span className="font-semibold text-stone-800">
             NiMet Climate Summary &bull; {zoneLabel}
           </span>
           <span className="text-stone-400 font-mono text-[11px]">
-            Reference Period: Seasonal Climate Prediction
+            Seasonal Climate Prediction
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          {/* Point 1: Rainfall Outlook */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
-            <span className="font-bold text-stone-800 uppercase tracking-wide text-[10px] block text-[#1b4332]">
-              1. Rainfall Outlook
-            </span>
-            <p className="text-stone-700 leading-relaxed">
-              Predicted to be normal to slightly delayed in onset, with concentrated cumulative volume during peak months rather than uniform distribution.
-            </p>
+        {/* Single Elegant Visual Information Card */}
+        <div className="bg-[#fafaf7] rounded-2xl border border-stone-200/90 overflow-hidden shadow-xs">
+          <div className="px-5 py-3.5 bg-stone-100/70 border-b border-stone-200/80 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2">
+              <CloudSun className="w-4 h-4 text-[#1b4332]" />
+              <span>Climate Outlook</span>
+            </h3>
+            <span className="text-[11px] text-stone-500 font-medium">Regional Projection</span>
           </div>
 
-          {/* Point 2: Rainfall Timing */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
-            <span className="font-bold text-stone-800 uppercase tracking-wide text-[10px] block text-[#1b4332]">
-              2. Rainfall Timing & Cessation
-            </span>
-            <p className="text-stone-700 leading-relaxed">
-              Expected onset window typically stabilizes {isNorthern ? 'between late April and mid-May' : 'from late March to early April'}, with normal cessation expected by October.
-            </p>
-          </div>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-5 divide-y sm:divide-y-0 sm:divide-x divide-stone-200/80">
+            {/* Left Column */}
+            <div className="space-y-4 sm:pr-4">
+              {/* Statement 1: Rainfall Outlook */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
+                  <Droplets className="w-3.5 h-3.5" />
+                  <span>Rainfall Outlook</span>
+                </div>
+                <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
+                  Predicted to be normal to slightly delayed in onset, with concentrated cumulative volume during peak months rather than uniform distribution.
+                </p>
+              </div>
 
-          {/* Point 3: Dry-Spell Risk */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
-            <span className="font-bold text-stone-800 uppercase tracking-wide text-[10px] block text-[#1b4332]">
-              3. Dry-Spell Risk
-            </span>
-            <p className="text-stone-700 leading-relaxed">
-              Moderate-to-high risk of 7–14 day dry spells immediately following initial early rains; farmers are advised against premature planting on first scattered showers.
-            </p>
-          </div>
+              {/* Statement 2: Rainfall Timing & Cessation */}
+              <div className="space-y-1 pt-3 sm:pt-4 border-t border-stone-200/60">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Rainfall Timing &amp; Cessation</span>
+                </div>
+                <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
+                  Expected onset window typically stabilizes {isNorthern ? 'between late April and mid-May' : 'from late March to early April'}, with normal cessation expected by October.
+                </p>
+              </div>
+            </div>
 
-          {/* Point 4: Temperature Outlook */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
-            <span className="font-bold text-stone-800 uppercase tracking-wide text-[10px] block text-[#1b4332]">
-              4. Temperature Outlook
-            </span>
-            <p className="text-stone-700 leading-relaxed">
-              Daytime and nighttime temperatures are projected to be near normal to warmer than long-term averages, elevating early season evapotranspiration.
-            </p>
-          </div>
+            {/* Right Column */}
+            <div className="space-y-4 pt-4 sm:pt-0 sm:pl-5">
+              {/* Statement 3: Dry-Spell Risk */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
+                  <Flame className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Dry-Spell Risk</span>
+                </div>
+                <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
+                  Moderate-to-high risk of 7&ndash;14 day dry spells immediately following initial early rains; farmers are advised against premature planting on first scattered showers.
+                </p>
+              </div>
 
-          {/* Point 5: Agricultural Implication */}
-          <div className="p-3 bg-[#f0f5ee] rounded-xl border border-[#1b4332]/20 space-y-1 md:col-span-2">
-            <span className="font-bold text-[#1b4332] uppercase tracking-wide text-[10px] block">
-              5. Agricultural Implication
-            </span>
-            <p className="text-stone-800 leading-relaxed">
-              Adopt climate-smart practices: prepare seedbeds early, verify soil moisture depth before sowing, select certified drought-resilient varieties with suitable maturity cycles, and conserve topsoil moisture through mulching.
-            </p>
+              {/* Statement 4: Temperature Outlook */}
+              <div className="space-y-1 pt-3 sm:pt-4 border-t border-stone-200/60">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
+                  <ThermometerSun className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Temperature Outlook</span>
+                </div>
+                <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
+                  Daytime and nighttime temperatures are projected to be near normal to warmer than long-term averages, elevating early season evapotranspiration.
+                </p>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Agricultural Implication (Section 9: Without "5.") */}
+        <div className="p-4 sm:p-5 bg-[#f0f5ee] rounded-2xl border border-[#1b4332]/20 space-y-2">
+          <div className="flex items-center gap-2">
+            <Sprout className="w-4 h-4 text-[#1b4332]" />
+            <h4 className="font-bold text-[#1b4332] text-xs sm:text-sm uppercase tracking-wide">
+              Agricultural Implication
+            </h4>
+          </div>
+          <p className="text-xs sm:text-sm text-stone-800 leading-relaxed">
+            Adopt climate-smart practices: prepare seedbeds early, verify soil moisture depth before sowing, select certified drought-resilient varieties with suitable maturity cycles, and conserve topsoil moisture through mulching.
+          </p>
         </div>
       </div>
 

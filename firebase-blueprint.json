@@ -2,7 +2,7 @@
   "entities": {
     "Feedback": {
       "title": "SoilWise Feedback Submission",
-      "description": "Public product validation and waiting list submission from farmers and agricultural stakeholders.",
+      "description": "Public product validation, farming background, and waiting list submission from farmers and agricultural stakeholders.",
       "type": "object",
       "properties": {
         "submittedAt": {
@@ -12,7 +12,7 @@
         },
         "name": {
           "type": "string",
-          "description": "Name of respondent."
+          "description": "Name of respondent (optional)."
         },
         "phone": {
           "type": "string",
@@ -26,9 +26,50 @@
           "type": "string",
           "description": "Category of respondent (Farmer, Agronomist, etc.)."
         },
+        "respondentRole": {
+          "type": "string",
+          "description": "Role of respondent."
+        },
+        "isFarmer": {
+          "type": "boolean",
+          "description": "Whether the respondent is a farmer."
+        },
         "location": {
           "type": "string",
           "description": "Farm location or state/town."
+        },
+        "cropsGrown": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Crops cultivated or worked with."
+        },
+        "otherCrop": {
+          "type": "string",
+          "description": "Specification for other crops grown."
+        },
+        "soilTested": {
+          "type": "string",
+          "description": "Soil testing experience (Yes, No, I am not sure)."
+        },
+        "soilTestMethod": {
+          "type": "string",
+          "description": "Method or service used to test soil."
+        },
+        "otherSoilTestMethod": {
+          "type": "string",
+          "description": "Specification for other soil testing method."
+        },
+        "weatherInformationSource": {
+          "type": "string",
+          "description": "Primary channel used for rainfall or weather information."
+        },
+        "otherWeatherInformationSource": {
+          "type": "string",
+          "description": "Specification for other weather information source."
+        },
+        "farmDecisionChallenge": {
+          "type": "string",
+          "description": "Open-ended response describing biggest farm decision challenge."
         },
         "likesSoilwise": {
           "type": "string",

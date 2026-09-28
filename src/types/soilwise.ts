@@ -9,6 +9,8 @@ export interface SoilData {
 export interface FarmLocation {
   latitude: number;
   longitude: number;
+  state?: string;
+  lga?: string;
   address?: {
     fullAddress: string;
     road?: string;
@@ -35,6 +37,7 @@ export interface SoilTexture {
   source: string;
   isAvailable: boolean;
   unavailabilityReason?: string;
+  soilDataSource?: 'SoilGrids' | 'OpenLandMap' | string | null;
 }
 
 export type RainfallOnsetClassification = 
@@ -82,6 +85,8 @@ export interface FarmAnalysisResult {
   rainfallOutlook: RainfallOutlook;
   environmentalInfo: EnvironmentalInfo;
   status: 'completed' | 'partial';
+  selectedState?: string;
+  selectedLga?: string;
 }
 
 export type AnalysisStep =

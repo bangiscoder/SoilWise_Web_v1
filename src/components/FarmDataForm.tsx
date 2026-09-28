@@ -10,10 +10,16 @@ import {
   Loader2
 } from 'lucide-react';
 import { SoilData } from '../types/soilwise';
+import { NIGERIA_STATES_LGAS } from '../data/nigeriaStatesLga';
 import heroBackground from '../assets/images/farm_analysis_hero_1790600561723.jpg';
 
 interface FarmDataFormProps {
-  onSubmit: (soilData: SoilData, coordinates: { latitude: number; longitude: number }, analysisDate: string) => void;
+  onSubmit: (
+    soilData: SoilData,
+    coordinates: { latitude: number; longitude: number },
+    analysisDate: string,
+    locationDetails?: { state?: string; lga?: string }
+  ) => void;
   isSubmitting: boolean;
 }
 
@@ -28,6 +34,10 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
   // Required Farm Location fields - all start completely blank
   const [latitude, setLatitude] = useState<string>('');
   const [longitude, setLongitude] = useState<string>('');
+
+  // Optional State and LGA selection
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [selectedLga, setSelectedLga] = useState<string>('');
 
   // Geolocation state
   const [geoLoading, setGeoLoading] = useState(false);
@@ -187,7 +197,11 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
       },
-      autoAnalysisDate
+      autoAnalysisDate,
+      {
+        state: selectedState || undefined,
+        lga: selectedLga || undefined,
+      }
     );
   };
 
@@ -654,6 +668,60 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
                     <AlertCircle className="w-3 h-3 shrink-0" /> {errors.longitude}
                   </p>
                 )}
+              </div>
+            </div>
+
+            {/* State and LGA Dynamic Dropdowns */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-1 border-t border-stone-100">
+              <div>
+                <label htmlFor="stateInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
+                  State
+                </label>
+                <select
+                  id="stateInput"
+                  value={selectedState}
+                  onChange={(e) => {
+                    const newState = e.target.value;
+                    setSelectedState(newState);
+                    setSelectedLga('');
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer"
+                >
+                  <option value="">Select State...</option>
+                  {NIGERIA_STATES_LGAS.map((s) => (
+                    <option key={s.state} value={s.state}>
+                      {s.state}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-stone-400 mt-1">
+                  Optional &bull; Local administrative boundary
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="lgaInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
+                  Local Government Area (LGA)
+                </label>
+                <select
+                  id="lgaInput"
+                  value={selectedLga}
+                  disabled={!selectedState}
+                  onChange={(e) => setSelectedLga(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {selectedState ? 'Select LGA...' : 'Select a State first...'}
+                  </option>
+                  {(NIGERIA_STATES_LGAS.find((s) => s.state === selectedState)?.lgas || []).map((lga) => (
+                    <option key={lga} value={lga}>
+                      {lga}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-stone-400 mt-1">
+                  Populates based on selected State
+                </p>
               </div>
             </div>
 

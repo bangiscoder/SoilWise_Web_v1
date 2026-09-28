@@ -28,7 +28,8 @@ export async function performFarmAnalysis(
   soilData: SoilData,
   coordinates: { latitude: number; longitude: number },
   analysisDate: string,
-  onStepChange?: (step: AnalysisStep) => void
+  onStepChange?: (step: AnalysisStep) => void,
+  locationDetails?: { state?: string; lga?: string }
 ): Promise<FarmAnalysisResult> {
   const { latitude, longitude } = coordinates;
   const analysisYear = new Date(analysisDate).getFullYear() || new Date().getFullYear();
@@ -134,6 +135,8 @@ export async function performFarmAnalysis(
   const farmLocation: FarmLocation = {
     latitude,
     longitude,
+    state: locationDetails?.state,
+    lga: locationDetails?.lga,
     address: address || {
       fullAddress: `${latitude.toFixed(5)}°, ${longitude.toFixed(5)}°`,
     },
@@ -155,6 +158,8 @@ export async function performFarmAnalysis(
     rainfallOutlook,
     environmentalInfo,
     status: rainfallOutlook.isAvailable ? 'completed' : 'partial',
+    selectedState: locationDetails?.state,
+    selectedLga: locationDetails?.lga,
   };
 
   onStepChange?.('completed');
