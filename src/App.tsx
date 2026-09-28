@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
-import { LandingPage } from './components/LandingPage';
 import { FarmDataForm } from './components/FarmDataForm';
 import { FarmAnalysisView } from './components/FarmAnalysisView';
 import { AnalysisProgressModal } from './components/AnalysisProgressModal';
@@ -19,7 +18,8 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { AlertCircle, Lock } from 'lucide-react';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'landing' | 'farm-data' | 'analysis' | 'admin-login' | 'admin-dashboard'>('landing');
+  // Start directly with Farm Analysis as the primary experience
+  const [currentView, setCurrentView] = useState<'farm-data' | 'analysis' | 'admin-login' | 'admin-dashboard'>('farm-data');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep>('idle');
   const [analysisResult, setAnalysisResult] = useState<FarmAnalysisResult | null>(null);
@@ -69,11 +69,6 @@ export default function App() {
       return () => unsubscribe();
     }
   }, [currentView]);
-
-  const handleStart = () => {
-    setCurrentView('farm-data');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const handleFormSubmit = async (
     soilData: SoilData,
@@ -133,7 +128,7 @@ export default function App() {
   };
 
   const navigateToHome = () => {
-    setCurrentView('landing');
+    setCurrentView('farm-data');
     window.history.pushState({}, '', '/');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -177,7 +172,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setAppError(null)}
-                className="text-xs text-red-600 font-bold hover:underline"
+                className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
               >
                 Dismiss
               </button>
@@ -185,15 +180,7 @@ export default function App() {
           </div>
         )}
 
-        {/* View Routing */}
-        {currentView === 'landing' && (
-          <LandingPage
-            onStart={handleStart}
-            onOpenDocs={handleOpenDocs}
-            isAdmin={isAdminUser}
-          />
-        )}
-
+        {/* Primary Experience: Farm Analysis Form */}
         {currentView === 'farm-data' && (
           <FarmDataForm
             onSubmit={handleFormSubmit}
@@ -201,6 +188,7 @@ export default function App() {
           />
         )}
 
+        {/* Results Page */}
         {currentView === 'analysis' && analysisResult && (
           <FarmAnalysisView
             analysis={analysisResult}
