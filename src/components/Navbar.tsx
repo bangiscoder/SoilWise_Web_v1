@@ -5,9 +5,10 @@ interface NavbarProps {
   currentView: 'landing' | 'farm-data' | 'analysis';
   onNavigate: (view: 'landing' | 'farm-data') => void;
   onOpenDocs: () => void;
+  isAdmin?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenDocs }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenDocs, isAdmin }) => {
   return (
     <header className="sticky top-0 z-30 bg-[#fbfbf9]/90 backdrop-blur-md border-b border-stone-200/80">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
@@ -42,12 +43,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
           >
             Farm Data
           </button>
-          <button
-            onClick={onOpenDocs}
-            className="transition-colors hover:text-[#1b4332] flex items-center gap-1.5"
-          >
-            Data Architecture & API
-          </button>
+          {isAdmin && (
+            <button
+              onClick={onOpenDocs}
+              className="transition-colors hover:text-[#1b4332] flex items-center gap-1.5 cursor-pointer"
+            >
+              Data Architecture &amp; API
+            </button>
+          )}
         </nav>
 
         {/* Zone 3: 1-2 primary actions */}

@@ -14,8 +14,8 @@ import { AdminLogin } from './components/admin/AdminLogin';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { SoilData, FarmAnalysisResult, AnalysisStep } from './types/soilwise';
 import { performFarmAnalysis } from './services/soilwiseService';
-import { auth, AUTHORIZED_ADMIN_EMAIL } from './lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { auth, AUTHORIZED_ADMIN_EMAIL, isAdmin } from './lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { AlertCircle, Lock } from 'lucide-react';
 
 export default function App() {
@@ -25,27 +25,42 @@ export default function App() {
   const [analysisResult, setAnalysisResult] = useState<FarmAnalysisResult | null>(null);
   const [isDocsOpen, setIsDocsOpen] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
-  const [currentAdminUser, setCurrentAdminUser] = useState<string | null>(null);
+  
+  // Single central authentication state for entire application
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const isAdminUser = isAdmin(currentUser);
 
   // Monitor Firebase Auth state & handle URL routing
   useEffect(() => {
-    // Check initial path or hash
+    // Check initial path, hash, or query parameters
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '');
+    
+    const mode = searchParams.get('mode') || hashParams.get('mode');
+    const oobCode = searchParams.get('oobCode') || hashParams.get('oobCode');
 
-    if (path.includes('/admin/dashboard') || hash.includes('/admin/dashboard')) {
+    // Route for password reset or action links
+    if (mode === 'resetPassword' || oobCode || path.includes('/reset-password') || hash.includes('/reset-password')) {
+      setCurrentView('admin-login');
+    } else if (path.includes('/admin/dashboard') || hash.includes('/admin/dashboard')) {
       setCurrentView('admin-dashboard');
     } else if (path.includes('/admin') || hash.includes('/admin')) {
       setCurrentView('admin-login');
     }
 
-    // Auth listener
+    // Central Auth listener
     if (auth) {
       const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user && user.email?.toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
-          setCurrentAdminUser(user.email);
+        setCurrentUser(user);
+        if (user && isAdmin(user)) {
+          // If authorized admin landed on admin login, allow transition to dashboard
+          if (currentView === 'admin-dashboard') {
+            setCurrentView('admin-dashboard');
+          }
         } else {
-          setCurrentAdminUser(null);
+          // Block non-admins from dashboard
           if (currentView === 'admin-dashboard') {
             setCurrentView('admin-login');
           }
@@ -107,7 +122,7 @@ export default function App() {
   };
 
   const navigateToAdmin = () => {
-    if (currentAdminUser) {
+    if (isAdminUser) {
       setCurrentView('admin-dashboard');
       window.history.pushState({}, '', '/admin/dashboard');
     } else {
@@ -123,6 +138,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Guard for Data Architecture & API: only authorized administrator may open
+  const handleOpenDocs = () => {
+    if (!isAdminUser) {
+      setAppError('Admin access required.');
+      navigateToAdmin();
+      return;
+    }
+    setIsDocsOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#fbfbf9] text-stone-900 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       {/* Top Bar Navigation (shown on main public app) */}
@@ -134,7 +159,8 @@ export default function App() {
             setCurrentView(view);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          onOpenDocs={() => setIsDocsOpen(true)}
+          onOpenDocs={handleOpenDocs}
+          isAdmin={isAdminUser}
         />
       )}
 
@@ -146,7 +172,7 @@ export default function App() {
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-xs sm:text-sm text-red-800">
               <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-red-900">Analysis Request Notice</p>
+                <p className="font-semibold text-red-900">Notice</p>
                 <p className="mt-0.5">{appError}</p>
               </div>
               <button
@@ -163,7 +189,8 @@ export default function App() {
         {currentView === 'landing' && (
           <LandingPage
             onStart={handleStart}
-            onOpenDocs={() => setIsDocsOpen(true)}
+            onOpenDocs={handleOpenDocs}
+            isAdmin={isAdminUser}
           />
         )}
 
@@ -179,7 +206,8 @@ export default function App() {
             analysis={analysisResult}
             onEdit={handleEditData}
             onNewAnalysis={handleNewAnalysis}
-            onOpenDocs={() => setIsDocsOpen(true)}
+            onOpenDocs={handleOpenDocs}
+            isAdmin={isAdminUser}
           />
         )}
 
@@ -194,15 +222,25 @@ export default function App() {
           />
         )}
 
-        {/* Admin Dashboard Route */}
+        {/* Admin Dashboard Route (Admin only) */}
         {currentView === 'admin-dashboard' && (
-          <AdminDashboard
-            onLogout={() => {
-              setCurrentView('admin-login');
-              window.history.pushState({}, '', '/admin/login');
-            }}
-            onBackToApp={navigateToHome}
-          />
+          isAdminUser ? (
+            <AdminDashboard
+              onLogout={() => {
+                setCurrentView('admin-login');
+                window.history.pushState({}, '', '/admin/login');
+              }}
+              onBackToApp={navigateToHome}
+            />
+          ) : (
+            <AdminLogin
+              onSuccess={() => {
+                setCurrentView('admin-dashboard');
+                window.history.pushState({}, '', '/admin/dashboard');
+              }}
+              onBackToApp={navigateToHome}
+            />
+          )
         )}
       </main>
 
@@ -225,12 +263,14 @@ export default function App() {
       {/* Analysis Progress Dialog */}
       {isSubmitting && <AnalysisProgressModal currentStep={analysisStep} />}
 
-      {/* API Documentation and Schema Modal */}
-      <ApiDocsModal
-        isOpen={isDocsOpen}
-        onClose={() => setIsDocsOpen(false)}
-        currentAnalysis={analysisResult}
-      />
+      {/* API Documentation and Schema Modal (Protected) */}
+      {isAdminUser && (
+        <ApiDocsModal
+          isOpen={isDocsOpen}
+          onClose={() => setIsDocsOpen(false)}
+          currentAnalysis={analysisResult}
+        />
+      )}
     </div>
   );
 }

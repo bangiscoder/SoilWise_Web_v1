@@ -38,37 +38,56 @@ const firebaseConfig = {
 };
 ```
 
-### Environment Variables (.env)
-If configuring manually via environment variables:
-```bash
-VITE_FIREBASE_API_KEY="AIzaSy..."
-VITE_FIREBASE_AUTH_DOMAIN="your-app.firebaseapp.com"
-VITE_FIREBASE_PROJECT_ID="your-project-id"
-VITE_FIREBASE_DATABASE_ID="your-database-id"
-VITE_FIREBASE_STORAGE_BUCKET="your-app.firebasestorage.app"
-VITE_FIREBASE_MESSAGING_SENDER_ID="your-sender-id"
-VITE_FIREBASE_APP_ID="1:...:web:..."
-```
+### Required Firebase Console Settings
+
+To ensure authentication and password reset function correctly:
+
+1. **Enable Email/Password Provider**:
+   - Navigate to the Firebase Console: **Authentication → Sign-in method**.
+   - Ensure the **Email/Password** provider is **Enabled**.
+   - If disabled, authentication attempts will encounter `auth/operation-not-allowed`.
+
+2. **Add Authorised Domains**:
+   - Navigate to Firebase Console: **Authentication → Settings → Authorised domains**.
+   - Add your application domains:
+     - `ais-dev-5b2asfsm5ann3lkau562qr-507307338931.europe-west1.run.app`
+     - `ais-pre-5b2asfsm5ann3lkau562qr-507307338931.europe-west1.run.app`
+     - `localhost`
+   - This ensures `sendPasswordResetEmail` action URLs and redirect handlers operate without `auth/unauthorized-continue-uri` errors.
+
+3. **Password Reset Flow**:
+   - The admin reset page is handled directly by the application at `/admin/login?mode=resetPassword&oobCode=...`.
+   - The application inspects `oobCode` and validates it with `verifyPasswordResetCode(auth, oobCode)`, then sets the new password with `confirmPasswordReset(auth, oobCode, newPassword)`.
 
 ---
 
-## Security Model
+## Access Control & Security Model
 
-1. **Public Feedback Collection**:
+1. **Centralized Admin Check**:
+   - Evaluated via `isAdmin(user)` strictly matching `bangiscoder@gmail.com`.
+   - **Public users / Unauthenticated visitors**:
+     - "View Modular Architecture" button on the home page is completely hidden.
+     - "Data Architecture & API" navigation link is completely hidden.
+     - Direct access to architecture/API information is blocked and redirected.
+     - Feedback dashboard is completely blocked.
+   - **Authorized Administrator (`bangiscoder@gmail.com`)**:
+     - "View Modular Architecture" button appears on the home page.
+     - "Data Architecture & API" appears in navigation and opens schema docs.
+     - Full access to the feedback & validation dashboard.
+
+2. **Public Feedback Collection**:
    - Farmers and agricultural testers can submit validation feedback without creating an account or authenticating.
    - Submissions use Firestore `serverTimestamp()` to ensure tamper-proof timestamps.
    - Public users have **no read, update, or delete permissions** on the `soilwise_feedback` collection.
 
-2. **Authorized Administrator Access**:
-   - Only `bangiscoder@gmail.com` is permitted access to the administration dashboard.
-   - Firestore security rules strictly enforce:
+3. **Database Security Rules**:
+   - Enforced by `firestore.rules`:
      ```javascript
      match /soilwise_feedback/{feedbackId} {
        allow create: if isValidFeedback();
        allow read, update, delete: if request.auth != null && request.auth.token.email == 'bangiscoder@gmail.com';
      }
      ```
-   - Any other authenticated user receives an "Access denied" error and is logged out immediately.
 
 ---
 

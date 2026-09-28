@@ -4,9 +4,10 @@ import { ArrowRight, Compass, CloudRain, Layers, ShieldCheck, CheckCircle2 } fro
 interface LandingPageProps {
   onStart: () => void;
   onOpenDocs: () => void;
+  isAdmin?: boolean;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStart, onOpenDocs }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStart, onOpenDocs, isAdmin }) => {
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {/* Hero Section */}
@@ -36,12 +37,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart, onOpenDocs })
               <span>Try SoilWise AI</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <button
-              onClick={onOpenDocs}
-              className="w-full sm:w-auto px-5 py-3.5 bg-stone-100 hover:bg-stone-200/80 text-stone-700 font-medium rounded-xl transition-colors text-sm border border-stone-200/80"
-            >
-              View Modular Architecture
-            </button>
+            {isAdmin && (
+              <button
+                onClick={onOpenDocs}
+                className="w-full sm:w-auto px-5 py-3.5 bg-stone-100 hover:bg-stone-200/80 text-stone-700 font-medium rounded-xl transition-colors text-sm border border-stone-200/80 cursor-pointer"
+              >
+                View Modular Architecture
+              </button>
+            )}
           </div>
         </div>
 

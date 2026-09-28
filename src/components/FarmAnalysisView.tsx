@@ -31,6 +31,7 @@ interface FarmAnalysisViewProps {
   onEdit: () => void;
   onNewAnalysis: () => void;
   onOpenDocs: () => void;
+  isAdmin?: boolean;
 }
 
 export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
@@ -38,6 +39,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   onEdit,
   onNewAnalysis,
   onOpenDocs,
+  isAdmin,
 }) => {
   const { soilData, location, soilTexture, rainfallOutlook, environmentalInfo, analysisDate } = analysis;
 
@@ -683,21 +685,23 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
         </div>
       </div>
 
-      {/* Developer Contract Callout */}
-      <div className="p-4 bg-stone-100 rounded-xl border border-stone-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2 text-stone-700">
-          <Code2 className="w-4 h-4 text-[#1b4332]" />
-          <span>
-            Modular data contract ready for seamless future AI recommendation engine integration.
-          </span>
+      {/* Developer Contract Callout (Admin Only) */}
+      {isAdmin && (
+        <div className="p-4 bg-stone-100 rounded-xl border border-stone-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-stone-700">
+            <Code2 className="w-4 h-4 text-[#1b4332]" />
+            <span>
+              Modular data contract ready for seamless future AI recommendation engine integration.
+            </span>
+          </div>
+          <button
+            onClick={onOpenDocs}
+            className="text-[#1b4332] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            Inspect JSON Schema &rarr;
+          </button>
         </div>
-        <button
-          onClick={onOpenDocs}
-          className="text-[#1b4332] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-        >
-          Inspect JSON Schema &rarr;
-        </button>
-      </div>
+      )}
 
       {/* NEW SECTION 5: FEEDBACK & EARLY ACCESS (Final section of the result page) */}
       <FarmerFeedbackSection location={location} />

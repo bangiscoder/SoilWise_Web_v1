@@ -17,6 +17,17 @@ import {
 // Authorized administrator email
 export const AUTHORIZED_ADMIN_EMAIL = 'bangiscoder@gmail.com';
 
+/**
+ * Centrally check if a user is the authorized SoilWise AI administrator.
+ */
+export function isAdmin(user: any): boolean {
+  return Boolean(
+    user &&
+    user.email &&
+    user.email.toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase()
+  );
+}
+
 // Interface for feedback submission
 export interface FeedbackSubmission {
   id?: string;
