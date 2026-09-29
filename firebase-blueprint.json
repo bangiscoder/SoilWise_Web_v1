@@ -10,6 +10,10 @@
           "format": "date-time",
           "description": "Firestore server timestamp of submission."
         },
+        "language": {
+          "type": "string",
+          "description": "User interface language when feedback was submitted (en, ha, yo, ig)."
+        },
         "name": {
           "type": "string",
           "description": "Name of respondent (optional)."

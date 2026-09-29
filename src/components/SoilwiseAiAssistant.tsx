@@ -8,6 +8,7 @@ import {
   X
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ChatMessage {
   id: string;
@@ -26,19 +27,13 @@ interface SoilwiseAiAssistantProps {
 // Architectural flag ensuring no external model or API is queried during MVP validation
 export const AI_ASSISTANT_MODE: 'mock' | 'gemini' = 'mock';
 
-const SUGGESTED_QUESTIONS = [
-  'What does my soil pH mean?',
-  'What does the rainfall outlook mean?',
-  'What should I discuss with an agronomist?',
-  'What information should I collect before choosing a seed variety?',
-];
-
 export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   analysis,
   isOpen = true,
   onClose,
   onRequestConsultation,
 }) => {
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'init-1',
@@ -50,6 +45,12 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const suggestedQuestions = [
+    t('assistant.sampleQ1'),
+    t('assistant.sampleQ2'),
+    t('assistant.sampleQ3'),
+  ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -165,14 +166,14 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
             </span>
             <span className="text-stone-300">&bull;</span>
             <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-              AI Assistant Preview &mdash; Prototype
+              Prototype
             </span>
           </div>
           <h2 className="text-xl font-bold text-stone-900 tracking-tight mt-1">
-            SoilWise Assistant
+            {t('assistant.modalTitle')}
           </h2>
           <p className="text-xs text-stone-600 mt-0.5">
-            Here you can chat with your tailored AI Assistant for more information on any question you may have.
+            {t('assistant.modalSubtitle')}
           </p>
         </div>
 
@@ -234,7 +235,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
                 <Bot className="w-3.5 h-3.5 animate-pulse" />
               </div>
               <div className="bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs text-stone-500">
-                Checking farm profile data...
+                {t('assistant.thinking')}
               </div>
             </div>
           )}
@@ -248,7 +249,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
             <span>Suggested questions:</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {SUGGESTED_QUESTIONS.map((q) => (
+            {suggestedQuestions.map((q) => (
               <button
                 key={q}
                 onClick={() => handleSendMessage(q)}
@@ -270,7 +271,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSendMessage();
             }}
-            placeholder="Ask a question about your farm data..."
+            placeholder={t('assistant.inputPlaceholder')}
             disabled={isTyping}
             className="flex-1 px-3.5 py-2 text-xs sm:text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent text-stone-900"
           />
@@ -278,7 +279,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
             onClick={() => handleSendMessage()}
             disabled={isTyping || !inputText.trim()}
             className="p-2.5 bg-[#1b4332] hover:bg-[#143225] text-white rounded-xl transition-all disabled:opacity-40 cursor-pointer active:scale-95"
-            title="Send question"
+            title={t('assistant.send')}
           >
             <Send className="w-4 h-4" />
           </button>
@@ -289,8 +290,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
       <div className="text-[11px] text-stone-500 flex items-start gap-1.5">
         <AlertCircle className="w-3.5 h-3.5 text-stone-400 shrink-0 mt-0.5" />
         <p>
-          <strong className="text-stone-700">Prototype Assistant &mdash; Live AI integration coming in a future version: </strong>
-          Information is displayed for interaction preview purposes and does not replace advice from a qualified agricultural professional.
+          {t('assistant.disclaimer')}
         </p>
       </div>
     </div>

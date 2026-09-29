@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sprout, ShieldAlert, Sparkles, CheckCircle, Compass, Layers } from 'lucide-react';
 import { SoilData, RainfallOutlook, SoilTexture } from '../types/soilwise';
+import { useLanguage } from '../context/LanguageContext';
 
 interface FutureRecommendationSectionProps {
   soilData?: SoilData;
@@ -13,6 +14,7 @@ export const FutureRecommendationSection: React.FC<FutureRecommendationSectionPr
   rainfallOutlook,
   soilTexture,
 }) => {
+  const { t } = useLanguage();
   // Determine primary agronomic suitability drivers
   const ph = soilData?.ph ?? 6.5;
   const isAcidic = ph < 5.8;
@@ -32,10 +34,10 @@ export const FutureRecommendationSection: React.FC<FutureRecommendationSectionPr
         </div>
 
         <h2 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">
-          Recommendation
+          {t('results.recommendationsTitle')}
         </h2>
         <p className="text-sm sm:text-base font-semibold text-[#1b4332] mt-1">
-          Synthesised crop suitability and evidence-based decision guidance
+          {t('results.recommendationsSubtitle')}
         </p>
       </div>
 
@@ -45,7 +47,7 @@ export const FutureRecommendationSection: React.FC<FutureRecommendationSectionPr
         <div className="p-5 bg-[#fafaf7] rounded-2xl border border-stone-200/90 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-stone-600">
-              Soil Suitability Profile
+              {t('results.soilDataTitle')}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
               {phClass}
@@ -63,7 +65,7 @@ export const FutureRecommendationSection: React.FC<FutureRecommendationSectionPr
         <div className="p-5 bg-[#fafaf7] rounded-2xl border border-stone-200/90 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-stone-600">
-              Maturity Window Matching
+              {t('results.plantingWindow')}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
               {cycleClass}
@@ -95,7 +97,7 @@ export const FutureRecommendationSection: React.FC<FutureRecommendationSectionPr
         </div>
 
         <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
-          In future versions, SoilWise AI will help identify locally available improved seed varieties that may be suitable for your farm based on your farm data, relevant climate information and validated recommendations from local agronomists, agricultural research institutions and certified seed producers.
+          {t('results.futureSeedNotice')}
         </p>
 
         <div className="p-3.5 bg-white/90 rounded-xl border border-stone-200/80 text-xs text-stone-600 flex items-start gap-2.5">

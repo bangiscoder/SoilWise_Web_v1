@@ -25,6 +25,7 @@ import { FutureRecommendationSection } from './FutureRecommendationSection';
 import { SoilwiseAiAssistant } from './SoilwiseAiAssistant';
 import { AgronomistConsultationModal } from './AgronomistConsultationModal';
 import { FarmerFeedbackSection } from './FarmerFeedbackSection';
+import { useLanguage } from '../context/LanguageContext';
 import resultHeroBg from '../assets/images/result_hero_bg_1790608469988.jpg';
 
 interface FarmAnalysisViewProps {
@@ -42,6 +43,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   onOpenDocs,
   isAdmin,
 }) => {
+  const { t } = useLanguage();
   const { 
     soilData, 
     location, 
@@ -65,8 +67,8 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   const latFormatted = location.latitude.toFixed(6);
   const lonFormatted = location.longitude.toFixed(6);
   const elevationFormatted = location.elevationMeters !== null && location.elevationMeters !== undefined
-    ? `${location.elevationMeters} metres`
-    : 'an uncalculated elevation';
+    ? `${location.elevationMeters} m`
+    : 'N/A';
 
   const stateToDisplay = selectedState || location.state || location.address?.state || null;
   const lgaToDisplay = selectedLga || location.lga || location.address?.county || null;
@@ -87,23 +89,22 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
         {/* Hero Content */}
         <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-3.5">
           <span className="inline-block text-xs sm:text-sm font-semibold uppercase tracking-wider text-emerald-300 bg-emerald-950/70 px-4 py-1 rounded-full border border-emerald-500/30 backdrop-blur-xs">
-            Your Farm Analysis
+            {t('results.heroEyebrow')}
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-            Analysis Result
+            {t('results.heroTitle')}
           </h1>
 
           <p className="text-sm sm:text-lg text-stone-200 max-w-2xl mx-auto font-medium leading-relaxed drop-shadow-xs">
-            Your farm analysis and crop suitability report, generated from the soil data you provided and the geographic location of your farm.
+            {t('results.heroCaption')}
           </p>
 
           {/* Caution Statement */}
           <div className="max-w-2xl mx-auto p-3 sm:p-3.5 bg-stone-900/80 backdrop-blur-md rounded-2xl border border-amber-500/40 text-left flex items-start gap-2.5 text-xs text-amber-100 shadow-lg">
             <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p className="leading-relaxed">
-              <strong className="text-amber-300">Important: </strong>
-              SoilWise AI provides data-informed analysis and recommendations and may make mistakes. If you need clarification, have concerns about the result, or are unsure about a recommendation, consult a certified agronomist or other qualified agricultural professional.
+              {t('results.caution')}
             </p>
           </div>
         </div>
@@ -125,7 +126,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
               title="Edit soil or location inputs"
             >
               <Pencil className="w-3.5 h-3.5" />
-              <span>Edit Data</span>
+              <span>{t('results.editDataButton')}</span>
             </button>
             <button
               onClick={handlePrint}
@@ -140,7 +141,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
               className="px-3.5 py-2 text-white bg-[#1b4332] hover:bg-[#143225] rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer font-medium"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>New Analysis</span>
+              <span>{t('results.newAnalysisButton')}</span>
             </button>
           </div>
         </div>
@@ -153,10 +154,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             </div>
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
-                Farm Location
+                {t('results.locationTitle')}
               </h2>
               <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
-                Your farm location helps connect your soil profile with geographic, environmental and seasonal information relevant to the area where your farm is located.
+                {t('hero.caption')}
               </p>
             </div>
           </div>
@@ -164,14 +165,19 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           {/* Integrated Location Statement Card */}
           <div className="p-5 bg-[#fafaf7] rounded-2xl border border-stone-200/90 text-stone-800 text-sm sm:text-base leading-relaxed">
             <p>
-              Your GPS location (<span className="font-mono font-semibold text-stone-900">{latFormatted}&deg;</span>, <span className="font-mono font-semibold text-stone-900">{lonFormatted}&deg;</span>) places your farm around <strong className="text-stone-900">{fullAddress}</strong>, at an elevation of approximately <strong className="text-[#1b4332]">{elevationFormatted}</strong>.
+              {t('results.locationSummary', {
+                latitude: `${latFormatted}°`,
+                longitude: `${lonFormatted}°`,
+                address: fullAddress,
+                elevation: elevationFormatted,
+              })}
             </p>
           </div>
 
           {/* Map Preview */}
           <div className="pt-2">
             <span className="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2.5">
-              Satellite &amp; Terrain Map Preview
+              {t('results.mapView')}
             </span>
             <FarmMapPreview
               latitude={location.latitude}
@@ -190,10 +196,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             </div>
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
-                Soil Data
+                {t('results.soilDataTitle')}
               </h2>
               <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
-                Your soil profile combines the soil properties you provided with available location-based soil information to support the crop suitability analysis.
+                {t('form.soilDataExplanation')}
               </p>
             </div>
           </div>
@@ -202,7 +208,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-2">
               <h3 className="text-sm font-bold text-stone-900">
-                You provided the following soil profile
+                {t('results.soilDataTitle')}
               </h3>
 
               {/* State and LGA contextual badges if available */}
@@ -211,12 +217,12 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   {stateToDisplay && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#f0f5ee] text-[#1b4332] font-semibold border border-[#1b4332]/20">
                       <MapPinCheck className="w-3 h-3" />
-                      <span>State: {stateToDisplay}</span>
+                      <span>{t('results.state')}: {stateToDisplay}</span>
                     </span>
                   )}
                   {lgaToDisplay && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-stone-100 text-stone-700 font-medium border border-stone-200">
-                      <span>LGA: {lgaToDisplay}</span>
+                      <span>{t('results.lga')}: {lgaToDisplay}</span>
                     </span>
                   )}
                 </div>
@@ -226,16 +232,16 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
               {/* pH */}
               <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">pH Level</span>
+                <span className="text-xs font-semibold text-stone-500 block">{t('form.phLabel')}</span>
                 <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
                   {soilData.ph.toFixed(1)}
                 </span>
-                <span className="text-[10px] text-stone-400 mt-1 block">0&ndash;14 scale</span>
+                <span className="text-[10px] text-stone-400 mt-1 block">pH</span>
               </div>
 
               {/* N */}
               <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">Nitrogen (N)</span>
+                <span className="text-xs font-semibold text-stone-500 block">{t('form.nLabel')}</span>
                 <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
                   {soilData.nitrogen}
                 </span>
@@ -244,7 +250,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
               {/* P */}
               <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">Phosphorus (P)</span>
+                <span className="text-xs font-semibold text-stone-500 block">{t('form.pLabel')}</span>
                 <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
                   {soilData.phosphorus}
                 </span>
@@ -253,7 +259,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
               {/* K */}
               <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">Potassium (K)</span>
+                <span className="text-xs font-semibold text-stone-500 block">{t('form.kLabel')}</span>
                 <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
                   {soilData.potassium}
                 </span>
@@ -262,7 +268,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
               {/* EC */}
               <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center col-span-2 sm:col-span-1">
-                <span className="text-xs font-semibold text-stone-500 block">Cond. (EC)</span>
+                <span className="text-xs font-semibold text-stone-500 block">{t('form.ecLabel')}</span>
                 <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
                   {soilData.ec.toFixed(2)}
                 </span>
@@ -277,7 +283,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-[#1b4332]" />
                 <h3 className="text-sm font-bold text-stone-900">
-                  Soil texture data &mdash; ISRIC SoilGrids 2.0 (250 m model)
+                  {t('results.soilTextureTitle')} &mdash; ISRIC SoilGrids
                 </h3>
               </div>
 
@@ -294,7 +300,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   {/* Clay */}
                   <div>
                     <div className="flex justify-between text-xs font-medium text-stone-700 mb-1">
-                      <span>Clay</span>
+                      <span>{t('results.clay')}</span>
                       <span className="font-mono font-semibold">{soilTexture.clayPercent}%</span>
                     </div>
                     <div className="w-full h-2.5 bg-stone-100 rounded-full overflow-hidden">
@@ -308,7 +314,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   {/* Sand */}
                   <div>
                     <div className="flex justify-between text-xs font-medium text-stone-700 mb-1">
-                      <span>Sand</span>
+                      <span>{t('results.sand')}</span>
                       <span className="font-mono font-semibold">{soilTexture.sandPercent}%</span>
                     </div>
                     <div className="w-full h-2.5 bg-stone-100 rounded-full overflow-hidden">
@@ -322,7 +328,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   {/* Silt */}
                   <div>
                     <div className="flex justify-between text-xs font-medium text-stone-700 mb-1">
-                      <span>Silt</span>
+                      <span>{t('results.silt')}</span>
                       <span className="font-mono font-semibold">{soilTexture.siltPercent}%</span>
                     </div>
                     <div className="w-full h-2.5 bg-stone-100 rounded-full overflow-hidden">
@@ -342,9 +348,9 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             ) : (
               /* Fallback statement when soil texture data is unavailable */
               <div className="p-5 bg-stone-50 rounded-2xl border border-stone-200/90 text-xs sm:text-sm text-stone-700 space-y-1.5">
-                <p className="font-bold text-stone-900">Soil texture data unavailable</p>
+                <p className="font-bold text-stone-900">{t('results.soilTextureTitle')}</p>
                 <p className="leading-relaxed text-stone-600">
-                  Soil texture data is currently unavailable for this location. External soil-grid services did not return sufficient data for these coordinates. SoilWise AI is being developed with a dedicated fallback soil model to improve coverage in future versions.
+                  {t('results.soilTextureSubtitle')}
                 </p>
               </div>
             )}
@@ -583,11 +589,11 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5 text-[#1b4332]" />
               <h3 className="text-lg font-bold text-stone-900">
-                SoilWise Assistant
+                {t('results.assistantTitle')}
               </h3>
             </div>
             <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-              Here you can chat with your tailored AI Assistant for more information on any question you may have.
+              {t('results.assistantSubtitle')}
             </p>
           </div>
 
@@ -596,7 +602,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             className="px-5 py-3.5 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-[0.98]"
           >
             <Bot className="w-4 h-4 text-emerald-300" />
-            <span>Chat with SoilWise Assistant</span>
+            <span>{t('results.assistantButton')}</span>
           </button>
         </section>
 
@@ -606,17 +612,14 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             <div className="flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-[#1b4332]" />
               <h3 className="text-base sm:text-lg font-bold text-stone-900">
-                Talk to a Certified Agronomist Demo
+                {t('results.agronomistTitle')}
               </h3>
               <span className="text-[10px] bg-stone-200/80 text-stone-700 px-2 py-0.5 rounded font-medium">
-                Demo Feature
+                Demo
               </span>
             </div>
             <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
-              Need professional human guidance? In future versions, SoilWise AI will connect farmers with certified agricultural experts for verified field consultation.
-            </p>
-            <p className="text-xs font-semibold text-[#1b4332]">
-              &ldquo;AI helps make information accessible. Experts help provide professional judgement.&rdquo;
+              {t('results.agronomistSubtitle')}
             </p>
           </div>
 
@@ -625,7 +628,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             className="px-5 py-3.5 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-[0.98]"
           >
             <UserCheck className="w-4 h-4" />
-            <span>Request Expert Consultation</span>
+            <span>{t('results.agronomistButton')}</span>
           </button>
         </section>
 

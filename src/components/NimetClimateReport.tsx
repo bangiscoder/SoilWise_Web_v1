@@ -1,12 +1,14 @@
 import React from 'react';
 import { CloudSun, AlertCircle, Building2, Droplets, Calendar, Flame, ThermometerSun, Sprout } from 'lucide-react';
 import { FarmLocation } from '../types/soilwise';
+import { useLanguage } from '../context/LanguageContext';
 
 interface NimetClimateReportProps {
   location: FarmLocation;
 }
 
 export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location }) => {
+  const { t } = useLanguage();
   // Determine general agro-ecological zone for Nigerian context if applicable
   const lat = location.latitude;
   const isNorthern = lat >= 9.0;
@@ -25,14 +27,14 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-stone-900">
-                Climate Report
+                {t('results.climateTitle')}
               </h2>
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                Future Integration Demo
+                Demo
               </span>
             </div>
             <p className="text-xs text-stone-500">
-              Climate insights based on available Nigerian Meteorological Agency (NiMet) information.
+              {t('results.climateSubtitle')}
             </p>
           </div>
         </div>
@@ -40,10 +42,10 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
         {/* Source Badges */}
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <span className="px-2.5 py-1 bg-stone-100 text-stone-600 rounded-md font-mono">
-            Model: Open-Meteo
+            Open-Meteo
           </span>
           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md font-medium">
-            Agency: NiMet
+            NiMet
           </span>
         </div>
       </div>
@@ -53,9 +55,9 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
         <div className="flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-stone-900">NiMet Climate Report Connection Notice</p>
+            <p className="font-semibold text-stone-900">NiMet Seasonal Climate Prediction (SCP)</p>
             <p className="mt-0.5 text-stone-600 leading-relaxed">
-              Official NiMet climate information is not currently connected via a live API to this MVP. This section illustrates how official seasonal climate prediction (SCP) information will be incorporated into future SoilWise AI analysis alongside model data.
+              {t('results.climateSubtitle')}
             </p>
           </div>
         </div>
@@ -77,7 +79,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
           <div className="px-5 py-3.5 bg-stone-100/70 border-b border-stone-200/80 flex items-center justify-between">
             <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2">
               <CloudSun className="w-4 h-4 text-[#1b4332]" />
-              <span>Climate Outlook</span>
+              <span>{t('results.rainfallOutlook')}</span>
             </h3>
             <span className="text-[11px] text-stone-500 font-medium">Regional Projection</span>
           </div>
@@ -89,7 +91,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
                   <Droplets className="w-3.5 h-3.5" />
-                  <span>Rainfall Outlook</span>
+                  <span>{t('results.rainfallOutlook')}</span>
                 </div>
                 <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
                   Predicted to be normal to slightly delayed in onset, with concentrated cumulative volume during peak months rather than uniform distribution.
@@ -100,7 +102,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
               <div className="space-y-1 pt-3 sm:pt-4 border-t border-stone-200/60">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>Rainfall Timing &amp; Cessation</span>
+                  <span>{t('results.timingCessation')}</span>
                 </div>
                 <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
                   Expected onset window typically stabilizes {isNorthern ? 'between late April and mid-May' : 'from late March to early April'}, with normal cessation expected by October.
@@ -114,7 +116,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
                   <Flame className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Dry-Spell Risk</span>
+                  <span>{t('results.drySpellRisk')}</span>
                 </div>
                 <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
                   Moderate-to-high risk of 7&ndash;14 day dry spells immediately following initial early rains; farmers are advised against premature planting on first scattered showers.
@@ -125,7 +127,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
               <div className="space-y-1 pt-3 sm:pt-4 border-t border-stone-200/60">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#1b4332] uppercase tracking-wider">
                   <ThermometerSun className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Temperature Outlook</span>
+                  <span>{t('results.temperatureOutlook')}</span>
                 </div>
                 <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
                   Daytime and nighttime temperatures are projected to be near normal to warmer than long-term averages, elevating early season evapotranspiration.
@@ -140,7 +142,7 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
           <div className="flex items-center gap-2">
             <Sprout className="w-4 h-4 text-[#1b4332]" />
             <h4 className="font-bold text-[#1b4332] text-xs sm:text-sm uppercase tracking-wide">
-              Agricultural Implication
+              {t('results.agricImplication')}
             </h4>
           </div>
           <p className="text-xs sm:text-sm text-stone-800 leading-relaxed">
@@ -154,11 +156,11 @@ export const NimetClimateReport: React.FC<NimetClimateReportProps> = ({ location
         <div className="flex items-center gap-1.5">
           <Building2 className="w-3.5 h-3.5 text-[#1b4332]" />
           <span>
-            <strong className="text-stone-700">Source: Nigerian Meteorological Agency (NiMet)</strong> &bull; Seasonal Climate Prediction (SCP)
+            <strong className="text-stone-700">Source: NiMet &bull; Open-Meteo</strong>
           </span>
         </div>
         <p className="text-[10px] text-stone-400 italic">
-          Model-based Open-Meteo forecasts and official NiMet publications remain strictly distinguished.
+          NiMet SCP &amp; Open-Meteo integration
         </p>
       </div>
     </div>

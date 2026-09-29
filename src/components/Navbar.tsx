@@ -1,5 +1,7 @@
 import React from 'react';
 import { Sprout, RotateCcw } from 'lucide-react';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { useLanguage } from '../context/LanguageContext';
 
 interface NavbarProps {
   currentView: 'farm-data' | 'analysis';
@@ -9,6 +11,8 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenDocs, isAdmin }) => {
+  const { t } = useLanguage();
+
   return (
     <header className="sticky top-0 z-30 bg-[#fbfbf9]/90 backdrop-blur-md border-b border-stone-200/80">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
@@ -26,25 +30,28 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
         </button>
 
         {/* Navigation Actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-4">
           {/* Admin-only Navigation item */}
           {isAdmin && (
             <button
               onClick={onOpenDocs}
               className="text-xs sm:text-sm font-medium text-stone-600 hover:text-[#1b4332] transition-colors cursor-pointer"
             >
-              Data Architecture &amp; API
+              {t('nav.dataArchitecture')}
             </button>
           )}
+
+          {/* Language Switcher */}
+          <LanguageSwitcher />
 
           {/* Primary Action Button */}
           {currentView === 'analysis' && (
             <button
               onClick={() => onNavigate('farm-data')}
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-white bg-[#1b4332] hover:bg-[#143225] rounded-lg transition-colors shadow-xs active:scale-[0.98] whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-white bg-[#1b4332] hover:bg-[#143225] rounded-lg transition-colors shadow-xs active:scale-[0.98] whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>New Analysis</span>
+              <span>{t('nav.newAnalysis')}</span>
             </button>
           )}
         </div>
@@ -52,3 +59,4 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
     </header>
   );
 };
+

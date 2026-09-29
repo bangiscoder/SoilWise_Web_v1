@@ -16,6 +16,7 @@ service cloud.firestore {
              data.likesSoilwise is string && data.likesSoilwise.size() <= 50 &&
              data.wouldUse is string && data.wouldUse.size() <= 50 &&
              data.willingnessToPay is string && data.willingnessToPay.size() <= 100 &&
+             (!('language' in data) || (data.language is string && data.language.size() <= 10)) &&
              (!('name' in data) || (data.name is string && data.name.size() <= 150)) &&
              (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
              (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&

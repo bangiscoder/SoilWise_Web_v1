@@ -32,6 +32,7 @@ export function isAdmin(user: any): boolean {
 export interface FeedbackSubmission {
   id?: string;
   submittedAt?: any;
+  language?: string;
   name?: string;
   phone?: string;
   email?: string;

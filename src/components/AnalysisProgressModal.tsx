@@ -1,22 +1,25 @@
 import React from 'react';
 import { Loader2, CheckCircle2, Sprout } from 'lucide-react';
 import { AnalysisStep } from '../types/soilwise';
+import { useLanguage } from '../context/LanguageContext';
 
 interface AnalysisProgressModalProps {
   currentStep: AnalysisStep;
 }
 
-const STAGES: { key: AnalysisStep; label: string }[] = [
-  { key: 'preparing_data', label: 'Preparing farm data...' },
-  { key: 'retrieving_environmental', label: 'Retrieving environmental information...' },
-  { key: 'retrieving_rainfall', label: 'Retrieving rainfall information...' },
-  { key: 'finding_location', label: 'Finding farm location...' },
-  { key: 'combining_data', label: 'Combining data...' },
-  { key: 'preparing_analysis', label: 'Preparing Farm Analysis...' },
-];
-
 export const AnalysisProgressModal: React.FC<AnalysisProgressModalProps> = ({ currentStep }) => {
-  const currentStageIndex = STAGES.findIndex((s) => s.key === currentStep);
+  const { t } = useLanguage();
+
+  const stages: { key: AnalysisStep; label: string }[] = [
+    { key: 'preparing_data', label: t('progress.step1') },
+    { key: 'retrieving_environmental', label: t('progress.step2') },
+    { key: 'retrieving_rainfall', label: t('progress.step3') },
+    { key: 'finding_location', label: t('progress.step4') },
+    { key: 'combining_data', label: t('progress.step5') },
+    { key: 'preparing_analysis', label: t('progress.step6') },
+  ];
+
+  const currentStageIndex = stages.findIndex((s) => s.key === currentStep);
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -27,16 +30,16 @@ export const AnalysisProgressModal: React.FC<AnalysisProgressModalProps> = ({ cu
             <Sprout className="w-6 h-6 text-emerald-300" />
           </div>
           <h3 className="text-xl font-bold text-stone-900">
-            Analyzing Your Farm
+            {t('progress.title')}
           </h3>
           <p className="text-xs text-stone-500 max-w-xs">
-            Synthesizing your soil parameters with real-time geographic and climatic models
+            {t('progress.subtitle')}
           </p>
         </div>
 
         {/* Progress List */}
         <div className="space-y-3 py-2">
-          {STAGES.map((stage, idx) => {
+          {stages.map((stage, idx) => {
             const isCompleted = idx < currentStageIndex || currentStep === 'completed';
             const isCurrent = idx === currentStageIndex;
 
@@ -67,9 +70,10 @@ export const AnalysisProgressModal: React.FC<AnalysisProgressModalProps> = ({ cu
         </div>
 
         <div className="pt-2 text-center text-[11px] text-stone-400">
-          Communicating with OpenStreetMap, ISRIC SoilGrids & Open-Meteo
+          OpenStreetMap &bull; ISRIC SoilGrids &bull; Open-Meteo
         </div>
       </div>
     </div>
   );
 };
+
