@@ -94,6 +94,7 @@ export default function App() {
         confidence?: number;
         fileName?: string;
       } | null;
+      locationValidation?: import('./types/soilDataValidation').LocationValidationResult | null;
     }
   ) => {
     setIsSubmitting(true);

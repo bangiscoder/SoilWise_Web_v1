@@ -63,8 +63,46 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
   const isUserMeasured = soilDataProvenance === 'user_measured' || (hasSoilTest !== false && soilDataProvenance !== 'location_estimated');
 
+  const [activeDepthTab, setActiveDepthTab] = useState<'0-20' | '20-50' | 'landscape'>('0-20');
   const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false);
   const [isAssistantModalOpen, setIsAssistantModalOpen] = useState(false);
+
+  // Helper to format uncertainty confidence intervals
+  const formatEstimatedRange = (uncertainty?: any, unit?: string | null): string | null => {
+    if (!uncertainty) return null;
+    const interval = uncertainty.confidence_68 || uncertainty.confidence_50 || uncertainty.confidence_90;
+    if (interval && interval.lower !== undefined && interval.upper !== undefined && interval.lower !== null && interval.upper !== null) {
+      return `${interval.lower} – ${interval.upper} ${unit || ''}`.trim();
+    }
+    if (uncertainty.lower !== undefined && uncertainty.upper !== undefined && uncertainty.lower !== null && uncertainty.upper !== null) {
+      return `${uncertainty.lower} – ${uncertainty.upper} ${unit || ''}`.trim();
+    }
+    return null;
+  };
+
+  // Helper to retrieve farmer-measured soil test value if provided
+  const getUserMeasuredProp = (key: string): { value: number; unit: string } | null => {
+    if (!isUserMeasured) return null;
+    const um = analysis.soilEvidence?.user_measurements;
+    if (key === 'ph' && (um?.ph !== null && um?.ph !== undefined)) {
+      return { value: um.ph, unit: 'pH' };
+    }
+    if (key === 'nitrogen_total' && (um?.nitrogen !== null && um?.nitrogen !== undefined)) {
+      return { value: um.nitrogen, unit: 'mg/kg' };
+    }
+    if ((key === 'phosphorous_extractable' || key === 'phosphorus_extractable') && (um?.phosphorus !== null && um?.phosphorus !== undefined)) {
+      return { value: um.phosphorus, unit: 'mg/kg' };
+    }
+    if (key === 'potassium_extractable' && (um?.potassium !== null && um?.potassium !== undefined)) {
+      return { value: um.potassium, unit: 'mg/kg' };
+    }
+    if (key === 'ec' && (um?.ec !== null && um?.ec !== undefined)) {
+      return { value: um.ec, unit: 'dS/m' };
+    }
+    return null;
+  };
+
+  const isdaLocationAvailable = Boolean(analysis.soilEvidence?.location_estimate?.available);
 
   const handlePrint = () => {
     window.print();
@@ -212,22 +250,29 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             </div>
           </div>
 
-          {/* Soil Chemistry Profile */}
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-2">
+          {/* Soil Chemistry Profile & Complete iSDAsoil Multi-Depth Evidence */}
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-bold text-stone-900">
+                <h3 className="text-base font-bold text-stone-900">
                   {t('results.soilDataTitle')}
                 </h3>
                 {isUserMeasured ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1b4332] bg-[#f0f5ee] px-2.5 py-0.5 rounded-full border border-[#1b4332]/20">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{t('results.soilTestSourceUser')}</span>
+                    <span>Your soil test</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
                     <Info className="w-3.5 h-3.5" />
-                    <span>{t('results.soilTestSourceLocation')}</span>
+                    <span>Location estimate</span>
+                  </span>
+                )}
+
+                {isdaLocationAvailable && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>Location-based soil information available</span>
                   </span>
                 )}
               </div>
@@ -250,58 +295,412 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
               )}
             </div>
 
-            {/* If location estimated, show transparent provenance statement */}
-            {!isUserMeasured && (
-              <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2 leading-relaxed">
-                <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                <p>{t('results.soilTestSourceLocationNotice')}</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
-              {/* pH */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">{t('form.phLabel')}</span>
-                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
-                  {soilData.ph.toFixed(1)}
-                </span>
-                <span className="text-[10px] text-stone-400 mt-1 block">pH</span>
-              </div>
-
-              {/* N */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">{t('form.nLabel')}</span>
-                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
-                  {soilData.nitrogen}
-                </span>
-                <span className="text-[10px] text-stone-400 mt-1 block">mg/kg</span>
-              </div>
-
-              {/* P */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">{t('form.pLabel')}</span>
-                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
-                  {soilData.phosphorus}
-                </span>
-                <span className="text-[10px] text-stone-400 mt-1 block">mg/kg</span>
+            {/* Primary Overview Cards (Key Soil Properties) */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {/* pH Card */}
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-stone-600">{t('form.phLabel')}</span>
+                    {isUserMeasured ? (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full">
+                        Your soil test
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full">
+                        Location estimate
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-2 block">
+                    {isUserMeasured
+                      ? soilData.ph.toFixed(1)
+                      : (analysis.soilEvidence?.location_estimate?.profile?.ph.value ?? soilData.ph.toFixed(1))}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block">pH (1:5 H2O)</span>
+                </div>
+                {isUserMeasured && analysis.soilEvidence?.location_estimate?.profile?.ph.value && (
+                  <div className="pt-2 border-t border-stone-200/70 mt-2 text-[10px] text-stone-500 flex justify-between">
+                    <span>Location estimate:</span>
+                    <span className="font-mono font-bold text-stone-700">
+                      {analysis.soilEvidence.location_estimate.profile.ph.value} pH
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* K */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center">
-                <span className="text-xs font-semibold text-stone-500 block">{t('form.kLabel')}</span>
-                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
-                  {soilData.potassium}
-                </span>
-                <span className="text-[10px] text-stone-400 mt-1 block">mg/kg</span>
+              {/* Total Nitrogen Card */}
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-stone-600">{t('form.nLabel')}</span>
+                    {isUserMeasured ? (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full">
+                        Your soil test
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full">
+                        Location estimate
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-2 block">
+                    {isUserMeasured
+                      ? soilData.nitrogen
+                      : (analysis.soilEvidence?.location_estimate?.profile?.nitrogen_total.value ?? soilData.nitrogen)}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block">
+                    {isUserMeasured ? 'mg/kg (ppm)' : (analysis.soilEvidence?.location_estimate?.profile?.nitrogen_total.unit || 'g/kg')}
+                  </span>
+                </div>
+                {isUserMeasured && analysis.soilEvidence?.location_estimate?.profile?.nitrogen_total.value && (
+                  <div className="pt-2 border-t border-stone-200/70 mt-2 text-[10px] text-stone-500 flex justify-between">
+                    <span>Location estimate:</span>
+                    <span className="font-mono font-bold text-stone-700">
+                      {analysis.soilEvidence.location_estimate.profile.nitrogen_total.value} {analysis.soilEvidence.location_estimate.profile.nitrogen_total.unit}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* EC */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-center col-span-2 sm:col-span-1">
-                <span className="text-xs font-semibold text-stone-500 block">{t('form.ecLabel')}</span>
-                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-1 block">
-                  {soilData.ec.toFixed(2)}
-                </span>
-                <span className="text-[10px] text-stone-400 mt-1 block">dS/m</span>
+              {/* Extractable Phosphorus Card */}
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-stone-600">{t('form.pLabel')}</span>
+                    {isUserMeasured ? (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full">
+                        Your soil test
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full">
+                        Location estimate
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-2 block">
+                    {isUserMeasured
+                      ? soilData.phosphorus
+                      : (analysis.soilEvidence?.location_estimate?.profile?.phosphorus_extractable.value ?? soilData.phosphorus)}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block">mg/kg (Mehlich-3)</span>
+                </div>
+                {isUserMeasured && analysis.soilEvidence?.location_estimate?.profile?.phosphorus_extractable.value && (
+                  <div className="pt-2 border-t border-stone-200/70 mt-2 text-[10px] text-stone-500 flex justify-between">
+                    <span>Location estimate:</span>
+                    <span className="font-mono font-bold text-stone-700">
+                      {analysis.soilEvidence.location_estimate.profile.phosphorus_extractable.value} mg/kg
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Extractable Potassium Card */}
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-stone-600">{t('form.kLabel')}</span>
+                    {isUserMeasured ? (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full">
+                        Your soil test
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full">
+                        Location estimate
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-2 block">
+                    {isUserMeasured
+                      ? soilData.potassium
+                      : (analysis.soilEvidence?.location_estimate?.profile?.potassium_extractable.value ?? soilData.potassium)}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block">mg/kg (Mehlich-3)</span>
+                </div>
+                {isUserMeasured && analysis.soilEvidence?.location_estimate?.profile?.potassium_extractable.value && (
+                  <div className="pt-2 border-t border-stone-200/70 mt-2 text-[10px] text-stone-500 flex justify-between">
+                    <span>Location estimate:</span>
+                    <span className="font-mono font-bold text-stone-700">
+                      {analysis.soilEvidence.location_estimate.profile.potassium_extractable.value} mg/kg
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Electrical Conductivity (EC) Card */}
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 col-span-2 sm:col-span-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-stone-600">{t('form.ecLabel')}</span>
+                    {isUserMeasured ? (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full">
+                        Your soil test
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-stone-600 bg-stone-200/80 px-2 py-0.5 rounded-full">
+                        Location estimate
+                      </span>
+                    )}
+                  </div>
+                  {isUserMeasured ? (
+                    <>
+                      <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-2 block">
+                        {soilData.ec.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-stone-400 block">dS/m (Measured)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg font-bold text-stone-500 mt-3 block">
+                        Unavailable
+                      </span>
+                      <span className="text-[10px] text-stone-400 block mt-0.5">Not in iSDAsoil dataset</span>
+                    </>
+                  )}
+                </div>
+                <div className="pt-2 border-t border-stone-200/70 mt-2 text-[10px] text-stone-500 flex justify-between">
+                  <span>Location EC:</span>
+                  <span className="font-mono text-stone-500">Unavailable</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Complete iSDAsoil Soil Profile (Multi-Depth) */}
+            <div className="space-y-4 pt-4 border-t border-stone-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#1b4332]" />
+                    <span>Complete Digital Soil Profile &mdash; iSDAsoil</span>
+                  </h4>
+                  <p className="text-xs text-stone-600 mt-0.5">
+                    High-resolution (30m) location-derived estimates covering chemical, physical, and nutrient properties by depth.
+                  </p>
+                </div>
+
+                {/* Depth Selection Tabs */}
+                <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl self-start sm:self-auto text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setActiveDepthTab('0-20')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      activeDepthTab === '0-20'
+                        ? 'bg-white text-stone-900 shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    0–20 cm (Topsoil)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDepthTab('20-50')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      activeDepthTab === '20-50'
+                        ? 'bg-white text-stone-900 shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    20–50 cm (Subsoil)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDepthTab('landscape')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      activeDepthTab === 'landscape'
+                        ? 'bg-white text-stone-900 shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    Site & Landscape
+                  </button>
+                </div>
+              </div>
+
+              {/* Complete Multi-Depth Table */}
+              {isdaLocationAvailable ? (
+                <div className="overflow-x-auto rounded-2xl border border-stone-200/90 shadow-2xs">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-stone-50 border-b border-stone-200 text-stone-700 font-bold uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-3 px-4">Soil Property</th>
+                        <th className="py-3 px-4">Depth</th>
+                        <th className="py-3 px-4 text-right">Value</th>
+                        <th className="py-3 px-4 text-right">Estimated Range</th>
+                        <th className="py-3 px-4">Data Basis</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 bg-white">
+                      {/* Render all properties for the active depth */}
+                      {(() => {
+                        const isdaProps = analysis.soilEvidence?.location_estimate?.properties || {};
+                        const rows: React.ReactNode[] = [];
+
+                        for (const [key, prop] of Object.entries(isdaProps)) {
+                          if (key === 'status' || key === 'error') continue;
+
+                          if (activeDepthTab === '0-20') {
+                            const layer = prop.layers.find((l) => l.depthValue === '0-20' || l.depth === '0-20cm') ||
+                              (prop.topsoilLayer && prop.topsoilLayer.depthValue === '0-20' ? prop.topsoilLayer : null);
+
+                            if (layer) {
+                              const range = formatEstimatedRange(layer.uncertainty, layer.unit);
+                              const userTest = getUserMeasuredProp(key);
+                              rows.push(
+                                <tr key={`0-20-${key}`} className="hover:bg-stone-50/70 transition-colors">
+                                  <td className="py-2.5 px-4 font-semibold text-stone-900">
+                                    {prop.name}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-stone-500 font-mono text-[11px]">
+                                    0–20 cm
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right font-mono font-bold text-stone-800">
+                                    {layer.value !== null ? `${layer.value} ${layer.unit || ''}` : 'Unavailable'}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right text-stone-500 font-mono text-[11px]">
+                                    {range ? range : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-4">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200">
+                                        Location estimate
+                                      </span>
+                                      {userTest && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-900 bg-emerald-50 border border-emerald-300">
+                                          Your soil test: {userTest.value} {userTest.unit}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            } else if (key === 'ec') {
+                              const userTest = getUserMeasuredProp('ec');
+                              rows.push(
+                                <tr key="0-20-ec" className="hover:bg-stone-50/70 transition-colors bg-stone-50/30">
+                                  <td className="py-2.5 px-4 font-semibold text-stone-900">
+                                    Electrical Conductivity (EC)
+                                  </td>
+                                  <td className="py-2.5 px-4 text-stone-500 font-mono text-[11px]">
+                                    0–20 cm
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right text-stone-400 font-mono text-xs">
+                                    Unavailable
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right text-stone-400 font-mono text-[11px]">
+                                    —
+                                  </td>
+                                  <td className="py-2.5 px-4">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-stone-600 bg-stone-100 border border-stone-200">
+                                        Location estimate
+                                      </span>
+                                      {userTest && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-900 bg-emerald-50 border border-emerald-300">
+                                          Your soil test: {userTest.value} {userTest.unit}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+                          } else if (activeDepthTab === '20-50') {
+                            const layer = prop.layers.find((l) => l.depthValue === '20-50' || l.depth === '20-50cm') || prop.subsoilLayer;
+                            if (layer) {
+                              const range = formatEstimatedRange(layer.uncertainty, layer.unit);
+                              rows.push(
+                                <tr key={`20-50-${key}`} className="hover:bg-stone-50/70 transition-colors">
+                                  <td className="py-2.5 px-4 font-semibold text-stone-900">
+                                    {prop.name}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-stone-500 font-mono text-[11px]">
+                                    20–50 cm
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right font-mono font-bold text-stone-800">
+                                    {layer.value !== null ? `${layer.value} ${layer.unit || ''}` : 'Unavailable'}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right text-stone-500 font-mono text-[11px]">
+                                    {range ? range : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-4">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200">
+                                      Location estimate
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            }
+                          } else {
+                            // Landscape / Site Attributes
+                            const otherLayers = prop.layers.filter(
+                              (l) => l.depthValue !== '0-20' && l.depthValue !== '20-50' && l.depth !== '0-20cm' && l.depth !== '20-50cm'
+                            );
+                            for (const layer of otherLayers) {
+                              const range = formatEstimatedRange(layer.uncertainty, layer.unit);
+                              rows.push(
+                                <tr key={`other-${key}-${layer.depth}`} className="hover:bg-stone-50/70 transition-colors">
+                                  <td className="py-2.5 px-4 font-semibold text-stone-900">
+                                    {prop.name}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-stone-500 font-mono text-[11px]">
+                                    {layer.depth || 'Landscape'}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right font-mono font-bold text-stone-800">
+                                    {layer.value !== null ? `${layer.value} ${layer.unit || ''}` : 'Unavailable'}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right text-stone-500 font-mono text-[11px]">
+                                    {range ? range : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-4">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200">
+                                      Location estimate
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            }
+                          }
+                        }
+
+                        if (rows.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={5} className="py-6 text-center text-stone-500 text-xs">
+                                No properties available for this depth increment.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return rows;
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl text-xs text-stone-600 flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
+                  <p>
+                    Location-based soil data is temporarily unavailable for these coordinates. Regional agro-ecological baselines were used for analysis.
+                  </p>
+                </div>
+              )}
+
+              {/* Mandatory Laboratory Soil Testing Awareness Message */}
+              <div className="p-4 sm:p-5 bg-amber-50/80 border border-amber-200/90 rounded-2xl text-xs sm:text-sm text-stone-700 space-y-2">
+                <div className="flex items-center gap-2 text-amber-950 font-bold">
+                  <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>Laboratory Soil Testing Recommendation</span>
+                </div>
+                <p className="leading-relaxed">
+                  The location-based soil information shown above is an estimate derived from digital soil data for your area. It may not represent the current condition of your specific field because soil properties can change over time through cultivation, fertiliser use, erosion, organic matter management and other factors.
+                </p>
+                <p className="leading-relaxed">
+                  For a more accurate picture of your farm&apos;s current soil condition, we recommend laboratory soil testing. SoilWise AI&apos;s location-based estimates should not be interpreted as a laboratory analysis of your farm&apos;s soil.
+                </p>
+                <p className="text-[11px] text-stone-500 font-medium pt-1">
+                  Data source: iSDAsoil.
+                </p>
               </div>
             </div>
           </div>

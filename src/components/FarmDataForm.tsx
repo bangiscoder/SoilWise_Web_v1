@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MapPin, 
   FlaskConical, 
   Navigation, 
   AlertCircle, 
+  AlertTriangle,
   Check, 
   Info,
   ShieldCheck,
@@ -13,7 +14,9 @@ import {
   Trash2,
   CheckCircle2,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  MapPinCheck,
+  RefreshCw
 } from 'lucide-react';
 import { SoilData } from '../types/soilwise';
 import { NIGERIA_STATES_LGAS } from '../data/nigeriaStatesLga';
@@ -23,6 +26,8 @@ import {
   validateSoilPhotoFile, 
   SoilPhotoAnalysisResult 
 } from '../services/soilPhotoAnalysisService';
+import { validateLocationApi } from '../services/soilDataValidationService';
+import { LocationValidationResult } from '../types/soilDataValidation';
 import heroBackground from '../assets/images/farm_analysis_hero_1790600561723.jpg';
 
 interface FarmDataFormProps {
@@ -39,6 +44,7 @@ interface FarmDataFormProps {
         confidence?: number;
         fileName?: string;
       } | null;
+      locationValidation?: LocationValidationResult | null;
     }
   ) => void;
   isSubmitting: boolean;
@@ -71,7 +77,7 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
   const [latitude, setLatitude] = useState<string>('');
   const [longitude, setLongitude] = useState<string>('');
 
-  // Optional State and LGA selection
+  // Selected State and LGA selection
   const [selectedState, setSelectedState] = useState<string>('');
   const [selectedLga, setSelectedLga] = useState<string>('');
 
@@ -79,9 +85,64 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoSuccess, setGeoSuccess] = useState<boolean>(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+
+  // Geographic validation state
+  const [locationValidation, setLocationValidation] = useState<LocationValidationResult | null>(null);
+  const [isValidatingLocation, setIsValidatingLocation] = useState<boolean>(false);
+  const [boundaryConfirmed, setBoundaryConfirmed] = useState<boolean>(false);
 
   // Field validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const triggerLocationValidation = async (
+    stateVal = selectedState,
+    lgaVal = selectedLga,
+    latVal = latitude,
+    lonVal = longitude,
+    accVal = gpsAccuracy
+  ): Promise<LocationValidationResult | null> => {
+    const latNum = parseFloat(latVal);
+    const lonNum = parseFloat(lonVal);
+    if (!stateVal || !lgaVal || isNaN(latNum) || isNaN(lonNum)) {
+      setLocationValidation(null);
+      return null;
+    }
+    setIsValidatingLocation(true);
+    try {
+      const res = await validateLocationApi(stateVal, lgaVal, latNum, lonNum, accVal);
+      setLocationValidation(res);
+      return res;
+    } catch (err: any) {
+      console.warn('Geographic validation error:', err);
+      return null;
+    } finally {
+      setIsValidatingLocation(false);
+    }
+  };
+
+  useEffect(() => {
+    const latNum = parseFloat(latitude);
+    const lonNum = parseFloat(longitude);
+    if (
+      selectedState &&
+      selectedLga &&
+      !isNaN(latNum) &&
+      !isNaN(lonNum) &&
+      latNum >= 4.0 &&
+      latNum <= 14.0 &&
+      lonNum >= 2.5 &&
+      lonNum <= 15.0
+    ) {
+      const timer = setTimeout(() => {
+        triggerLocationValidation(selectedState, selectedLga, latitude, longitude, gpsAccuracy);
+      }, 400);
+      return () => clearTimeout(timer);
+    } else {
+      setLocationValidation(null);
+      setBoundaryConfirmed(false);
+    }
+  }, [selectedState, selectedLga, latitude, longitude, gpsAccuracy]);
 
   const handleGetLocation = () => {
     setGeoError(null);
@@ -98,8 +159,10 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
       (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
+        const acc = position.coords.accuracy !== undefined ? position.coords.accuracy : null;
         setLatitude(lat.toFixed(6));
         setLongitude(lon.toFixed(6));
+        setGpsAccuracy(acc);
         setGeoSuccess(true);
         setGeoLoading(false);
         // Clear coordinate errors
@@ -107,6 +170,8 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
           const next = { ...prev };
           delete next.latitude;
           delete next.longitude;
+          delete next.locationConflict;
+          delete next.boundary;
           return next;
         });
       },
@@ -268,12 +333,26 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
     const errs: Record<string, string> = { ...errors };
     let firstErrorKey: string | null = null;
 
+    if (!selectedState.trim()) {
+      errs.state = 'Please select your State';
+      firstErrorKey = firstErrorKey || 'state';
+    } else {
+      delete errs.state;
+    }
+
+    if (!selectedLga.trim()) {
+      errs.lga = 'Please select your LGA';
+      firstErrorKey = firstErrorKey || 'lga';
+    } else {
+      delete errs.lga;
+    }
+
     if (!latitude.trim()) {
       errs.latitude = t('form.validation.latRequired');
       firstErrorKey = firstErrorKey || 'latitude';
     } else {
       const latNum = parseFloat(latitude);
-      if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+      if (isNaN(latNum) || latNum < 4.0 || latNum > 14.0) {
         errs.latitude = t('form.validation.latRange');
         firstErrorKey = firstErrorKey || 'latitude';
       } else {
@@ -286,7 +365,7 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
       firstErrorKey = firstErrorKey || 'longitude';
     } else {
       const lonNum = parseFloat(longitude);
-      if (isNaN(lonNum) || lonNum < -180 || lonNum > 180) {
+      if (isNaN(lonNum) || lonNum < 2.5 || lonNum > 15.0) {
         errs.longitude = t('form.validation.lngRange');
         firstErrorKey = firstErrorKey || 'longitude';
       } else {
@@ -332,7 +411,7 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
     formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
@@ -346,6 +425,44 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
     if (!validateLocation()) {
       setCurrentSection(3);
       return;
+    }
+
+    // Validate location coordinates against administrative boundaries
+    let currentValidation = locationValidation;
+    if (!currentValidation) {
+      currentValidation = await triggerLocationValidation(
+        selectedState,
+        selectedLga,
+        latitude,
+        longitude,
+        gpsAccuracy
+      );
+    }
+
+    if (currentValidation) {
+      const status = currentValidation.validation.status;
+      if (status === 'match') {
+        // Confirmed match - proceed
+      } else if (status === 'boundary_uncertain') {
+        if (!boundaryConfirmed) {
+          setErrors((prev) => ({
+            ...prev,
+            boundary: 'Please confirm your farm location near the boundary before continuing.',
+          }));
+          const cardEl = document.getElementById('locationValidationCard');
+          cardEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+      } else {
+        // Conflicting or invalid location: do not silently proceed
+        setErrors((prev) => ({
+          ...prev,
+          locationConflict: 'Please resolve the location mismatch before continuing.',
+        }));
+        const cardEl = document.getElementById('locationValidationCard');
+        cardEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
     }
 
     const soilData: SoilData = hasSoilTest === true
@@ -387,6 +504,7 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
           confidence: soilPhotoAnalysis.confidence,
           fileName: soilPhotoAnalysis.fileName,
         } : null,
+        locationValidation: currentValidation || null,
       }
     );
   };
@@ -1212,132 +1330,380 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-2">
-                {/* Latitude */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label htmlFor="latitudeInput" className="block text-xs font-semibold text-stone-700">
-                      {t('form.latitudeLabel')} <span className="text-red-500">*</span>
-                    </label>
-                    <span className="text-[11px] text-stone-400">4.0&deg; to 14.0&deg;</span>
-                  </div>
-                  <input
-                    id="latitudeInput"
-                    type="number"
-                    step="any"
-                    placeholder={t('form.latitudePlaceholder')}
-                    value={latitude}
-                    onChange={(e) => {
-                      setLatitude(e.target.value);
-                      setGeoSuccess(false);
-                      if (errors.latitude) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.latitude;
-                          return next;
-                        });
-                      }
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                      errors.latitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                  />
-                  {errors.latitude && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" /> {errors.latitude}
-                    </p>
-                  )}
+              {/* Step A: State and LGA Selection */}
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-stone-500">1. Administrative Location</span>
                 </div>
-
-                {/* Longitude */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label htmlFor="longitudeInput" className="block text-xs font-semibold text-stone-700">
-                      {t('form.longitudeLabel')} <span className="text-red-500">*</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                  <div>
+                    <label htmlFor="stateInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
+                      {t('form.stateLabel')} <span className="text-red-500">*</span>
                     </label>
-                    <span className="text-[11px] text-stone-400">2.5&deg; to 15.0&deg;</span>
-                  </div>
-                  <input
-                    id="longitudeInput"
-                    type="number"
-                    step="any"
-                    placeholder={t('form.longitudePlaceholder')}
-                    value={longitude}
-                    onChange={(e) => {
-                      setLongitude(e.target.value);
-                      setGeoSuccess(false);
-                      if (errors.longitude) {
+                    <select
+                      id="stateInput"
+                      value={selectedState}
+                      onChange={(e) => {
+                        const newState = e.target.value;
+                        setSelectedState(newState);
+                        setSelectedLga('');
+                        setLocationValidation(null);
+                        setBoundaryConfirmed(false);
                         setErrors((prev) => {
                           const next = { ...prev };
-                          delete next.longitude;
+                          delete next.state;
+                          delete next.locationConflict;
                           return next;
                         });
-                      }
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                      errors.longitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                  />
-                  {errors.longitude && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" /> {errors.longitude}
-                    </p>
-                  )}
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                        errors.state ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                      } rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer`}
+                    >
+                      <option value="">{t('form.statePlaceholder')}...</option>
+                      {NIGERIA_STATES_LGAS.map((s) => (
+                        <option key={s.state} value={s.state}>
+                          {s.state}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.state && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> {errors.state}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="lgaInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
+                      {t('form.lgaLabel')} <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="lgaInput"
+                      value={selectedLga}
+                      disabled={!selectedState}
+                      onChange={(e) => {
+                        setSelectedLga(e.target.value);
+                        setLocationValidation(null);
+                        setBoundaryConfirmed(false);
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.lga;
+                          delete next.locationConflict;
+                          return next;
+                        });
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                        errors.lga ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                      } rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <option value="">
+                        {selectedState ? `${t('form.lgaPlaceholder')}...` : `${t('form.lgaSelectStateFirst')}...`}
+                      </option>
+                      {(NIGERIA_STATES_LGAS.find((s) => s.state === selectedState)?.lgas || []).map((lga) => (
+                        <option key={lga} value={lga}>
+                          {lga}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.lga && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> {errors.lga}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* State and LGA Dynamic Dropdowns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-1 border-t border-stone-100">
-                <div>
-                  <label htmlFor="stateInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
-                    {t('form.stateLabel')}
-                  </label>
-                  <select
-                    id="stateInput"
-                    value={selectedState}
-                    onChange={(e) => {
-                      const newState = e.target.value;
-                      setSelectedState(newState);
-                      setSelectedLga('');
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer"
-                  >
-                    <option value="">{t('form.statePlaceholder')}...</option>
-                    {NIGERIA_STATES_LGAS.map((s) => (
-                      <option key={s.state} value={s.state}>
-                        {s.state}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-stone-400 mt-1">
-                    {t('common.optional')} &bull; Nigerian State
-                  </p>
+              {/* Step B: GPS Coordinates */}
+              <div className="space-y-2 pt-2 border-t border-stone-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-stone-500">2. Farm GPS Coordinates</span>
+                  {gpsAccuracy !== null && (
+                    <span className="text-[11px] font-mono text-stone-500 bg-stone-100 px-2 py-0.5 rounded">
+                      Accuracy: &plusmn;{Math.round(gpsAccuracy)}m
+                    </span>
+                  )}
                 </div>
 
-                <div>
-                  <label htmlFor="lgaInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
-                    {t('form.lgaLabel')}
-                  </label>
-                  <select
-                    id="lgaInput"
-                    value={selectedLga}
-                    disabled={!selectedState}
-                    onChange={(e) => setSelectedLga(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">
-                      {selectedState ? `${t('form.lgaPlaceholder')}...` : `${t('form.lgaSelectStateFirst')}...`}
-                    </option>
-                    {(NIGERIA_STATES_LGAS.find((s) => s.state === selectedState)?.lgas || []).map((lga) => (
-                      <option key={lga} value={lga}>
-                        {lga}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-stone-400 mt-1">
-                    {t('common.optional')} &bull; Local Government Area
-                  </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                  {/* Latitude */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor="latitudeInput" className="block text-xs font-semibold text-stone-700">
+                        {t('form.latitudeLabel')} <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[11px] text-stone-400">4.0&deg; to 14.0&deg; N</span>
+                    </div>
+                    <input
+                      id="latitudeInput"
+                      type="number"
+                      step="any"
+                      placeholder={t('form.latitudePlaceholder')}
+                      value={latitude}
+                      onChange={(e) => {
+                        setLatitude(e.target.value);
+                        setGeoSuccess(false);
+                        setLocationValidation(null);
+                        setBoundaryConfirmed(false);
+                        if (errors.latitude || errors.locationConflict) {
+                          setErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.latitude;
+                            delete next.locationConflict;
+                            return next;
+                          });
+                        }
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                        errors.latitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                      } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                    />
+                    {errors.latitude && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> {errors.latitude}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Longitude */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor="longitudeInput" className="block text-xs font-semibold text-stone-700">
+                        {t('form.longitudeLabel')} <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[11px] text-stone-400">2.5&deg; to 15.0&deg; E</span>
+                    </div>
+                    <input
+                      id="longitudeInput"
+                      type="number"
+                      step="any"
+                      placeholder={t('form.longitudePlaceholder')}
+                      value={longitude}
+                      onChange={(e) => {
+                        setLongitude(e.target.value);
+                        setGeoSuccess(false);
+                        setLocationValidation(null);
+                        setBoundaryConfirmed(false);
+                        if (errors.longitude || errors.locationConflict) {
+                          setErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.longitude;
+                            delete next.locationConflict;
+                            return next;
+                          });
+                        }
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                        errors.longitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                      } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                    />
+                    {errors.longitude && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> {errors.longitude}
+                      </p>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* Step C: Location Validation Result Card */}
+              <div id="locationValidationCard" className="pt-2 border-t border-stone-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                    3. Location Verification Status
+                  </span>
+                  {selectedState && selectedLga && latitude && longitude && (
+                    <button
+                      type="button"
+                      onClick={() => triggerLocationValidation(selectedState, selectedLga, latitude, longitude, gpsAccuracy)}
+                      disabled={isValidatingLocation}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#1b4332] hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isValidatingLocation ? 'animate-spin' : ''}`} />
+                      <span>Re-validate</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Case 1: Validating in progress */}
+                {isValidatingLocation && (
+                  <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl flex items-center gap-3 text-stone-700 text-xs sm:text-sm">
+                    <Loader2 className="w-5 h-5 text-[#1b4332] animate-spin shrink-0" />
+                    <span>Verifying your GPS coordinates against Nigerian State and LGA boundaries...</span>
+                  </div>
+                )}
+
+                {/* Case 2: Validation result received */}
+                {!isValidatingLocation && locationValidation && (
+                  <>
+                    {/* Status: MATCH */}
+                    {locationValidation.validation.status === 'match' && (
+                      <div className="p-4 sm:p-5 bg-emerald-50/90 border border-emerald-300 rounded-2xl flex items-start gap-3.5 text-emerald-950 shadow-xs">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1 text-xs sm:text-sm">
+                          <span className="font-bold text-emerald-900 block text-sm">
+                            Location Verified
+                          </span>
+                          <p className="leading-relaxed text-emerald-900">
+                            Location verified. Your GPS location is within <span className="font-semibold">{locationValidation.selected.state}</span>, <span className="font-semibold">{locationValidation.selected.lga}</span>, matching the State and LGA you selected. This location will be used for your SoilWise assessment.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status: LGA_MISMATCH */}
+                    {locationValidation.validation.status === 'lga_mismatch' && (
+                      <div className="p-4 sm:p-5 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3.5 text-amber-950 shadow-xs">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1.5 text-xs sm:text-sm">
+                          <span className="font-bold text-amber-900 block text-sm">
+                            LGA Mismatch
+                          </span>
+                          <p className="leading-relaxed text-amber-900">
+                            Your GPS location appears to be outside the <span className="font-semibold">{locationValidation.selected.lga}</span> you selected. Please check your selected State/LGA or update your GPS location before continuing.
+                          </p>
+                          {locationValidation.detected.lga && (
+                            <p className="text-[11px] text-amber-800 font-medium">
+                              GPS boundary analysis places your coordinate in: <span className="font-bold underline">{locationValidation.detected.lga}</span>. Your selected administrative location has not been changed.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status: STATE_MISMATCH */}
+                    {locationValidation.validation.status === 'state_mismatch' && (
+                      <div className="p-4 sm:p-5 bg-red-50 border border-red-300 rounded-2xl flex items-start gap-3.5 text-red-950 shadow-xs">
+                        <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1.5 text-xs sm:text-sm">
+                          <span className="font-bold text-red-900 block text-sm">
+                            State Mismatch
+                          </span>
+                          <p className="leading-relaxed text-red-900">
+                            Your GPS location appears to be in another State. Please confirm your GPS location and selected State before continuing.
+                          </p>
+                          {locationValidation.detected.state && (
+                            <p className="text-[11px] text-red-800 font-medium">
+                              GPS boundary analysis places your coordinate in: <span className="font-bold underline">{locationValidation.detected.state}</span>. Your selected administrative location has not been changed.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status: BOUNDARY_UNCERTAIN */}
+                    {locationValidation.validation.status === 'boundary_uncertain' && (
+                      <div className="p-4 sm:p-5 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3.5 text-amber-950 shadow-xs">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="space-y-2.5 text-xs sm:text-sm">
+                          <span className="font-bold text-amber-900 block text-sm">
+                            Boundary Uncertainty
+                          </span>
+                          <p className="leading-relaxed text-amber-900">
+                            Your GPS location is close to an administrative boundary, so we could not confirm the LGA with certainty. Please check your selected State and LGA before continuing.
+                          </p>
+                          <label className="flex items-start gap-2.5 pt-1 cursor-pointer select-none bg-white/70 p-2.5 rounded-xl border border-amber-200">
+                            <input
+                              type="checkbox"
+                              checked={boundaryConfirmed}
+                              onChange={(e) => {
+                                setBoundaryConfirmed(e.target.checked);
+                                if (e.target.checked) {
+                                  setErrors((prev) => {
+                                    const next = { ...prev };
+                                    delete next.boundary;
+                                    delete next.locationConflict;
+                                    return next;
+                                  });
+                                }
+                              }}
+                              className="mt-0.5 rounded border-amber-400 text-[#1b4332] focus:ring-[#1b4332] w-4 h-4 cursor-pointer shrink-0"
+                            />
+                            <span className="text-xs font-semibold text-amber-950 leading-normal">
+                              I confirm that my farm is located in {selectedState}, {selectedLga} near the boundary.
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status: OUTSIDE_NIGERIA */}
+                    {locationValidation.validation.status === 'outside_nigeria' && (
+                      <div className="p-4 sm:p-5 bg-red-50 border border-red-300 rounded-2xl flex items-start gap-3.5 text-red-950 shadow-xs">
+                        <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1 text-xs sm:text-sm">
+                          <span className="font-bold text-red-900 block text-sm">
+                            Outside Nigeria
+                          </span>
+                          <p className="leading-relaxed text-red-900">
+                            Your GPS location appears to be outside Nigeria. Please check your GPS location before continuing.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status: INVALID_COORDINATES */}
+                    {locationValidation.validation.status === 'invalid_coordinates' && (
+                      <div className="p-4 sm:p-5 bg-red-50 border border-red-300 rounded-2xl flex items-start gap-3.5 text-red-950 shadow-xs">
+                        <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1 text-xs sm:text-sm">
+                          <span className="font-bold text-red-900 block text-sm">
+                            Invalid Coordinates
+                          </span>
+                          <p className="leading-relaxed text-red-900">
+                            We could not validate your GPS location. Please obtain your location again and try again.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status: UNKNOWN */}
+                    {locationValidation.validation.status === 'unknown' && (
+                      <div className="p-4 sm:p-5 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3.5 text-amber-950 shadow-xs">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1 text-xs sm:text-sm">
+                          <span className="font-bold text-amber-900 block text-sm">
+                            Location Unconfirmed
+                          </span>
+                          <p className="leading-relaxed text-amber-900">
+                            We could not confirm your selected location. Please check your GPS location and selected State/LGA before continuing.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Case 3: Prompting input when validation has not run yet */}
+                {!isValidatingLocation && !locationValidation && (
+                  <div className="p-4 bg-stone-50 border border-stone-200/80 rounded-2xl flex items-start gap-3 text-stone-600 text-xs sm:text-sm">
+                    <Info className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
+                    <div>
+                      {!selectedState || !selectedLga ? (
+                        <p className="leading-relaxed">
+                          Please select your <span className="font-semibold text-stone-800">State</span> and <span className="font-semibold text-stone-800">LGA</span> above, then provide your farm GPS coordinates to verify your location.
+                        </p>
+                      ) : !latitude || !longitude ? (
+                        <p className="leading-relaxed">
+                          Click <span className="font-semibold text-stone-800">&quot;{t('form.getMyLocation')}&quot;</span> or enter your farm coordinates to verify your location against <span className="font-semibold text-stone-800">{selectedState}, {selectedLga}</span>.
+                        </p>
+                      ) : (
+                        <p className="leading-relaxed">
+                          Coordinates and administrative area selected. Checking verification status...
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Validation errors on submission */}
+                {(errors.locationConflict || errors.boundary) && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-700 font-medium">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>{errors.locationConflict || errors.boundary}</span>
+                  </div>
+                )}
               </div>
 
               {/* Explanation Under "Farm Location" */}

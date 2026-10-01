@@ -1,3 +1,5 @@
+import { IsdaPropertyRecord, IsdaDepthLayer } from '../types/soilwise';
+
 export interface NormalisedSoilProperty {
   property: string;
   value: number | string | null;
@@ -79,6 +81,7 @@ export interface IsdaSoilServiceResponse {
   authDiagnostic: AuthDiagnostic;
   soilPropertyDiagnostic: SoilPropertyDiagnostic;
   normalised: SoilWiseNormalisedProfile;
+  fullProfile?: Record<string, IsdaPropertyRecord>;
   tokenInfo: TokenCacheMetadata;
   diagnostics: {
     timestamp: string;
@@ -353,6 +356,125 @@ function createUnavailableProperty(
   };
 }
 
+const PROPERTY_METADATA: Record<string, { name: string; method?: string }> = {
+  ph: { name: 'Soil pH', method: '1:5 H2O suspension prediction' },
+  nitrogen_total: { name: 'Total Nitrogen', method: 'Dumas dry combustion equivalent' },
+  phosphorous_extractable: { name: 'Extractable Phosphorus (Mehlich-3)', method: 'Mehlich-3 extraction prediction' },
+  phosphorus_extractable: { name: 'Extractable Phosphorus (Mehlich-3)', method: 'Mehlich-3 extraction prediction' },
+  potassium_extractable: { name: 'Extractable Potassium (Mehlich-3)', method: 'Mehlich-3 extraction prediction' },
+  carbon_organic: { name: 'Organic Carbon', method: 'Dry combustion prediction' },
+  carbon_total: { name: 'Total Carbon', method: 'Dry combustion prediction' },
+  calcium_extractable: { name: 'Extractable Calcium', method: 'Mehlich-3 extraction prediction' },
+  magnesium_extractable: { name: 'Extractable Magnesium', method: 'Mehlich-3 extraction prediction' },
+  iron_extractable: { name: 'Extractable Iron', method: 'Mehlich-3 extraction prediction' },
+  zinc_extractable: { name: 'Extractable Zinc', method: 'Mehlich-3 extraction prediction' },
+  sulphur_extractable: { name: 'Extractable Sulphur', method: 'Mehlich-3 extraction prediction' },
+  aluminium_extractable: { name: 'Extractable Aluminium', method: 'Mehlich-3 extraction prediction' },
+  bulk_density: { name: 'Bulk Density', method: 'Pedotransfer function prediction' },
+  stone_content: { name: 'Stone Content', method: 'Coarse fragments prediction' },
+  sand_content: { name: 'Sand Content', method: 'Laser diffraction / Pipette equivalent' },
+  silt_content: { name: 'Silt Content', method: 'Laser diffraction / Pipette equivalent' },
+  clay_content: { name: 'Clay Content', method: 'Laser diffraction / Pipette equivalent' },
+  texture_class: { name: 'USDA Texture Class', method: 'USDA 12-class textural classification' },
+  cation_exchange_capacity: { name: 'Cation Exchange Capacity (CEC)', method: 'Cobalt-hexamine equivalent' },
+  bedrock_depth: { name: 'Depth to Bedrock', method: 'Spatial machine-learning prediction' },
+  slope_angle: { name: 'Slope Angle', method: 'SRTM / Digital Elevation Model' },
+  fcc: { name: 'Fertility Capability Classification', method: 'FCC system' },
+};
+
+/**
+ * Extracts all multi-depth properties from iSDAsoil payload preserving 0-20cm and 20-50cm layers,
+ * confidence intervals (50%, 68%, 90%), and contextual soil attributes without fabrication.
+ */
+export function extractFullIsdaProfile(rawData: any): Record<string, IsdaPropertyRecord> {
+  const result: Record<string, IsdaPropertyRecord> = {};
+  const propertySource = rawData?.property || rawData?.properties || (rawData && typeof rawData === 'object' && !rawData.status && !rawData.error ? rawData : null);
+
+  if (propertySource && typeof propertySource === 'object') {
+    for (const [key, value] of Object.entries(propertySource)) {
+      if (key === 'status' || key === 'error' || key === 'code' || key === 'detail') continue;
+
+      const meta = PROPERTY_METADATA[key] || {
+        name: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        method: null,
+      };
+
+      if (Array.isArray(value)) {
+        const layers: IsdaDepthLayer[] = value.map((entry: any) => {
+          const depthVal = entry?.depth?.value ? String(entry.depth.value) : '0-20';
+          const depthUnit = entry?.depth?.unit ? String(entry.depth.unit) : 'cm';
+          const rawVal =
+            typeof entry?.value === 'object' && entry?.value !== null
+              ? entry.value.value
+              : (entry?.value ?? entry?.mean ?? null);
+          const unit =
+            typeof entry?.value === 'object' && entry?.value !== null
+              ? entry.value.unit
+              : (entry?.unit ?? null);
+
+          let uncertainty: IsdaDepthLayer['uncertainty'] = null;
+          if (Array.isArray(entry?.uncertainty) && entry.uncertainty.length > 0) {
+            const u50 = entry.uncertainty.find((u: any) => u.confidence_interval === '50%');
+            const u68 = entry.uncertainty.find((u: any) => u.confidence_interval === '68%');
+            const u90 = entry.uncertainty.find((u: any) => u.confidence_interval === '90%');
+            const primary = u68 || entry.uncertainty[0];
+
+            const lower = primary?.lower_bound !== undefined ? Number(primary.lower_bound) : null;
+            const upper = primary?.upper_bound !== undefined ? Number(primary.upper_bound) : null;
+            const stdev =
+              lower !== null && upper !== null ? parseFloat(((upper - lower) / 2).toFixed(2)) : null;
+
+            uncertainty = {
+              confidence_50: u50 ? { lower: Number(u50.lower_bound), upper: Number(u50.upper_bound) } : null,
+              confidence_68: u68 ? { lower: Number(u68.lower_bound), upper: Number(u68.upper_bound) } : null,
+              confidence_90: u90 ? { lower: Number(u90.lower_bound), upper: Number(u90.upper_bound) } : null,
+              lower,
+              upper,
+              stdev,
+            };
+          }
+
+          return {
+            depth: `${depthVal}${depthUnit}`,
+            depthValue: depthVal,
+            depthUnit,
+            value: rawVal,
+            unit,
+            uncertainty,
+          };
+        });
+
+        const topsoil = layers.find((l) => l.depthValue === '0-20') || layers[0] || null;
+        const subsoil = layers.find((l) => l.depthValue === '20-50') || null;
+
+        result[key] = {
+          key,
+          name: meta.name,
+          layers,
+          topsoilLayer: topsoil,
+          subsoilLayer: subsoil,
+          status: layers.length > 0 && layers.some((l) => l.value !== null) ? 'available' : 'unavailable',
+          analyticalMethod: meta.method || null,
+        };
+      }
+    }
+  }
+
+  // Ensure EC is explicitly recorded with transparent zero-fabrication contract
+  result['ec'] = {
+    key: 'ec',
+    name: 'Electrical Conductivity',
+    layers: [],
+    topsoilLayer: null,
+    subsoilLayer: null,
+    status: 'unavailable',
+    unavailabilityReason:
+      'Electrical Conductivity (EC) is not measured or exposed by the iSDAsoil API v2 dataset. SoilWise policy strictly prohibits estimating or fabricating EC from pH or texture proxies.',
+  };
+
+  return result;
+}
+
 /**
  * Normalises raw iSDAsoil API response into SoilWise Normalised Soil Profile
  */
@@ -373,7 +495,7 @@ export function normaliseIsdaSoilData(
         rawData?.[name];
       if (candidate !== undefined && candidate !== null) {
         if (Array.isArray(candidate) && candidate.length > 0) {
-          const entry = candidate[0];
+          const entry = candidate.find((item: any) => item?.depth?.value === '0-20') || candidate[0];
           const val = typeof entry?.value === 'object' && entry?.value !== null
             ? entry.value.value
             : (entry?.value ?? entry?.mean);
@@ -762,6 +884,7 @@ export async function fetchIsdaSoilData(
         message: 'Request skipped due to missing/invalid token.',
       },
       normalised,
+      fullProfile: extractFullIsdaProfile(null),
       tokenInfo,
       diagnostics,
     };
@@ -772,7 +895,7 @@ export async function fetchIsdaSoilData(
     const apiUrl = new URL(soilPropertyEndpoint);
     apiUrl.searchParams.set('lat', String(latitude));
     apiUrl.searchParams.set('lon', String(longitude));
-    apiUrl.searchParams.set('depth', '0-20');
+    // Omitting depth returns all available depth increments (0-20cm and 20-50cm) in a single request
 
     logStage('iSDAsoil Query', 'info', `Executing GET ${apiUrl.toString()}`);
 
@@ -826,6 +949,7 @@ export async function fetchIsdaSoilData(
           message: `HTTP ${httpStatus}: ${errText.substring(0, 150) || resp.statusText}`,
         },
         normalised,
+        fullProfile: extractFullIsdaProfile(null),
         tokenInfo: tokenManager.getCacheMetadata(),
         diagnostics,
       };
@@ -850,6 +974,7 @@ export async function fetchIsdaSoilData(
         message: 'Raw soilproperty response successfully retrieved.',
       },
       normalised,
+      fullProfile: extractFullIsdaProfile(rawData),
       tokenInfo: tokenManager.getCacheMetadata(),
       diagnostics,
     };
@@ -867,6 +992,7 @@ export async function fetchIsdaSoilData(
         message: err.message || 'Network exception during soilproperty request.',
       },
       normalised,
+      fullProfile: extractFullIsdaProfile(null),
       tokenInfo: tokenManager.getCacheMetadata(),
       diagnostics,
     };

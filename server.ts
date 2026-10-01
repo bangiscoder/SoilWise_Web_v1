@@ -69,6 +69,28 @@ app.post('/api/admin/soil-data-test/reset-token', (_req: Request, res: Response)
   }
 });
 
+// Farm Analysis: Geographic Point-in-Polygon Location Validation
+app.post('/api/location/validate', (req: Request, res: Response) => {
+  try {
+    const { selectedState, selectedLga, latitude, longitude, accuracyM } = req.body;
+    const latNum = parseFloat(latitude);
+    const lonNum = parseFloat(longitude);
+    const accNum = accuracyM !== undefined && accuracyM !== null && accuracyM !== '' ? parseFloat(accuracyM) : null;
+
+    const result = validateNigerianLocation(
+      selectedState || '',
+      selectedLga || '',
+      latNum,
+      lonNum,
+      accNum
+    );
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Error validating Nigerian coordinates' });
+  }
+});
+
 // Admin Developer Validation: Step 1 - Geographic Point-in-Polygon Validation
 app.post('/api/admin/soil-data-test/validate-location', (req: Request, res: Response) => {
   try {
@@ -88,6 +110,25 @@ app.post('/api/admin/soil-data-test/validate-location', (req: Request, res: Resp
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error validating Nigerian coordinates' });
+  }
+});
+
+// Farm Analysis: Query verified iSDAsoil location profile (strictly server-side auth & token cache)
+app.post('/api/soil/isdasoil-profile', async (req: Request, res: Response) => {
+  try {
+    const { latitude, longitude } = req.body;
+    const latNum = parseFloat(latitude);
+    const lonNum = parseFloat(longitude);
+
+    if (isNaN(latNum) || isNaN(lonNum)) {
+      res.status(400).json({ error: 'Valid numeric latitude and longitude are required' });
+      return;
+    }
+
+    const response = await fetchIsdaSoilData(latNum, lonNum);
+    res.json(response);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Error communicating with iSDAsoil service' });
   }
 });
 

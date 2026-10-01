@@ -17,6 +17,9 @@ import {
   FarmAnalysisResult,
   AnalysisStep,
   SoilDataProvenance,
+  SoilEvidence,
+  SoilEvidenceUserMeasurements,
+  SoilEvidenceLocationEstimate,
 } from '../types/soilwise';
 
 import { fetchDailyWeatherSeries, fetchElevation } from './weatherService';
@@ -24,6 +27,39 @@ import { calculateRainfallOutlook } from './rainfallAnalysisService';
 import { calculateEnvironmentalInfo } from './environmentalCalculationService';
 import { fetchReverseGeocode, fetchNearestLandmark } from './geocodingService';
 import { fetchSoilTexture, fetchLocationEstimatedSoilData } from './soilService';
+import { IsdaSoilServiceResponse } from './isdaSoilService';
+
+/**
+ * Communicates with the SoilWise backend to retrieve the full iSDAsoil location profile.
+ * Architecture: Browser -> SoilWise Backend (/api/soil/isdasoil-profile) -> iSDAsoil API.
+ * Never calls iSDAsoil directly from the browser; uses the existing server-side token cache.
+ */
+export async function fetchIsdaSoilProfile(
+  latitude: number,
+  longitude: number
+): Promise<IsdaSoilServiceResponse | null> {
+  try {
+    if (typeof window === 'undefined') {
+      const { fetchIsdaSoilData } = await import('./isdaSoilService');
+      return await fetchIsdaSoilData(latitude, longitude);
+    }
+    const resp = await fetch('/api/soil/isdasoil-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude }),
+    });
+
+    if (!resp.ok) {
+      console.warn(`[Farm Analysis] iSDAsoil server endpoint returned HTTP ${resp.status}`);
+      return null;
+    }
+
+    return await resp.json();
+  } catch (err: any) {
+    console.warn('[Farm Analysis] Could not reach backend iSDAsoil service:', err?.message || err);
+    return null;
+  }
+}
 
 export async function performFarmAnalysis(
   soilData: SoilData,
@@ -47,6 +83,7 @@ export async function performFarmAnalysis(
       confidence?: number;
       fileName?: string;
     } | null;
+    locationValidation?: import('../types/soilDataValidation').LocationValidationResult | null;
   }
 ): Promise<FarmAnalysisResult> {
   const { latitude, longitude } = coordinates;
@@ -71,6 +108,7 @@ export async function performFarmAnalysis(
     soilTestMeta?.hasSoilTest === false
       ? fetchLocationEstimatedSoilData(latitude, longitude)
       : Promise.resolve(null);
+  const isdaSoilPromise = fetchIsdaSoilProfile(latitude, longitude);
 
   // Step 3: Retrieving rainfall information...
   await new Promise((r) => setTimeout(r, 400));
@@ -81,15 +119,23 @@ export async function performFarmAnalysis(
   onStepChange?.('finding_location');
 
   // Await all independent services concurrently using allSettled to ensure resilience
-  const [weatherRes, elevationRes, soilTextureRes, geocodeRes, landmarkRes, locationSoilRes] =
-    await Promise.allSettled([
-      weatherPromise,
-      elevationPromise,
-      soilTexturePromise,
-      geocodePromise,
-      landmarkPromise,
-      locationSoilPromise,
-    ]);
+  const [
+    weatherRes,
+    elevationRes,
+    soilTextureRes,
+    geocodeRes,
+    landmarkRes,
+    locationSoilRes,
+    isdaSoilRes,
+  ] = await Promise.allSettled([
+    weatherPromise,
+    elevationPromise,
+    soilTexturePromise,
+    geocodePromise,
+    landmarkPromise,
+    locationSoilPromise,
+    isdaSoilPromise,
+  ]);
 
   // Step 5: Combining data...
   onStepChange?.('combining_data');
@@ -186,6 +232,43 @@ export async function performFarmAnalysis(
     }
   }
 
+  // Resolve iSDAsoil location profile response (resilient to network/auth issues)
+  const isdaSoilPayload = isdaSoilRes.status === 'fulfilled' ? isdaSoilRes.value : null;
+  const isdaAvailable = Boolean(isdaSoilPayload && isdaSoilPayload.success && isdaSoilPayload.normalised);
+
+  // Construct structured soilEvidence preserving user measurements vs location estimate separation
+  const userMeasurements: SoilEvidenceUserMeasurements = {
+    available: isUserMeasured,
+    source_type: 'user_measured',
+    ph: isUserMeasured ? soilData.ph : null,
+    nitrogen: isUserMeasured ? soilData.nitrogen : null,
+    phosphorus: isUserMeasured ? soilData.phosphorus : null,
+    potassium: isUserMeasured ? soilData.potassium : null,
+    ec: isUserMeasured ? soilData.ec : null,
+  };
+
+  const locationEstimate: SoilEvidenceLocationEstimate = {
+    available: isdaAvailable,
+    source: 'iSDAsoil',
+    source_type: 'location_estimated',
+    resolution_m: 30,
+    status: isdaAvailable
+      ? isdaSoilPayload!.normalised.overall_status
+      : 'unavailable',
+    fetched_at: isdaSoilPayload?.normalised?.fetched_at || new Date().toISOString(),
+    unavailabilityReason: isdaAvailable
+      ? undefined
+      : isdaSoilPayload?.raw?.error || isdaSoilPayload?.raw?.response || 'iSDAsoil service unavailable for this location',
+    profile: isdaSoilPayload?.normalised,
+    properties: isdaSoilPayload?.fullProfile,
+    rawResponse: isdaSoilPayload?.raw,
+  };
+
+  const soilEvidence: SoilEvidence = {
+    user_measurements: userMeasurements,
+    location_estimate: locationEstimate,
+  };
+
   // Step 6: Preparing Farm Analysis...
   onStepChange?.('preparing_analysis');
   await new Promise((r) => setTimeout(r, 350));
@@ -208,6 +291,8 @@ export async function performFarmAnalysis(
     soilPhoto: soilTestMeta?.soilPhoto || null,
     soilTextureImageEstimate: soilTestMeta?.soilTextureImageEstimate || null,
     photoAnalysisResult: soilTestMeta?.photoAnalysisResult || null,
+    soilEvidence,
+    locationValidation: soilTestMeta?.locationValidation || null,
   };
 
   onStepChange?.('completed');

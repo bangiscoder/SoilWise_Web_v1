@@ -38,7 +38,10 @@ export async function validateLocationApi(
   longitude: number,
   accuracyM: number | null = null
 ): Promise<LocationValidationResult> {
-  const resp = await fetch('/api/admin/soil-data-test/validate-location', {
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : 'http://localhost:3000';
+  const resp = await fetch(`${origin}/api/location/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
