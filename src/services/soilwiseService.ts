@@ -16,20 +16,38 @@ import {
   EnvironmentalInfo,
   FarmAnalysisResult,
   AnalysisStep,
+  SoilDataProvenance,
 } from '../types/soilwise';
 
 import { fetchDailyWeatherSeries, fetchElevation } from './weatherService';
 import { calculateRainfallOutlook } from './rainfallAnalysisService';
 import { calculateEnvironmentalInfo } from './environmentalCalculationService';
 import { fetchReverseGeocode, fetchNearestLandmark } from './geocodingService';
-import { fetchSoilTexture } from './soilService';
+import { fetchSoilTexture, fetchLocationEstimatedSoilData } from './soilService';
 
 export async function performFarmAnalysis(
   soilData: SoilData,
   coordinates: { latitude: number; longitude: number },
   analysisDate: string,
   onStepChange?: (step: AnalysisStep) => void,
-  locationDetails?: { state?: string; lga?: string }
+  locationDetails?: { state?: string; lga?: string },
+  soilTestMeta?: {
+    hasSoilTest?: boolean;
+    soilDataProvenance?: 'user_measured' | 'location_estimated' | 'unavailable';
+    soilPhotoProvided?: boolean;
+    soilPhoto?: string | null;
+    soilTextureImageEstimate?: {
+      texture: string;
+      confidence: number;
+      source: 'image_estimate';
+      status: 'preliminary';
+    } | null;
+    photoAnalysisResult?: {
+      estimatedTextureClass?: string;
+      confidence?: number;
+      fileName?: string;
+    } | null;
+  }
 ): Promise<FarmAnalysisResult> {
   const { latitude, longitude } = coordinates;
   const analysisYear = new Date(analysisDate).getFullYear() || new Date().getFullYear();
@@ -49,6 +67,10 @@ export async function performFarmAnalysis(
   const soilTexturePromise = fetchSoilTexture(latitude, longitude);
   const geocodePromise = fetchReverseGeocode(latitude, longitude);
   const landmarkPromise = fetchNearestLandmark(latitude, longitude);
+  const locationSoilPromise =
+    soilTestMeta?.hasSoilTest === false
+      ? fetchLocationEstimatedSoilData(latitude, longitude)
+      : Promise.resolve(null);
 
   // Step 3: Retrieving rainfall information...
   await new Promise((r) => setTimeout(r, 400));
@@ -59,13 +81,14 @@ export async function performFarmAnalysis(
   onStepChange?.('finding_location');
 
   // Await all independent services concurrently using allSettled to ensure resilience
-  const [weatherRes, elevationRes, soilTextureRes, geocodeRes, landmarkRes] =
+  const [weatherRes, elevationRes, soilTextureRes, geocodeRes, landmarkRes, locationSoilRes] =
     await Promise.allSettled([
       weatherPromise,
       elevationPromise,
       soilTexturePromise,
       geocodePromise,
       landmarkPromise,
+      locationSoilPromise,
     ]);
 
   // Step 5: Combining data...
@@ -144,6 +167,25 @@ export async function performFarmAnalysis(
     elevationMeters: elevation,
   };
 
+  // Resolve Soil Data: Use user-measured laboratory test if hasSoilTest !== false,
+  // or use location-derived soil estimates if hasSoilTest === false
+  let effectiveSoilData: SoilData = soilData;
+  const isUserMeasured = soilTestMeta?.hasSoilTest !== false;
+  const provenance: SoilDataProvenance = isUserMeasured ? 'user_measured' : 'location_estimated';
+
+  if (!isUserMeasured) {
+    const locSoil = locationSoilRes.status === 'fulfilled' ? locationSoilRes.value : null;
+    if (locSoil) {
+      effectiveSoilData = {
+        ph: locSoil.ph,
+        nitrogen: locSoil.nitrogen,
+        phosphorus: locSoil.phosphorus,
+        potassium: locSoil.potassium,
+        ec: locSoil.ec,
+      };
+    }
+  }
+
   // Step 6: Preparing Farm Analysis...
   onStepChange?.('preparing_analysis');
   await new Promise((r) => setTimeout(r, 350));
@@ -152,7 +194,7 @@ export async function performFarmAnalysis(
     id: `FA-${Date.now()}`,
     analysisDate,
     createdAt: new Date().toISOString(),
-    soilData,
+    soilData: effectiveSoilData,
     location: farmLocation,
     soilTexture,
     rainfallOutlook,
@@ -160,6 +202,12 @@ export async function performFarmAnalysis(
     status: rainfallOutlook.isAvailable ? 'completed' : 'partial',
     selectedState: locationDetails?.state,
     selectedLga: locationDetails?.lga,
+    hasSoilTest: isUserMeasured,
+    soilDataProvenance: provenance,
+    soilPhotoProvided: soilTestMeta?.soilPhotoProvided ?? Boolean(soilTestMeta?.soilPhoto),
+    soilPhoto: soilTestMeta?.soilPhoto || null,
+    soilTextureImageEstimate: soilTestMeta?.soilTextureImageEstimate || null,
+    photoAnalysisResult: soilTestMeta?.photoAnalysisResult || null,
   };
 
   onStepChange?.('completed');

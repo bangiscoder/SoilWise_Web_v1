@@ -75,6 +75,15 @@ export interface EnvironmentalInfo {
   source: string;
 }
 
+export type SoilDataProvenance = 'user_measured' | 'location_estimated' | 'unavailable';
+
+export interface SoilTextureImageEstimate {
+  texture: string;
+  confidence: number;
+  source: 'image_estimate';
+  status: 'preliminary';
+}
+
 export interface FarmAnalysisResult {
   id: string;
   analysisDate: string; // YYYY-MM-DD
@@ -87,6 +96,16 @@ export interface FarmAnalysisResult {
   status: 'completed' | 'partial';
   selectedState?: string;
   selectedLga?: string;
+  hasSoilTest?: boolean;
+  soilDataProvenance?: SoilDataProvenance;
+  soilPhotoProvided?: boolean;
+  soilPhoto?: string | null;
+  soilTextureImageEstimate?: SoilTextureImageEstimate | null;
+  photoAnalysisResult?: {
+    estimatedTextureClass?: string;
+    confidence?: number;
+    fileName?: string;
+  } | null;
 }
 
 export type AnalysisStep =

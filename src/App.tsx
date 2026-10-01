@@ -11,6 +11,7 @@ import { AnalysisProgressModal } from './components/AnalysisProgressModal';
 import { ApiDocsModal } from './components/ApiDocsModal';
 import { AdminLogin } from './components/admin/AdminLogin';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { SoilDataTestView } from './components/admin/SoilDataTestView';
 import { SoilData, FarmAnalysisResult, AnalysisStep } from './types/soilwise';
 import { performFarmAnalysis } from './services/soilwiseService';
 import { auth, AUTHORIZED_ADMIN_EMAIL, isAdmin } from './lib/firebase';
@@ -19,7 +20,7 @@ import { AlertCircle, Lock } from 'lucide-react';
 
 export default function App() {
   // Start directly with Farm Analysis as the primary experience
-  const [currentView, setCurrentView] = useState<'farm-data' | 'analysis' | 'admin-login' | 'admin-dashboard'>('farm-data');
+  const [currentView, setCurrentView] = useState<'farm-data' | 'analysis' | 'admin-login' | 'admin-dashboard' | 'admin-soil-data-test'>('farm-data');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep>('idle');
   const [analysisResult, setAnalysisResult] = useState<FarmAnalysisResult | null>(null);
@@ -44,6 +45,8 @@ export default function App() {
     // Route for password reset or action links
     if (mode === 'resetPassword' || oobCode || path.includes('/reset-password') || hash.includes('/reset-password')) {
       setCurrentView('admin-login');
+    } else if (path.includes('/admin/soil-data-test') || hash.includes('/admin/soil-data-test')) {
+      setCurrentView('admin-soil-data-test');
     } else if (path.includes('/admin/dashboard') || hash.includes('/admin/dashboard')) {
       setCurrentView('admin-dashboard');
     } else if (path.includes('/admin') || hash.includes('/admin')) {
@@ -55,13 +58,13 @@ export default function App() {
       const unsubscribe = onAuthStateChanged(auth, (user) => {
         setCurrentUser(user);
         if (user && isAdmin(user)) {
-          // If authorized admin landed on admin login, allow transition to dashboard
-          if (currentView === 'admin-dashboard') {
-            setCurrentView('admin-dashboard');
+          // If authorized admin landed on admin login or test view, preserve view
+          if (currentView === 'admin-dashboard' || currentView === 'admin-soil-data-test') {
+            // Keep current admin view
           }
         } else {
-          // Block non-admins from dashboard
-          if (currentView === 'admin-dashboard') {
+          // Block non-admins from dashboard and developer test
+          if (currentView === 'admin-dashboard' || currentView === 'admin-soil-data-test') {
             setCurrentView('admin-login');
           }
         }
@@ -74,7 +77,24 @@ export default function App() {
     soilData: SoilData,
     coordinates: { latitude: number; longitude: number },
     analysisDate: string,
-    locationDetails?: { state?: string; lga?: string }
+    locationDetails?: { state?: string; lga?: string },
+    soilTestMeta?: {
+      hasSoilTest?: boolean;
+      soilDataProvenance?: 'user_measured' | 'location_estimated' | 'unavailable';
+      soilPhotoProvided?: boolean;
+      soilPhoto?: string | null;
+      soilTextureImageEstimate?: {
+        texture: string;
+        confidence: number;
+        source: 'image_estimate';
+        status: 'preliminary';
+      } | null;
+      photoAnalysisResult?: {
+        estimatedTextureClass?: string;
+        confidence?: number;
+        fileName?: string;
+      } | null;
+    }
   ) => {
     setIsSubmitting(true);
     setAppError(null);
@@ -86,7 +106,8 @@ export default function App() {
         coordinates,
         analysisDate,
         (step) => setAnalysisStep(step),
-        locationDetails
+        locationDetails,
+        soilTestMeta
       );
 
       setAnalysisResult(result);
@@ -148,7 +169,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#fbfbf9] text-stone-900 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       {/* Top Bar Navigation (shown on main public app) */}
-      {currentView !== 'admin-login' && currentView !== 'admin-dashboard' && (
+      {currentView !== 'admin-login' && currentView !== 'admin-dashboard' && currentView !== 'admin-soil-data-test' && (
         <Navbar
           currentView={currentView}
           onNavigate={(view) => {
@@ -221,6 +242,11 @@ export default function App() {
                 window.history.pushState({}, '', '/admin/login');
               }}
               onBackToApp={navigateToHome}
+              onOpenSoilDataTest={() => {
+                setCurrentView('admin-soil-data-test');
+                window.history.pushState({}, '', '/admin/soil-data-test');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           ) : (
             <AdminLogin
@@ -232,10 +258,32 @@ export default function App() {
             />
           )
         )}
+
+        {/* Developer Soil Data & GPS Validation Test (Admin only) */}
+        {currentView === 'admin-soil-data-test' && (
+          isAdminUser ? (
+            <SoilDataTestView
+              onBackToApp={navigateToHome}
+              onGoToDashboard={() => {
+                setCurrentView('admin-dashboard');
+                window.history.pushState({}, '', '/admin/dashboard');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          ) : (
+            <AdminLogin
+              onSuccess={() => {
+                setCurrentView('admin-soil-data-test');
+                window.history.pushState({}, '', '/admin/soil-data-test');
+              }}
+              onBackToApp={navigateToHome}
+            />
+          )
+        )}
       </main>
 
       {/* Footer with Discreet Admin Access */}
-      {currentView !== 'admin-login' && currentView !== 'admin-dashboard' && (
+      {currentView !== 'admin-login' && currentView !== 'admin-dashboard' && currentView !== 'admin-soil-data-test' && (
         <footer className="py-6 border-t border-stone-200/80 bg-stone-50/50 text-center text-xs text-stone-500">
           <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <span>SoilWise AI &bull; Agricultural Intelligence MVP</span>

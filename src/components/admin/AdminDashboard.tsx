@@ -17,7 +17,21 @@ import {
   RefreshCw,
   AlertCircle,
   TrendingUp,
-  MessageSquare
+  MessageSquare,
+  Compass,
+  ShieldCheck,
+  AlertTriangle,
+  Copy,
+  Check,
+  Terminal,
+  Cloud,
+  Lock,
+  Key,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
+  Info
 } from 'lucide-react';
 import { 
   collection, 
@@ -28,16 +42,42 @@ import {
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth, AUTHORIZED_ADMIN_EMAIL, FeedbackSubmission } from '../../lib/firebase';
+import { fetchCredentialsStatus } from '../../services/soilDataValidationService';
+import { TokenCacheMetadata } from '../../types/soilDataValidation';
 
 interface AdminDashboardProps {
   onLogout: () => void;
   onBackToApp: () => void;
+  onOpenSoilDataTest?: () => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBackToApp }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBackToApp, onOpenSoilDataTest }) => {
   const [submissions, setSubmissions] = useState<FeedbackSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isdaStatus, setIsdaStatus] = useState<TokenCacheMetadata | null>(null);
+  const [showCloudRunGuide, setShowCloudRunGuide] = useState<boolean>(true);
+  const [isCheckingCredentials, setIsCheckingCredentials] = useState<boolean>(false);
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
+  const [guideActiveTab, setGuideActiveTab] = useState<'console' | 'cli' | 'secrets'>('console');
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedLabel(label);
+    setTimeout(() => setCopiedLabel(null), 2500);
+  };
+
+  const handleRefreshDiagnostics = async () => {
+    setIsCheckingCredentials(true);
+    try {
+      const data = await fetchCredentialsStatus();
+      setIsdaStatus(data);
+    } catch (err: any) {
+      console.warn('Could not refresh credentials:', err.message);
+    } finally {
+      setIsCheckingCredentials(false);
+    }
+  };
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +88,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBack
 
   // Modal Detail
   const [selectedRecord, setSelectedRecord] = useState<FeedbackSubmission | null>(null);
+
+  // Check iSDAsoil server credentials on mount
+  useEffect(() => {
+    fetchCredentialsStatus()
+      .then((data) => setIsdaStatus(data))
+      .catch((err) => console.warn('Could not load iSDA credentials status:', err.message));
+  }, []);
 
   // Listen to Firestore real-time updates
   useEffect(() => {
@@ -228,6 +275,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBack
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {onOpenSoilDataTest && (
+            <button
+              onClick={onOpenSoilDataTest}
+              className="px-3.5 py-2 text-xs font-semibold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 rounded-xl transition-colors border border-emerald-300 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Compass className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Soil Data &amp; GPS Test</span>
+            </button>
+          )}
+
           <button
             onClick={onBackToApp}
             className="px-3.5 py-2 text-xs font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors border border-stone-200 flex items-center gap-1.5 cursor-pointer"
@@ -261,6 +318,544 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBack
           <span>{errorMessage}</span>
         </div>
       )}
+
+      {/* iSDAsoil Server Environment & Credentials Diagnostic Card + Cloud Run Guide */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/90 shadow-2xs space-y-6">
+        {/* Section Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-stone-200 pb-5">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+              isdaStatus?.credentialsConfigured
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                : 'bg-amber-100 text-amber-800 border border-amber-300'
+            }`}>
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-stone-900">
+                  Cloud Run Environment &amp; iSDAsoil Credentials Diagnostic
+                </h2>
+                {isdaStatus?.credentialsConfigured ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Verified: All Variables Present
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    Action Required: Variables Missing
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-stone-500 mt-1">
+                Real-time check verifying the existence of required server-side variables without revealing confidential values.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
+            <button
+              onClick={() => setShowCloudRunGuide(!showCloudRunGuide)}
+              className="px-3.5 py-2 text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors border border-stone-200 flex items-center gap-1.5 cursor-pointer"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-stone-600" />
+              <span>{showCloudRunGuide ? 'Hide Cloud Run Guide' : 'Cloud Run Setup Guide'}</span>
+              {showCloudRunGuide ? (
+                <ChevronUp className="w-3.5 h-3.5 text-stone-400" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+              )}
+            </button>
+
+            {onOpenSoilDataTest && (
+              <button
+                onClick={onOpenSoilDataTest}
+                className="px-3.5 py-2 text-xs font-semibold text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors border border-emerald-200 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Soil Data &amp; GPS Test</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleRefreshDiagnostics}
+              disabled={isCheckingCredentials}
+              className="px-3.5 py-2 text-xs font-semibold text-stone-800 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors border border-stone-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Query server for variable existence"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-stone-600 ${isCheckingCredentials ? 'animate-spin' : ''}`} />
+              <span>{isCheckingCredentials ? 'Checking...' : 'Re-check Environment'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Diagnostic Check Grid: Verifying Existence Without Revealing Values */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-stone-500" />
+              Server-Side Variable Existence Audit
+            </span>
+            <span className="text-[11px] text-stone-400">
+              Values strictly obscured for security &bull; Runtime inspect only
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Variable 1: ISDA_USERNAME */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              isdaStatus?.usernameStatus === 'loaded'
+                ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950'
+                : 'bg-amber-50/50 border-amber-200 text-amber-950'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-stone-500" />
+                  <span className="text-xs font-mono font-bold">ISDA_USERNAME</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => copyToClipboard('ISDA_USERNAME', 'ISDA_USERNAME')}
+                    className="p-1 hover:bg-black/5 rounded text-stone-500 hover:text-stone-800 cursor-pointer"
+                    title="Copy variable name"
+                  >
+                    {copiedLabel === 'ISDA_USERNAME' ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                  {isdaStatus?.usernameStatus === 'loaded' ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-200 text-emerald-800 border border-emerald-300 flex items-center gap-0.5">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
+                      EXISTS
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200 text-amber-800 border border-amber-300 flex items-center gap-0.5">
+                      <AlertTriangle className="w-2.5 h-2.5" />
+                      NOT FOUND
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1 mt-2">
+                <div className="text-[11px] text-stone-500 flex items-center justify-between">
+                  <span>Variable Value:</span>
+                  <span className="font-mono text-[10px] text-stone-400 font-medium">Confidential</span>
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-stone-200 font-mono text-xs flex items-center justify-between">
+                  {isdaStatus?.usernameStatus === 'loaded' ? (
+                    <>
+                      <span className="text-emerald-700 tracking-wider font-bold">
+                        &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-sans font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                        Loaded in process.env
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-amber-700 text-[11px] font-sans">
+                      Missing from Cloud Run environment
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-[10px] text-stone-500 mt-2.5">
+                Identifies registered account for iSDAsoil token generation.
+              </p>
+            </div>
+
+            {/* Variable 2: ISDA_PASSWORD */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              isdaStatus?.passwordStatus === 'loaded'
+                ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950'
+                : 'bg-amber-50/50 border-amber-200 text-amber-950'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-stone-500" />
+                  <span className="text-xs font-mono font-bold">ISDA_PASSWORD</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => copyToClipboard('ISDA_PASSWORD', 'ISDA_PASSWORD')}
+                    className="p-1 hover:bg-black/5 rounded text-stone-500 hover:text-stone-800 cursor-pointer"
+                    title="Copy variable name"
+                  >
+                    {copiedLabel === 'ISDA_PASSWORD' ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                  {isdaStatus?.passwordStatus === 'loaded' ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-200 text-emerald-800 border border-emerald-300 flex items-center gap-0.5">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
+                      EXISTS
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200 text-amber-800 border border-amber-300 flex items-center gap-0.5">
+                      <AlertTriangle className="w-2.5 h-2.5" />
+                      NOT FOUND
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1 mt-2">
+                <div className="text-[11px] text-stone-500 flex items-center justify-between">
+                  <span>Variable Value:</span>
+                  <span className="font-mono text-[10px] text-stone-400 font-medium">Confidential</span>
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-stone-200 font-mono text-xs flex items-center justify-between">
+                  {isdaStatus?.passwordStatus === 'loaded' ? (
+                    <>
+                      <span className="text-emerald-700 tracking-wider font-bold">
+                        &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-sans font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                        Loaded in process.env
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-amber-700 text-[11px] font-sans">
+                      Missing from Cloud Run environment
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-[10px] text-stone-500 mt-2.5">
+                Authenticates against iSDAsoil OAuth2 login endpoint.
+              </p>
+            </div>
+
+            {/* Target Endpoint & Architecture Verification */}
+            <div className="p-4 rounded-2xl border bg-stone-50 border-stone-200 text-stone-900">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Cloud className="w-3.5 h-3.5 text-stone-500" />
+                  <span className="text-xs font-mono font-bold">LOGIN ENDPOINT</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stone-200 text-stone-700">
+                  HTTP POST
+                </span>
+              </div>
+
+              <div className="space-y-1 mt-2">
+                <div className="text-[11px] text-stone-500 flex items-center justify-between">
+                  <span>Auth Endpoint:</span>
+                  <span className="text-[10px] text-stone-400">form-urlencoded</span>
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-stone-200 font-mono text-xs text-stone-800 truncate">
+                  https://api.isda-africa.com/login
+                </div>
+              </div>
+
+              <p className="text-[10px] text-stone-500 mt-2.5">
+                {isdaStatus?.hasCachedToken
+                  ? `JWT Active in Memory (${isdaStatus.expiresInSeconds}s left, ${isdaStatus.cacheHitsCount} hits)`
+                  : 'Tokens cached in server memory on first request'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Clear, Step-by-Step Cloud Run Configuration Guide */}
+        {showCloudRunGuide && (
+          <div className="bg-stone-50/90 rounded-2xl p-5 sm:p-6 border border-stone-200/90 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2">
+                  <Cloud className="w-4 h-4 text-emerald-700" />
+                  Cloud Run Configuration Guide: Adding ISDA_USERNAME &amp; ISDA_PASSWORD
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Follow these step-by-step instructions to securely supply credentials in Google Cloud Run.
+                </p>
+              </div>
+
+              {/* Guide Mode Tabs */}
+              <div className="flex items-center bg-stone-200/70 p-1 rounded-xl text-xs">
+                <button
+                  onClick={() => setGuideActiveTab('console')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                    guideActiveTab === 'console'
+                      ? 'bg-white text-stone-900 shadow-2xs font-bold'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  Cloud Console (Web)
+                </button>
+                <button
+                  onClick={() => setGuideActiveTab('cli')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                    guideActiveTab === 'cli'
+                      ? 'bg-white text-stone-900 shadow-2xs font-bold'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  gcloud CLI (Terminal)
+                </button>
+                <button
+                  onClick={() => setGuideActiveTab('secrets')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                    guideActiveTab === 'secrets'
+                      ? 'bg-white text-stone-900 shadow-2xs font-bold'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  Secret Manager (Best Practice)
+                </button>
+              </div>
+            </div>
+
+            {/* TAB 1: CLOUD CONSOLE WEB UI INSTRUCTIONS */}
+            {guideActiveTab === 'console' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1.5">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
+                      1
+                    </div>
+                    <h4 className="font-bold text-stone-900">Open Cloud Run</h4>
+                    <p className="text-stone-500 text-[11px] leading-relaxed">
+                      Go to the{' '}
+                      <a
+                        href="https://console.cloud.google.com/run"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-700 underline font-semibold inline-flex items-center gap-0.5"
+                      >
+                        Google Cloud Run Console <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                      , select project, and click the <strong className="text-stone-800">soilwise-ai-web</strong> service.
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1.5">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
+                      2
+                    </div>
+                    <h4 className="font-bold text-stone-900">Edit &amp; Deploy</h4>
+                    <p className="text-stone-500 text-[11px] leading-relaxed">
+                      In the top action bar of the service details page, click the button labeled{' '}
+                      <strong className="text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">
+                        Edit &amp; Deploy New Revision
+                      </strong>.
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1.5">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
+                      3
+                    </div>
+                    <h4 className="font-bold text-stone-900">Add Variables</h4>
+                    <p className="text-stone-500 text-[11px] leading-relaxed">
+                      Navigate to the <strong className="text-stone-800">Variables &amp; Secrets</strong> tab under Container settings. Click <strong className="text-stone-800">Add Variable</strong> twice to configure both entries.
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1.5">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
+                      4
+                    </div>
+                    <h4 className="font-bold text-stone-900">Deploy &amp; Verify</h4>
+                    <p className="text-stone-500 text-[11px] leading-relaxed">
+                      Click <strong className="text-stone-800">Deploy</strong> at the bottom. Once deployment finishes, return here and click <strong className="text-stone-800">Re-check Environment</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Variable Specifications Table */}
+                <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-2xs">
+                  <div className="px-4 py-2.5 bg-stone-100/70 border-b border-stone-200 text-xs font-bold text-stone-700 flex items-center justify-between">
+                    <span>Required Cloud Run Environment Variables</span>
+                    <span className="text-[11px] text-stone-500 font-normal">Click to copy variable names</span>
+                  </div>
+                  <div className="divide-y divide-stone-200 text-xs font-mono">
+                    <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-stone-400 font-sans font-medium text-[11px]">1.</span>
+                        <span className="font-bold text-stone-900 bg-stone-100 px-2 py-0.5 rounded border border-stone-200">
+                          ISDA_USERNAME
+                        </span>
+                        <span className="text-stone-500 font-sans text-[11px]">
+                          &rarr; Set value to your registered iSDA account email
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard('ISDA_USERNAME', 'ISDA_USERNAME')}
+                        className="px-2.5 py-1 text-[11px] text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors border border-stone-200 flex items-center gap-1 font-sans cursor-pointer self-start sm:self-center"
+                      >
+                        {copiedLabel === 'ISDA_USERNAME' ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="text-emerald-700">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy Name</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-stone-400 font-sans font-medium text-[11px]">2.</span>
+                        <span className="font-bold text-stone-900 bg-stone-100 px-2 py-0.5 rounded border border-stone-200">
+                          ISDA_PASSWORD
+                        </span>
+                        <span className="text-stone-500 font-sans text-[11px]">
+                          &rarr; Set value to your iSDA API account password
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard('ISDA_PASSWORD', 'ISDA_PASSWORD')}
+                        className="px-2.5 py-1 text-[11px] text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors border border-stone-200 flex items-center gap-1 font-sans cursor-pointer self-start sm:self-center"
+                      >
+                        {copiedLabel === 'ISDA_PASSWORD' ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="text-emerald-700">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy Name</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: GCLOUD CLI INSTRUCTIONS */}
+            {guideActiveTab === 'cli' && (
+              <div className="space-y-3">
+                <p className="text-xs text-stone-600">
+                  Execute this command from your terminal or Google Cloud Shell to update the Cloud Run service in a single step:
+                </p>
+
+                <div className="relative bg-stone-900 rounded-xl p-4 text-xs font-mono text-emerald-400 overflow-x-auto shadow-inner">
+                  <div className="flex items-center justify-between text-[11px] text-stone-400 pb-2 mb-2 border-b border-stone-800 font-sans">
+                    <span className="flex items-center gap-1.5 text-stone-300">
+                      <Terminal className="w-3.5 h-3.5" />
+                      Google Cloud SDK Command
+                    </span>
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          'gcloud run services update soilwise-ai-web \\\n  --region=europe-west1 \\\n  --set-env-vars="ISDA_USERNAME=your_username@example.com,ISDA_PASSWORD=your_api_password"',
+                          'gcloud-cmd'
+                        )
+                      }
+                      className="px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedLabel === 'gcloud-cmd' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Copied Command</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy Command</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="text-stone-100 whitespace-pre-wrap leading-relaxed">
+{`gcloud run services update soilwise-ai-web \\
+  --region=europe-west1 \\
+  --set-env-vars="ISDA_USERNAME=your_username@example.com,ISDA_PASSWORD=your_api_password"`}
+                  </pre>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  Replace <code className="font-mono text-stone-700 font-semibold">your_username@example.com</code> and <code className="font-mono text-stone-700 font-semibold">your_api_password</code> with your actual credentials before running.
+                </p>
+              </div>
+            )}
+
+            {/* TAB 3: SECRET MANAGER BEST PRACTICE */}
+            {guideActiveTab === 'secrets' && (
+              <div className="space-y-3">
+                <p className="text-xs text-stone-600">
+                  For maximum security, avoid storing passwords in plain environment variables. Store <code className="font-mono font-bold">ISDA_PASSWORD</code> in Google Cloud Secret Manager and reference it in Cloud Run:
+                </p>
+
+                <div className="relative bg-stone-900 rounded-xl p-4 text-xs font-mono text-stone-200 overflow-x-auto shadow-inner">
+                  <div className="flex items-center justify-between text-[11px] text-stone-400 pb-2 mb-2 border-b border-stone-800 font-sans">
+                    <span className="flex items-center gap-1.5 text-stone-300">
+                      <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                      Secret Manager Setup Commands
+                    </span>
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          '# 1. Create the secret in Secret Manager\necho -n "your_password" | gcloud secrets create isda-password --data-file=-\n\n# 2. Grant Cloud Run service account access\ngcloud secrets add-iam-policy-binding isda-password \\\n  --member="serviceAccount:YOUR_SERVICE_ACCOUNT" \\\n  --role="roles/secretmanager.secretAccessor"\n\n# 3. Mount secret as ISDA_PASSWORD in Cloud Run\ngcloud run services update soilwise-ai-web \\\n  --region=europe-west1 \\\n  --set-secrets="ISDA_PASSWORD=isda-password:latest" \\\n  --set-env-vars="ISDA_USERNAME=your_username@example.com"',
+                          'secrets-cmd'
+                        )
+                      }
+                      className="px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedLabel === 'secrets-cmd' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy Commands</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed">
+{`# 1. Store password in Secret Manager
+echo -n "your_password" | gcloud secrets create isda-password --data-file=-
+
+# 2. Mount secret as ISDA_PASSWORD in Cloud Run
+gcloud run services update soilwise-ai-web \\
+  --region=europe-west1 \\
+  --set-secrets="ISDA_PASSWORD=isda-password:latest" \\
+  --set-env-vars="ISDA_USERNAME=your_username@example.com"`}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Crucial Security Rules Callout */}
+            <div className="p-3.5 bg-stone-100 rounded-xl border border-stone-200 text-xs text-stone-700 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-emerald-800 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-stone-900">
+                  Security Principles Enforced:
+                </p>
+                <ul className="list-disc list-inside text-[11px] text-stone-600 space-y-0.5">
+                  <li>
+                    <strong className="text-stone-800">Never prefix with VITE_:</strong> Environment variables prefixed with <code className="font-mono bg-white px-1 rounded">VITE_</code> are embedded into public JavaScript bundles during build time. Always use <code className="font-mono bg-white px-1 rounded">ISDA_USERNAME</code> and <code className="font-mono bg-white px-1 rounded">ISDA_PASSWORD</code>.
+                  </li>
+                  <li>
+                    <strong className="text-stone-800">Zero Startup Crashes:</strong> SoilWise AI uses lazy on-demand authentication. If credentials are missing or incorrect, Cloud Run will still start and listen on port 3000 normally.
+                  </li>
+                  <li>
+                    <strong className="text-stone-800">No Secrets in Browser:</strong> Diagnostics only verify boolean presence in server environment. Plaintext values are never returned over HTTP or logged.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Section 9: Dashboard Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">

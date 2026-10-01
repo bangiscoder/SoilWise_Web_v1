@@ -7,11 +7,22 @@ import {
   Check, 
   Info,
   ShieldCheck,
-  Loader2
+  Loader2,
+  Camera,
+  Upload,
+  Trash2,
+  CheckCircle2,
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react';
 import { SoilData } from '../types/soilwise';
 import { NIGERIA_STATES_LGAS } from '../data/nigeriaStatesLga';
 import { useLanguage } from '../context/LanguageContext';
+import { 
+  analyzeSoilPhoto, 
+  validateSoilPhotoFile, 
+  SoilPhotoAnalysisResult 
+} from '../services/soilPhotoAnalysisService';
 import heroBackground from '../assets/images/farm_analysis_hero_1790600561723.jpg';
 
 interface FarmDataFormProps {
@@ -19,7 +30,16 @@ interface FarmDataFormProps {
     soilData: SoilData,
     coordinates: { latitude: number; longitude: number },
     analysisDate: string,
-    locationDetails?: { state?: string; lga?: string }
+    locationDetails?: { state?: string; lga?: string },
+    soilTestMeta?: {
+      hasSoilTest?: boolean;
+      soilPhoto?: string | null;
+      photoAnalysisResult?: {
+        estimatedTextureClass?: string;
+        confidence?: number;
+        fileName?: string;
+      } | null;
+    }
   ) => void;
   isSubmitting: boolean;
 }
@@ -27,7 +47,20 @@ interface FarmDataFormProps {
 export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitting }) => {
   const { t } = useLanguage();
 
-  // Required Soil fields - all start completely blank with no prefilled values
+  // Active form section: 1 = Soil Analysis Data, 2 = Soil Photo, 3 = Farm Location
+  const [currentSection, setCurrentSection] = useState<1 | 2 | 3>(1);
+
+  // Soil test availability state (null = not selected yet, true = Yes, false = No)
+  const [hasSoilTest, setHasSoilTest] = useState<boolean | null>(null);
+
+  // Optional soil photo upload state
+  const [soilPhotoFile, setSoilPhotoFile] = useState<File | null>(null);
+  const [soilPhotoPreview, setSoilPhotoPreview] = useState<string | null>(null);
+  const [soilPhotoAnalysis, setSoilPhotoAnalysis] = useState<SoilPhotoAnalysisResult | null>(null);
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState<boolean>(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Soil fields - start completely blank with no prefilled values
   const [ph, setPh] = useState<string>('');
   const [nitrogen, setNitrogen] = useState<string>('');
   const [phosphorus, setPhosphorus] = useState<string>('');
@@ -89,105 +122,248 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
     );
   };
 
-  const validate = (): boolean => {
-    const errs: Record<string, string> = {};
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    // pH validation (Required, 1.0 - 14.0)
-    if (!ph.trim()) {
-      errs.ph = t('form.validation.phRequired');
-    } else {
-      const phNum = parseFloat(ph);
-      if (isNaN(phNum) || phNum < 1 || phNum > 14) {
-        errs.ph = t('form.validation.phRange');
-      }
+    setPhotoError(null);
+    const validation = validateSoilPhotoFile(file);
+    if (!validation.valid) {
+      setPhotoError(validation.error || 'Invalid file');
+      return;
     }
 
-    // Nitrogen validation (Required, >= 0 mg/kg)
-    if (!nitrogen.trim()) {
-      errs.nitrogen = t('form.validation.nRequired');
-    } else {
-      const nNum = parseFloat(nitrogen);
-      if (isNaN(nNum) || nNum < 0) {
-        errs.nitrogen = t('form.validation.nRange');
-      }
+    setSoilPhotoFile(file);
+    setIsAnalyzingPhoto(true);
+
+    try {
+      const analysis = await analyzeSoilPhoto(file);
+      setSoilPhotoPreview(analysis.imageUrl);
+      setSoilPhotoAnalysis(analysis);
+    } catch (err: any) {
+      console.error('Photo processing error:', err);
+      setPhotoError(err.message || 'Could not process soil photo.');
+    } finally {
+      setIsAnalyzingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setSoilPhotoFile(null);
+    setSoilPhotoPreview(null);
+    setSoilPhotoAnalysis(null);
+    setPhotoError(null);
+  };
+
+  // Validate Section 1: Soil Analysis Data
+  const validateSection1 = (): boolean => {
+    const errs: Record<string, string> = { ...errors };
+
+    // 1. Soil test availability question must be explicitly chosen
+    if (hasSoilTest === null) {
+      errs.hasSoilTest = t('form.validation.hasSoilTestRequired');
+      setErrors(errs);
+      const el = document.getElementById('soilTestQuestion');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
     }
 
-    // Phosphorus validation (Required, >= 0 mg/kg)
-    if (!phosphorus.trim()) {
-      errs.phosphorus = t('form.validation.pRequired');
-    } else {
-      const pNum = parseFloat(phosphorus);
-      if (isNaN(pNum) || pNum < 0) {
-        errs.phosphorus = t('form.validation.pRange');
+    delete errs.hasSoilTest;
+
+    // 2. Only validate manual soil chemistry if user selected YES
+    if (hasSoilTest === true) {
+      let firstErrorKey: string | null = null;
+
+      // pH validation (Required, 1.0 - 14.0)
+      if (!ph.trim()) {
+        errs.ph = t('form.validation.phRequired');
+        firstErrorKey = firstErrorKey || 'ph';
+      } else {
+        const phNum = parseFloat(ph);
+        if (isNaN(phNum) || phNum < 1 || phNum > 14) {
+          errs.ph = t('form.validation.phRange');
+          firstErrorKey = firstErrorKey || 'ph';
+        } else {
+          delete errs.ph;
+        }
       }
+
+      // Nitrogen validation (Required, >= 0 mg/kg)
+      if (!nitrogen.trim()) {
+        errs.nitrogen = t('form.validation.nRequired');
+        firstErrorKey = firstErrorKey || 'nitrogen';
+      } else {
+        const nNum = parseFloat(nitrogen);
+        if (isNaN(nNum) || nNum < 0) {
+          errs.nitrogen = t('form.validation.nRange');
+          firstErrorKey = firstErrorKey || 'nitrogen';
+        } else {
+          delete errs.nitrogen;
+        }
+      }
+
+      // Phosphorus validation (Required, >= 0 mg/kg)
+      if (!phosphorus.trim()) {
+        errs.phosphorus = t('form.validation.pRequired');
+        firstErrorKey = firstErrorKey || 'phosphorus';
+      } else {
+        const pNum = parseFloat(phosphorus);
+        if (isNaN(pNum) || pNum < 0) {
+          errs.phosphorus = t('form.validation.pRange');
+          firstErrorKey = firstErrorKey || 'phosphorus';
+        } else {
+          delete errs.phosphorus;
+        }
+      }
+
+      // Potassium validation (Required, >= 0 mg/kg)
+      if (!potassium.trim()) {
+        errs.potassium = t('form.validation.kRequired');
+        firstErrorKey = firstErrorKey || 'potassium';
+      } else {
+        const kNum = parseFloat(potassium);
+        if (isNaN(kNum) || kNum < 0) {
+          errs.potassium = t('form.validation.kRange');
+          firstErrorKey = firstErrorKey || 'potassium';
+        } else {
+          delete errs.potassium;
+        }
+      }
+
+      // Electrical Conductivity validation (Required, >= 0 dS/m)
+      if (!ec.trim()) {
+        errs.ec = t('form.validation.ecRequired');
+        firstErrorKey = firstErrorKey || 'ec';
+      } else {
+        const ecNum = parseFloat(ec);
+        if (isNaN(ecNum) || ecNum < 0) {
+          errs.ec = t('form.validation.ecRange');
+          firstErrorKey = firstErrorKey || 'ec';
+        } else {
+          delete errs.ec;
+        }
+      }
+
+      setErrors(errs);
+      if (firstErrorKey) {
+        const el = document.getElementById(`${firstErrorKey}Input`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (el as HTMLElement)?.focus?.();
+        return false;
+      }
+    } else {
+      delete errs.ph;
+      delete errs.nitrogen;
+      delete errs.phosphorus;
+      delete errs.potassium;
+      delete errs.ec;
+      setErrors(errs);
     }
 
-    // Potassium validation (Required, >= 0 mg/kg)
-    if (!potassium.trim()) {
-      errs.potassium = t('form.validation.kRequired');
-    } else {
-      const kNum = parseFloat(potassium);
-      if (isNaN(kNum) || kNum < 0) {
-        errs.potassium = t('form.validation.kRange');
-      }
-    }
+    return true;
+  };
 
-    // Electrical Conductivity validation (Required, >= 0 dS/m)
-    if (!ec.trim()) {
-      errs.ec = t('form.validation.ecRequired');
-    } else {
-      const ecNum = parseFloat(ec);
-      if (isNaN(ecNum) || ecNum < 0) {
-        errs.ec = t('form.validation.ecRange');
-      }
-    }
+  // Validate Section 3: Farm Location
+  const validateLocation = (): boolean => {
+    const errs: Record<string, string> = { ...errors };
+    let firstErrorKey: string | null = null;
 
-    // Latitude validation (Required, -90 to +90)
     if (!latitude.trim()) {
       errs.latitude = t('form.validation.latRequired');
+      firstErrorKey = firstErrorKey || 'latitude';
     } else {
       const latNum = parseFloat(latitude);
       if (isNaN(latNum) || latNum < -90 || latNum > 90) {
         errs.latitude = t('form.validation.latRange');
+        firstErrorKey = firstErrorKey || 'latitude';
+      } else {
+        delete errs.latitude;
       }
     }
 
-    // Longitude validation (Required, -180 to +180)
     if (!longitude.trim()) {
       errs.longitude = t('form.validation.lngRequired');
+      firstErrorKey = firstErrorKey || 'longitude';
     } else {
       const lonNum = parseFloat(longitude);
       if (isNaN(lonNum) || lonNum < -180 || lonNum > 180) {
         errs.longitude = t('form.validation.lngRange');
+        firstErrorKey = firstErrorKey || 'longitude';
+      } else {
+        delete errs.longitude;
       }
     }
 
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    if (firstErrorKey) {
+      const el = document.getElementById(`${firstErrorKey}Input`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (el as HTMLElement)?.focus?.();
+      return false;
+    }
+
+    return true;
+  };
+
+  // Section Navigation Handlers
+  const handleContinueToPhoto = () => {
+    if (validateSection1()) {
+      setCurrentSection(2);
+      const formEl = document.getElementById('farmAnalysisForm');
+      formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleBackToSoilData = () => {
+    setCurrentSection(1);
+    const formEl = document.getElementById('farmAnalysisForm');
+    formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleContinueToLocation = () => {
+    setCurrentSection(3);
+    const formEl = document.getElementById('farmAnalysisForm');
+    formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleBackToPhoto = () => {
+    setCurrentSection(2);
+    const formEl = document.getElementById('farmAnalysisForm');
+    formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
-    if (!validate()) {
-      // Scroll to the first error
-      const firstErrorKey = Object.keys(errors)[0];
-      const errorEl = document.getElementById(`${firstErrorKey}Input`);
-      if (errorEl) {
-        errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        errorEl.focus();
-      }
+    // Check Section 1 validity
+    if (!validateSection1()) {
+      setCurrentSection(1);
       return;
     }
 
-    const soilData: SoilData = {
-      ph: parseFloat(ph),
-      nitrogen: parseFloat(nitrogen),
-      phosphorus: parseFloat(phosphorus),
-      potassium: parseFloat(potassium),
-      ec: parseFloat(ec),
-    };
+    // Check Section 3 validity
+    if (!validateLocation()) {
+      setCurrentSection(3);
+      return;
+    }
+
+    const soilData: SoilData = hasSoilTest === true
+      ? {
+          ph: parseFloat(ph),
+          nitrogen: parseFloat(nitrogen),
+          phosphorus: parseFloat(phosphorus),
+          potassium: parseFloat(potassium),
+          ec: parseFloat(ec),
+        }
+      : {
+          // Standard regional baseline reference values when user does not have a laboratory soil test
+          ph: 6.5,
+          nitrogen: 25,
+          phosphorus: 15,
+          potassium: 120,
+          ec: 0.25,
+        };
 
     // System automatically captures the analysis date internally
     const autoAnalysisDate = new Date().toISOString().split('T')[0];
@@ -202,6 +378,15 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
       {
         state: selectedState || undefined,
         lga: selectedLga || undefined,
+      },
+      {
+        hasSoilTest: hasSoilTest === true,
+        soilPhoto: soilPhotoPreview || null,
+        photoAnalysisResult: soilPhotoAnalysis ? {
+          estimatedTextureClass: soilPhotoAnalysis.estimatedTextureClass,
+          confidence: soilPhotoAnalysis.confidence,
+          fileName: soilPhotoAnalysis.fileName,
+        } : null,
       }
     );
   };
@@ -306,470 +491,891 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
       </section>
 
       {/* 3. MAIN FARM ANALYSIS FORM */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+      <section id="farmAnalysisForm" className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        {/* Header of input area */}
+        <div className="text-center sm:text-left space-y-1 mb-6">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#1b4332]">
+            {t('nav.farmAnalysis')}
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">
+            {t('nav.farmAnalysis')}
+          </h2>
+          <p className="text-sm text-stone-600">
+            {t('hero.caption')}
+          </p>
+        </div>
+
+        {/* 3-Section Stepper Indicator */}
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border border-stone-200/90 shadow-xs mb-8">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            {/* Step 1: Soil Analysis Data */}
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentSection(1);
+                document.getElementById('farmAnalysisForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentSection === 1
+                  ? 'bg-[#1b4332] text-white shadow-xs'
+                  : hasSoilTest !== null
+                  ? 'bg-stone-50 hover:bg-stone-100 text-stone-800'
+                  : 'bg-transparent hover:bg-stone-50 text-stone-500'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                currentSection === 1
+                  ? 'bg-white/20 text-white'
+                  : hasSoilTest !== null
+                  ? 'bg-[#1b4332] text-white'
+                  : 'bg-stone-200 text-stone-700'
+              }`}>
+                {hasSoilTest !== null && currentSection !== 1 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '1'}
+              </div>
+              <div className="hidden sm:block min-w-0">
+                <span className="text-xs font-bold block truncate">1. Soil Analysis</span>
+                <span className={`text-[10px] block truncate ${currentSection === 1 ? 'text-emerald-100' : 'text-stone-500'}`}>
+                  {hasSoilTest === true ? 'Lab data' : hasSoilTest === false ? 'No lab test' : 'Required'}
+                </span>
+              </div>
+              <span className="sm:hidden text-xs font-bold truncate">1. Soil</span>
+            </button>
+
+            {/* Step 2: Soil Photo */}
+            <button
+              type="button"
+              onClick={() => {
+                if (validateSection1()) {
+                  setCurrentSection(2);
+                  document.getElementById('farmAnalysisForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentSection === 2
+                  ? 'bg-[#1b4332] text-white shadow-xs'
+                  : soilPhotoPreview
+                  ? 'bg-stone-50 hover:bg-stone-100 text-stone-800'
+                  : 'bg-transparent hover:bg-stone-50 text-stone-500'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                currentSection === 2
+                  ? 'bg-white/20 text-white'
+                  : soilPhotoPreview
+                  ? 'bg-[#1b4332] text-white'
+                  : 'bg-stone-200 text-stone-700'
+              }`}>
+                {soilPhotoPreview && currentSection !== 2 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '2'}
+              </div>
+              <div className="hidden sm:block min-w-0">
+                <span className="text-xs font-bold block truncate">2. Soil Photo</span>
+                <span className={`text-[10px] block truncate ${currentSection === 2 ? 'text-emerald-100' : 'text-stone-500'}`}>
+                  {soilPhotoPreview ? 'Photo attached' : 'Optional'}
+                </span>
+              </div>
+              <span className="sm:hidden text-xs font-bold truncate">2. Photo</span>
+            </button>
+
+            {/* Step 3: Farm Location */}
+            <button
+              type="button"
+              onClick={() => {
+                if (validateSection1()) {
+                  setCurrentSection(3);
+                  document.getElementById('farmAnalysisForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentSection === 3
+                  ? 'bg-[#1b4332] text-white shadow-xs'
+                  : latitude && longitude
+                  ? 'bg-stone-50 hover:bg-stone-100 text-stone-800'
+                  : 'bg-transparent hover:bg-stone-50 text-stone-500'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                currentSection === 3
+                  ? 'bg-white/20 text-white'
+                  : latitude && longitude
+                  ? 'bg-[#1b4332] text-white'
+                  : 'bg-stone-200 text-stone-700'
+              }`}>
+                {latitude && longitude && currentSection !== 3 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '3'}
+              </div>
+              <div className="hidden sm:block min-w-0">
+                <span className="text-xs font-bold block truncate">3. Farm Location</span>
+                <span className={`text-[10px] block truncate ${currentSection === 3 ? 'text-emerald-100' : 'text-stone-500'}`}>
+                  {latitude && longitude ? 'GPS set' : 'Required'}
+                </span>
+              </div>
+              <span className="sm:hidden text-xs font-bold truncate">3. Location</span>
+            </button>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Header of input area */}
-          <div className="text-center sm:text-left space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#1b4332]">
-              {t('nav.farmAnalysis')}
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">
-              {t('nav.farmAnalysis')}
-            </h2>
-            <p className="text-sm text-stone-600">
-              {t('hero.caption')}
-            </p>
-          </div>
-
-          {/* Section: Your Soil Data */}
-          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-5">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
-                <FlaskConical className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-stone-900">
-                  {t('form.soilDataTitle')}
-                </h3>
-                <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
-                  {t('form.soilDataSubtitle')}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 pt-2">
-              {/* pH */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="phInput" className="block text-xs font-semibold text-stone-700">
-                    {t('form.phLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-stone-400">1.0 &ndash; 14.0</span>
-                </div>
-                <div className="relative">
-                  <input
-                    id="phInput"
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    max="14"
-                    placeholder={t('form.phPlaceholder')}
-                    value={ph}
-                    onChange={(e) => {
-                      setPh(e.target.value);
-                      if (errors.ph) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.ph;
-                          return next;
-                        });
-                      }
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                      errors.ph ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
-                    pH
-                  </span>
-                </div>
-                <p className="text-[11px] text-stone-500 mt-1 leading-normal">
-                  {t('form.phHelper')}
-                </p>
-                {errors.ph && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" /> {errors.ph}
-                  </p>
-                )}
-              </div>
-
-              {/* Nitrogen */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="nitrogenInput" className="block text-xs font-semibold text-stone-700">
-                    {t('form.nLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-stone-400">&ge; 0 mg/kg</span>
-                </div>
-                <div className="relative">
-                  <input
-                    id="nitrogenInput"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder={t('form.nPlaceholder')}
-                    value={nitrogen}
-                    onChange={(e) => {
-                      setNitrogen(e.target.value);
-                      if (errors.nitrogen) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.nitrogen;
-                          return next;
-                        });
-                      }
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                      errors.nitrogen ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
-                    mg/kg
-                  </span>
-                </div>
-                <p className="text-[11px] text-stone-500 mt-1 leading-normal">
-                  {t('form.nHelper')}
-                </p>
-                {errors.nitrogen && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" /> {errors.nitrogen}
-                  </p>
-                )}
-              </div>
-
-              {/* Phosphorus */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="phosphorusInput" className="block text-xs font-semibold text-stone-700">
-                    {t('form.pLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-stone-400">&ge; 0 mg/kg</span>
-                </div>
-                <div className="relative">
-                  <input
-                    id="phosphorusInput"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder={t('form.pPlaceholder')}
-                    value={phosphorus}
-                    onChange={(e) => {
-                      setPhosphorus(e.target.value);
-                      if (errors.phosphorus) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.phosphorus;
-                          return next;
-                        });
-                      }
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                      errors.phosphorus ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
-                    mg/kg
-                  </span>
-                </div>
-                <p className="text-[11px] text-stone-500 mt-1 leading-normal">
-                  {t('form.pHelper')}
-                </p>
-                {errors.phosphorus && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" /> {errors.phosphorus}
-                  </p>
-                )}
-              </div>
-
-              {/* Potassium */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="potassiumInput" className="block text-xs font-semibold text-stone-700">
-                    {t('form.kLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-stone-400">&ge; 0 mg/kg</span>
-                </div>
-                <div className="relative">
-                  <input
-                    id="potassiumInput"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder={t('form.kPlaceholder')}
-                    value={potassium}
-                    onChange={(e) => {
-                      setPotassium(e.target.value);
-                      if (errors.potassium) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.potassium;
-                          return next;
-                        });
-                      }
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                      errors.potassium ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
-                    mg/kg
-                  </span>
-                </div>
-                <p className="text-[11px] text-stone-500 mt-1 leading-normal">
-                  {t('form.kHelper')}
-                </p>
-                {errors.potassium && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" /> {errors.potassium}
-                  </p>
-                )}
-              </div>
-
-              {/* Electrical Conductivity (EC) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="ecInput" className="block text-xs font-semibold text-stone-700">
-                    {t('form.ecLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-stone-400">&ge; 0 dS/m</span>
-                </div>
-                <div className="relative">
-                  <input
-                    id="ecInput"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder={t('form.ecPlaceholder')}
-                    value={ec}
-                    onChange={(e) => {
-                      setEc(e.target.value);
-                      if (errors.ec) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.ec;
-                          return next;
-                        });
-                      }
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                      errors.ec ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
-                    dS/m
-                  </span>
-                </div>
-                <p className="text-[11px] text-stone-500 mt-1 leading-normal">
-                  {t('form.ecHelper')}
-                </p>
-                {errors.ec && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" /> {errors.ec}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Explanation Under "Your Soil Data" */}
-            <div className="pt-3 border-t border-stone-100 flex items-start gap-2.5 text-xs text-stone-600">
-              <Info className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
-              <p className="leading-relaxed">
-                {t('form.soilDataExplanation')}
-              </p>
-            </div>
-          </div>
-
-          {/* Section: Farm Location */}
-          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          {/* SECTION 1: SOIL ANALYSIS DATA */}
+          {currentSection === 1 && (
+            <div id="soilDataSection" className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
-                  <MapPin className="w-4 h-4" />
+                  <FlaskConical className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-stone-900">
-                    {t('form.locationTitle')}
+                    {t('form.soilDataTitle')}
                   </h3>
                   <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
-                    {t('form.locationSubtitle')}
+                    {t('form.soilDataSubtitle')}
                   </p>
                 </div>
               </div>
 
-              {/* Geolocation Button */}
-              <button
-                type="button"
-                onClick={handleGetLocation}
-                disabled={geoLoading}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-[#1b4332] bg-[#f0f5ee] hover:bg-[#e4ede1] border border-[#1b4332]/25 rounded-xl transition-colors active:scale-[0.98] disabled:opacity-50 cursor-pointer shrink-0"
-              >
-                <Navigation className={`w-3.5 h-3.5 ${geoLoading ? 'animate-spin' : ''}`} />
-                <span>{geoLoading ? t('form.acquiringGps') : t('form.getMyLocation')}</span>
-              </button>
-            </div>
-
-            {/* Geolocation Message Banners */}
-            {geoError && (
-              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
-                <span>{geoError}</span>
-              </div>
-            )}
-
-            {geoSuccess && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-800">
-                <Check className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span>{t('form.locationAcquired')}</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-2">
-              {/* Latitude */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="latitudeInput" className="block text-xs font-semibold text-stone-700">
-                    {t('form.latitudeLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-stone-400">4.0&deg; to 14.0&deg;</span>
+              {/* 1. SOIL-TEST AVAILABILITY QUESTION (Before the pH, N, P, K and EC inputs) */}
+              <div id="soilTestQuestion" className="p-5 sm:p-6 bg-[#fafaf7] rounded-2xl border border-stone-200/90 space-y-4">
+                <div className="space-y-1.5">
+                  <h4 className="text-sm sm:text-base font-bold text-stone-900 leading-snug">
+                    {t('form.hasSoilTestQuestion')} <span className="text-red-500">*</span>
+                  </h4>
+                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                    {t('form.hasSoilTestSubtitle')}
+                  </p>
                 </div>
-                <input
-                  id="latitudeInput"
-                  type="number"
-                  step="any"
-                  placeholder={t('form.latitudePlaceholder')}
-                  value={latitude}
-                  onChange={(e) => {
-                    setLatitude(e.target.value);
-                    setGeoSuccess(false);
-                    if (errors.latitude) {
+
+                {/* Two Options: Yes / No - neither preselected */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  {/* Option 1: Yes, I have a soil test result */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasSoilTest(true);
                       setErrors((prev) => {
                         const next = { ...prev };
-                        delete next.latitude;
+                        delete next.hasSoilTest;
                         return next;
                       });
-                    }
-                  }}
-                  className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                    errors.latitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                  } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                />
-                {errors.latitude && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" /> {errors.latitude}
+                    }}
+                    className={`p-4 rounded-xl border text-left transition-all flex items-start gap-3.5 cursor-pointer ${
+                      hasSoilTest === true
+                        ? 'border-[#1b4332] bg-[#f0f5ee] text-[#1b4332] ring-2 ring-[#1b4332]/25 font-semibold shadow-xs'
+                        : 'border-stone-200 bg-white hover:border-stone-300 text-stone-800'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                      hasSoilTest === true ? 'border-[#1b4332] bg-[#1b4332] text-white' : 'border-stone-300 bg-stone-100'
+                    }`}>
+                      {hasSoilTest === true && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs sm:text-sm font-bold block text-stone-900">
+                        {t('form.hasSoilTestYes')}
+                      </span>
+                      <span className="text-[11px] text-stone-500 block">
+                        Enter laboratory pH, N, P, K & EC values
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Option 2: No, I don't have a soil test result */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasSoilTest(false);
+                      // Clear any manual soil parameter errors
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.hasSoilTest;
+                        delete next.ph;
+                        delete next.nitrogen;
+                        delete next.phosphorus;
+                        delete next.potassium;
+                        delete next.ec;
+                        return next;
+                      });
+                    }}
+                    className={`p-4 rounded-xl border text-left transition-all flex items-start gap-3.5 cursor-pointer ${
+                      hasSoilTest === false
+                        ? 'border-[#1b4332] bg-[#f0f5ee] text-[#1b4332] ring-2 ring-[#1b4332]/25 font-semibold shadow-xs'
+                        : 'border-stone-200 bg-white hover:border-stone-300 text-stone-800'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                      hasSoilTest === false ? 'border-[#1b4332] bg-[#1b4332] text-white' : 'border-stone-300 bg-stone-100'
+                    }`}>
+                      {hasSoilTest === false && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs sm:text-sm font-bold block text-stone-900">
+                        {t('form.hasSoilTestNo')}
+                      </span>
+                      <span className="text-[11px] text-stone-500 block">
+                        Continue with initial assessment using location
+                      </span>
+                    </div>
+                  </button>
+                </div>
+
+                {errors.hasSoilTest && (
+                  <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{errors.hasSoilTest}</span>
                   </p>
                 )}
               </div>
 
-              {/* Longitude */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="longitudeInput" className="block text-xs font-semibold text-stone-700">
-                    {t('form.longitudeLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-stone-400">2.5&deg; to 15.0&deg;</span>
+              {/* 2. WHEN THE USER SELECTS YES */}
+              {hasSoilTest === true && (
+                <div className="space-y-5 pt-2">
+                  {/* Contextual label: Source: User-provided soil test result */}
+                  <div className="flex items-center justify-between pb-1 border-b border-stone-100">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1b4332] bg-[#f0f5ee] px-3 py-1 rounded-full border border-[#1b4332]/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1b4332]" />
+                      {t('form.soilTestSourceUser')}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                    {/* pH */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label htmlFor="phInput" className="block text-xs font-semibold text-stone-700">
+                          {t('form.phLabel')} <span className="text-red-500">*</span>
+                        </label>
+                        <span className="text-[11px] text-stone-400">1.0 &ndash; 14.0</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="phInput"
+                          type="number"
+                          step="0.01"
+                          min="1"
+                          max="14"
+                          placeholder={t('form.phPlaceholder')}
+                          value={ph}
+                          onChange={(e) => {
+                            setPh(e.target.value);
+                            if (errors.ph) {
+                              setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.ph;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                            errors.ph ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                          } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
+                          pH
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 leading-normal">
+                        {t('form.phHelper')}
+                      </p>
+                      {errors.ph && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" /> {errors.ph}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Nitrogen */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label htmlFor="nitrogenInput" className="block text-xs font-semibold text-stone-700">
+                          {t('form.nLabel')} <span className="text-red-500">*</span>
+                        </label>
+                        <span className="text-[11px] text-stone-400">&ge; 0 mg/kg</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="nitrogenInput"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('form.nPlaceholder')}
+                          value={nitrogen}
+                          onChange={(e) => {
+                            setNitrogen(e.target.value);
+                            if (errors.nitrogen) {
+                              setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.nitrogen;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                            errors.nitrogen ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                          } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
+                          mg/kg
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 leading-normal">
+                        {t('form.nHelper')}
+                      </p>
+                      {errors.nitrogen && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" /> {errors.nitrogen}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Phosphorus */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label htmlFor="phosphorusInput" className="block text-xs font-semibold text-stone-700">
+                          {t('form.pLabel')} <span className="text-red-500">*</span>
+                        </label>
+                        <span className="text-[11px] text-stone-400">&ge; 0 mg/kg</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="phosphorusInput"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('form.pPlaceholder')}
+                          value={phosphorus}
+                          onChange={(e) => {
+                            setPhosphorus(e.target.value);
+                            if (errors.phosphorus) {
+                              setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.phosphorus;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                            errors.phosphorus ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                          } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
+                          mg/kg
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 leading-normal">
+                        {t('form.pHelper')}
+                      </p>
+                      {errors.phosphorus && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" /> {errors.phosphorus}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Potassium */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label htmlFor="potassiumInput" className="block text-xs font-semibold text-stone-700">
+                          {t('form.kLabel')} <span className="text-red-500">*</span>
+                        </label>
+                        <span className="text-[11px] text-stone-400">&ge; 0 mg/kg</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="potassiumInput"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('form.kPlaceholder')}
+                          value={potassium}
+                          onChange={(e) => {
+                            setPotassium(e.target.value);
+                            if (errors.potassium) {
+                              setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.potassium;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                            errors.potassium ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                          } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
+                          mg/kg
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 leading-normal">
+                        {t('form.kHelper')}
+                      </p>
+                      {errors.potassium && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" /> {errors.potassium}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Electrical Conductivity (EC) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label htmlFor="ecInput" className="block text-xs font-semibold text-stone-700">
+                          {t('form.ecLabel')} <span className="text-red-500">*</span>
+                        </label>
+                        <span className="text-[11px] text-stone-400">&ge; 0 dS/m</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="ecInput"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('form.ecPlaceholder')}
+                          value={ec}
+                          onChange={(e) => {
+                            setEc(e.target.value);
+                            if (errors.ec) {
+                              setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.ec;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                            errors.ec ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                          } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs text-stone-400 pointer-events-none">
+                          dS/m
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 leading-normal">
+                        {t('form.ecHelper')}
+                      </p>
+                      {errors.ec && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" /> {errors.ec}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Explanation Under "Your Soil Data" */}
+                  <div className="pt-3 border-t border-stone-100 flex items-start gap-2.5 text-xs text-stone-600">
+                    <Info className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">
+                      {t('form.soilDataExplanation')}
+                    </p>
+                  </div>
                 </div>
-                <input
-                  id="longitudeInput"
-                  type="number"
-                  step="any"
-                  placeholder={t('form.longitudePlaceholder')}
-                  value={longitude}
-                  onChange={(e) => {
-                    setLongitude(e.target.value);
-                    setGeoSuccess(false);
-                    if (errors.longitude) {
-                      setErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.longitude;
-                        return next;
-                      });
-                    }
-                  }}
-                  className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
-                    errors.longitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
-                  } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
-                />
-                {errors.longitude && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" /> {errors.longitude}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* State and LGA Dynamic Dropdowns */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-1 border-t border-stone-100">
-              <div>
-                <label htmlFor="stateInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
-                  {t('form.stateLabel')}
-                </label>
-                <select
-                  id="stateInput"
-                  value={selectedState}
-                  onChange={(e) => {
-                    const newState = e.target.value;
-                    setSelectedState(newState);
-                    setSelectedLga('');
-                  }}
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer"
-                >
-                  <option value="">{t('form.statePlaceholder')}...</option>
-                  {NIGERIA_STATES_LGAS.map((s) => (
-                    <option key={s.state} value={s.state}>
-                      {s.state}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-stone-400 mt-1">
-                  {t('common.optional')} &bull; Nigerian State
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="lgaInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
-                  {t('form.lgaLabel')}
-                </label>
-                <select
-                  id="lgaInput"
-                  value={selectedLga}
-                  disabled={!selectedState}
-                  onChange={(e) => setSelectedLga(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {selectedState ? `${t('form.lgaPlaceholder')}...` : `${t('form.lgaSelectStateFirst')}...`}
-                  </option>
-                  {(NIGERIA_STATES_LGAS.find((s) => s.state === selectedState)?.lgas || []).map((lga) => (
-                    <option key={lga} value={lga}>
-                      {lga}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-stone-400 mt-1">
-                  {t('common.optional')} &bull; Local Government Area
-                </p>
-              </div>
-            </div>
-
-            {/* Explanation Under "Farm Location" */}
-            <div className="pt-3 border-t border-stone-100 flex items-start gap-2.5 text-xs text-stone-600">
-              <Info className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
-              <p className="leading-relaxed">
-                {t('form.coordsExplanation')}
-              </p>
-            </div>
-          </div>
-
-          {/* Analyse Farm Action Button */}
-          <div className="pt-3">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-4 px-6 bg-[#1b4332] hover:bg-[#143225] text-white font-bold text-base rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>{t('form.submittingButton')}</span>
-                </>
-              ) : (
-                <span>{t('form.submitButton')}</span>
               )}
-            </button>
-            <p className="text-center text-xs text-stone-500 mt-2.5">
-              OpenStreetMap &bull; ISRIC SoilGrids &bull; Open-Meteo
-            </p>
-          </div>
+
+              {/* 3. WHEN THE USER SELECTS NO */}
+              {hasSoilTest === false && (
+                <div className="space-y-4 pt-2">
+                  {/* Reassuring Information Panel */}
+                  <div className="p-5 sm:p-6 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-3.5 text-stone-700">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-[#1b4332] shrink-0" />
+                      <h4 className="text-base sm:text-lg font-bold text-stone-900">
+                        {t('form.noTestTitle')}
+                      </h4>
+                    </div>
+                    
+                    <p className="text-xs sm:text-sm leading-relaxed text-stone-700">
+                      {t('form.noTestParagraph1')}
+                    </p>
+
+                    <p className="text-xs sm:text-sm leading-relaxed text-stone-700 font-medium">
+                      {t('form.noTestParagraph2')}
+                    </p>
+
+                    <div className="p-3.5 bg-white/80 rounded-xl border border-emerald-300/40 text-xs sm:text-sm text-stone-700 leading-relaxed">
+                      {t('form.noTestParagraph3')}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Section 1 Navigation Action */}
+              <div className="pt-4 border-t border-stone-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleContinueToPhoto}
+                  className="px-6 py-3 bg-[#1b4332] hover:bg-[#143225] text-white font-bold text-sm rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span>{t('form.continueToPhoto')}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 2: SOIL PHOTO */}
+          {currentSection === 2 && (
+            <div id="soilPhotoSection" className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-stone-900">
+                    {t('form.photoTitle')}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
+                    {t('form.photoSubtitle')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload Drop/Click Area or Preview */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-1">
+                  <span className="text-sm font-bold text-stone-900">
+                    {t('form.uploadPhoto')}
+                  </span>
+                  <span className="text-xs text-stone-500 font-medium">
+                    Optional
+                  </span>
+                </div>
+
+                {!soilPhotoPreview ? (
+                  <div>
+                    <label
+                      htmlFor="soilPhotoUpload"
+                      className="border-2 border-dashed border-stone-300 hover:border-[#1b4332] rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-white hover:bg-[#f0f5ee]/40 group"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-[#f0f5ee] border border-stone-200 flex items-center justify-center text-stone-600 group-hover:text-[#1b4332] group-hover:border-[#1b4332]/40 transition-colors shadow-xs mb-3">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-bold text-stone-900 group-hover:text-[#1b4332] transition-colors">
+                        {t('form.uploadPhoto')}
+                      </span>
+                      <span className="text-xs text-stone-500 mt-1">
+                        {t('form.supportedFormats')}
+                      </span>
+                      <input
+                        id="soilPhotoUpload"
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-white rounded-2xl border border-stone-200 space-y-3.5 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3.5">
+                        <img
+                          src={soilPhotoPreview}
+                          alt="Uploaded farm soil"
+                          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-stone-300 shadow-xs shrink-0"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="text-xs sm:text-sm font-bold text-stone-900 block truncate max-w-[200px] sm:max-w-xs">
+                            {soilPhotoFile?.name || 'soil-sample.jpg'}
+                          </span>
+                          <span className="text-[11px] text-stone-500 block">
+                            {soilPhotoFile ? `${(soilPhotoFile.size / 1024).toFixed(1)} KB` : ''}
+                          </span>
+                          {isAnalyzingPhoto ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 font-medium">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              {t('form.analyzingPhoto')}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              {t('form.photoUploadedSuccess')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Change / Remove Buttons */}
+                      <div className="flex items-center gap-2">
+                        <label
+                          htmlFor="changeSoilPhotoUpload"
+                          className="px-3.5 py-2 text-xs font-semibold text-stone-700 bg-stone-50 hover:bg-stone-100 border border-stone-300 rounded-xl transition-colors cursor-pointer"
+                        >
+                          {t('form.changePhoto')}
+                          <input
+                            id="changeSoilPhotoUpload"
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                            onChange={handlePhotoSelect}
+                            className="hidden"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-xl transition-colors cursor-pointer"
+                          title={t('form.removePhoto')}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Display preliminary estimated texture indicator if processed */}
+                    {soilPhotoAnalysis?.estimatedTextureClass && (
+                      <div className="pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs">
+                        <span className="text-stone-600 font-medium">
+                          Preliminary Visual Texture Indicator:
+                        </span>
+                        <span className="font-bold text-[#1b4332] bg-[#f0f5ee] px-2.5 py-0.5 rounded-md border border-[#1b4332]/20">
+                          {soilPhotoAnalysis.estimatedTextureClass}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {photoError && (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" /> {photoError}
+                  </p>
+                )}
+
+                {/* 5. PHOTO GUIDANCE */}
+                <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/70 flex items-start gap-2.5 text-xs text-stone-600">
+                  <Info className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    {t('form.photoGuidance')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 2 Navigation Buttons */}
+              <div className="pt-4 border-t border-stone-100 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToSoilData}
+                  className="px-5 py-2.5 border border-stone-300 hover:bg-stone-50 text-stone-700 font-semibold text-sm rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>{t('form.backToSoilData')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinueToLocation}
+                  className="px-6 py-3 bg-[#1b4332] hover:bg-[#143225] text-white font-bold text-sm rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span>{t('form.continueToLocation')}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 3: FARM LOCATION */}
+          {currentSection === 3 && (
+            <div id="farmLocationSection" className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-stone-900">
+                      {t('form.locationTitle')}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
+                      {t('form.locationSubtitle')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Geolocation Button */}
+                <button
+                  type="button"
+                  onClick={handleGetLocation}
+                  disabled={geoLoading}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-[#1b4332] bg-[#f0f5ee] hover:bg-[#e4ede1] border border-[#1b4332]/25 rounded-xl transition-colors active:scale-[0.98] disabled:opacity-50 cursor-pointer shrink-0"
+                >
+                  <Navigation className={`w-3.5 h-3.5 ${geoLoading ? 'animate-spin' : ''}`} />
+                  <span>{geoLoading ? t('form.acquiringGps') : t('form.getMyLocation')}</span>
+                </button>
+              </div>
+
+              {/* Geolocation Message Banners */}
+              {geoError && (
+                <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                  <span>{geoError}</span>
+                </div>
+              )}
+
+              {geoSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-800">
+                  <Check className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{t('form.locationAcquired')}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-2">
+                {/* Latitude */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="latitudeInput" className="block text-xs font-semibold text-stone-700">
+                      {t('form.latitudeLabel')} <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-stone-400">4.0&deg; to 14.0&deg;</span>
+                  </div>
+                  <input
+                    id="latitudeInput"
+                    type="number"
+                    step="any"
+                    placeholder={t('form.latitudePlaceholder')}
+                    value={latitude}
+                    onChange={(e) => {
+                      setLatitude(e.target.value);
+                      setGeoSuccess(false);
+                      if (errors.latitude) {
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.latitude;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                      errors.latitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                  />
+                  {errors.latitude && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" /> {errors.latitude}
+                    </p>
+                  )}
+                </div>
+
+                {/* Longitude */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="longitudeInput" className="block text-xs font-semibold text-stone-700">
+                      {t('form.longitudeLabel')} <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-stone-400">2.5&deg; to 15.0&deg;</span>
+                  </div>
+                  <input
+                    id="longitudeInput"
+                    type="number"
+                    step="any"
+                    placeholder={t('form.longitudePlaceholder')}
+                    value={longitude}
+                    onChange={(e) => {
+                      setLongitude(e.target.value);
+                      setGeoSuccess(false);
+                      if (errors.longitude) {
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.longitude;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-stone-50 border ${
+                      errors.longitude ? 'border-red-400 bg-red-50/30' : 'border-stone-300'
+                    } rounded-xl text-sm font-mono text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all`}
+                  />
+                  {errors.longitude && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" /> {errors.longitude}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* State and LGA Dynamic Dropdowns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-1 border-t border-stone-100">
+                <div>
+                  <label htmlFor="stateInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
+                    {t('form.stateLabel')}
+                  </label>
+                  <select
+                    id="stateInput"
+                    value={selectedState}
+                    onChange={(e) => {
+                      const newState = e.target.value;
+                      setSelectedState(newState);
+                      setSelectedLga('');
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer"
+                  >
+                    <option value="">{t('form.statePlaceholder')}...</option>
+                    {NIGERIA_STATES_LGAS.map((s) => (
+                      <option key={s.state} value={s.state}>
+                        {s.state}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-stone-400 mt-1">
+                    {t('common.optional')} &bull; Nigerian State
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="lgaInput" className="block text-xs font-semibold text-stone-700 mb-1.5">
+                    {t('form.lgaLabel')}
+                  </label>
+                  <select
+                    id="lgaInput"
+                    value={selectedLga}
+                    disabled={!selectedState}
+                    onChange={(e) => setSelectedLga(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {selectedState ? `${t('form.lgaPlaceholder')}...` : `${t('form.lgaSelectStateFirst')}...`}
+                    </option>
+                    {(NIGERIA_STATES_LGAS.find((s) => s.state === selectedState)?.lgas || []).map((lga) => (
+                      <option key={lga} value={lga}>
+                        {lga}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-stone-400 mt-1">
+                    {t('common.optional')} &bull; Local Government Area
+                  </p>
+                </div>
+              </div>
+
+              {/* Explanation Under "Farm Location" */}
+              <div className="pt-3 border-t border-stone-100 flex items-start gap-2.5 text-xs text-stone-600">
+                <Info className="w-4 h-4 text-[#1b4332] shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  {t('form.coordsExplanation')}
+                </p>
+              </div>
+
+              {/* Section 3 Navigation Actions */}
+              <div className="pt-4 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToPhoto}
+                  className="px-5 py-2.5 border border-stone-300 hover:bg-stone-50 text-stone-700 font-semibold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>{t('form.backToPhoto')}</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="py-3.5 px-8 bg-[#1b4332] hover:bg-[#143225] text-white font-bold text-base rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>{t('form.submittingButton')}</span>
+                    </>
+                  ) : (
+                    <span>{t('form.submitButton')}</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </form>
       </section>
     </div>

@@ -16,7 +16,9 @@ import {
   UserCheck,
   AlertCircle,
   Sparkles,
-  MapPinCheck
+  MapPinCheck,
+  Camera,
+  CheckCircle2
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
@@ -52,8 +54,14 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
     environmentalInfo, 
     analysisDate,
     selectedState,
-    selectedLga
+    selectedLga,
+    hasSoilTest,
+    soilDataProvenance,
+    soilPhoto,
+    photoAnalysisResult
   } = analysis;
+
+  const isUserMeasured = soilDataProvenance === 'user_measured' || (hasSoilTest !== false && soilDataProvenance !== 'location_estimated');
 
   const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false);
   const [isAssistantModalOpen, setIsAssistantModalOpen] = useState(false);
@@ -204,12 +212,25 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             </div>
           </div>
 
-          {/* User-Provided Soil Profile */}
+          {/* Soil Chemistry Profile */}
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-2">
-              <h3 className="text-sm font-bold text-stone-900">
-                {t('results.soilDataTitle')}
-              </h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-stone-900">
+                  {t('results.soilDataTitle')}
+                </h3>
+                {isUserMeasured ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1b4332] bg-[#f0f5ee] px-2.5 py-0.5 rounded-full border border-[#1b4332]/20">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{t('results.soilTestSourceUser')}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>{t('results.soilTestSourceLocation')}</span>
+                  </span>
+                )}
+              </div>
 
               {/* State and LGA contextual badges if available */}
               {(stateToDisplay || lgaToDisplay) && (
@@ -228,6 +249,14 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 </div>
               )}
             </div>
+
+            {/* If location estimated, show transparent provenance statement */}
+            {!isUserMeasured && (
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2 leading-relaxed">
+                <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <p>{t('results.soilTestSourceLocationNotice')}</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
               {/* pH */}
@@ -276,6 +305,46 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Uploaded Soil Photograph (Visual Preliminary Assessment Only) */}
+          {soilPhoto && (
+            <div className="pt-2 border-t border-stone-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-[#1b4332]" />
+                  <h3 className="text-sm font-bold text-stone-900">
+                    {t('results.soilPhotoCardTitle')}
+                  </h3>
+                </div>
+                {photoAnalysisResult?.estimatedTextureClass && (
+                  <span className="text-xs font-semibold text-[#1b4332] bg-[#f0f5ee] px-3 py-1 rounded-full border border-[#1b4332]/20">
+                    {photoAnalysisResult.estimatedTextureClass}
+                  </span>
+                )}
+              </div>
+
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 flex flex-col sm:flex-row sm:items-center gap-4">
+                <img
+                  src={soilPhoto}
+                  alt="Farm soil sample"
+                  className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border border-stone-300 shadow-xs shrink-0"
+                />
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-stone-900">
+                      {t('results.soilPhotoVisualEstimateTitle')}:
+                    </span>
+                    <span className="font-semibold text-[#1b4332]">
+                      {photoAnalysisResult?.estimatedTextureClass || 'Visual Texture Analyzed'}
+                    </span>
+                  </div>
+                  <p className="text-stone-600 leading-relaxed">
+                    {t('results.soilPhotoVisualNotice')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Conditional Soil Texture Display (ISRIC SoilGrids 2.0) */}
           <div className="pt-2 border-t border-stone-100 space-y-3">
