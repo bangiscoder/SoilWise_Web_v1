@@ -133,7 +133,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
     return null;
   };
 
-  const isdaLocationAvailable = Boolean(analysis.soilEvidence?.location_estimate?.available);
+  const isdaLocationAvailable = Boolean(
+    analysis.soilEvidence?.location_estimate?.available ||
+    (analysis.soilEvidence?.location_estimate?.properties && Object.keys(analysis.soilEvidence.location_estimate.properties).length > 0)
+  );
 
   const handlePrint = () => {
     window.print();
@@ -513,13 +516,21 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 </div>
 
                 {/* Depth Selection Tabs (Responsive equal-width grid on mobile, flex on desktop) */}
-                <div className="w-full sm:w-auto grid grid-cols-3 sm:flex items-center gap-1 bg-stone-100 p-1 rounded-xl text-xs font-semibold">
+                <div 
+                  role="tablist"
+                  aria-label="Soil depth increments"
+                  className="w-full sm:w-auto grid grid-cols-3 sm:flex items-center gap-1 bg-stone-100 p-1 rounded-xl text-xs font-semibold"
+                >
                   <button
                     type="button"
+                    role="tab"
+                    id="tab-depth-0-20"
+                    aria-selected={activeDepthTab === '0-20'}
+                    aria-controls="panel-depth-properties"
                     onClick={() => setActiveDepthTab('0-20')}
-                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold ${
+                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold select-none ${
                       activeDepthTab === '0-20'
-                        ? 'bg-white text-stone-900 shadow-xs'
+                        ? 'bg-white text-stone-900 shadow-xs font-bold border border-stone-200/50'
                         : 'text-stone-600 hover:text-stone-900'
                     }`}
                   >
@@ -527,10 +538,14 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    id="tab-depth-20-50"
+                    aria-selected={activeDepthTab === '20-50'}
+                    aria-controls="panel-depth-properties"
                     onClick={() => setActiveDepthTab('20-50')}
-                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold ${
+                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold select-none ${
                       activeDepthTab === '20-50'
-                        ? 'bg-white text-stone-900 shadow-xs'
+                        ? 'bg-white text-stone-900 shadow-xs font-bold border border-stone-200/50'
                         : 'text-stone-600 hover:text-stone-900'
                     }`}
                   >
@@ -538,10 +553,14 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    id="tab-depth-landscape"
+                    aria-selected={activeDepthTab === 'landscape'}
+                    aria-controls="panel-depth-properties"
                     onClick={() => setActiveDepthTab('landscape')}
-                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold ${
+                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold select-none ${
                       activeDepthTab === 'landscape'
-                        ? 'bg-white text-stone-900 shadow-xs'
+                        ? 'bg-white text-stone-900 shadow-xs font-bold border border-stone-200/50'
                         : 'text-stone-600 hover:text-stone-900'
                     }`}
                   >
@@ -552,8 +571,21 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
               {/* Complete Multi-Depth Table (Responsive horizontally scrollable container with min-width to ensure all results remain visible and readable on mobile) */}
               {isdaLocationAvailable ? (
-                <div className="overflow-x-auto rounded-2xl border border-stone-200/90 shadow-2xs">
-                  <table className="w-full min-w-[560px] text-left text-xs">
+                <div 
+                  id="panel-depth-properties"
+                  role="tabpanel"
+                  aria-labelledby={`tab-depth-${activeDepthTab}`}
+                  className="space-y-1.5"
+                >
+                  <div className="flex sm:hidden items-center justify-between text-[11px] text-stone-500 px-1">
+                    <span className="font-semibold text-stone-700">
+                      {activeDepthTab === '0-20' ? '0–20 cm (Topsoil)' : activeDepthTab === '20-50' ? '20–50 cm (Subsoil)' : 'Site & Landscape'}
+                    </span>
+                    <span className="text-[10px] text-stone-400">Swipe to view all columns &rarr;</span>
+                  </div>
+
+                  <div className="w-full max-w-full overflow-x-auto rounded-2xl border border-stone-200/90 shadow-2xs overscroll-x-contain">
+                    <table className="w-full min-w-[560px] text-left text-xs">
                     <thead className="bg-stone-50 border-b border-stone-200 text-stone-700 font-bold uppercase tracking-wider text-[11px]">
                       <tr>
                         <th className="py-3 px-4">Soil Property</th>
@@ -711,6 +743,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                     </tbody>
                   </table>
                 </div>
+              </div>
               ) : (
                 <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl text-xs text-stone-600 flex items-start gap-2.5">
                   <Info className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
@@ -1083,6 +1116,8 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           soilData={soilData}
           rainfallOutlook={rainfallOutlook}
           soilTexture={soilTexture}
+          decision={analysis.cropRecommendationDecision}
+          location={location}
         />
 
         {/* 7. TALK TO A CERTIFIED AGRONOMIST DEMO */}

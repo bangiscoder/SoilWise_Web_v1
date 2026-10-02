@@ -1,4 +1,5 @@
 import { SoilWiseNormalisedProfile, LocationValidationResult } from './soilDataValidation';
+import { CropRecommendationDecision } from './cropRecommendation';
 
 export interface SoilData {
   ph: number;
@@ -169,6 +170,7 @@ export interface FarmAnalysisResult {
   } | null;
   soilEvidence?: SoilEvidence;
   locationValidation?: LocationValidationResult | null;
+  cropRecommendationDecision?: CropRecommendationDecision;
 }
 
 export type AnalysisStep =

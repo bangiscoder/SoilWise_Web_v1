@@ -1,0 +1,1821 @@
+{
+  "metadata": {
+    "title": "IAR Crop Variety Descriptors Compendium",
+    "publisher": "Institute for Agricultural Research (IAR), Federal Ministry of Agriculture and Food Security, Ahmadu Bello University, Zaria, Nigeria",
+    "edition": "2023 Edition",
+    "total_varieties_documented": 115,
+    "coverage_period": "1987 - 2020",
+    "intended_use": "Algorithmic Cultivar Matching and AI Decision-Support for SoilWise AI",
+    "schema_version": "1.0.0"
+  },
+  "crop_categories": {
+    "maize": [
+      {
+        "id": "SAMMAZ_11",
+        "variety_name": "SAMMAZ 11",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 5.0,
+        "maturity_class": "Late maturing",
+        "maturity_days": "110-120 days",
+        "characteristics": "Tall, high yield potential and good for intercropping",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Striga Resistant"
+        ],
+        "release_year": 2001,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_12",
+        "variety_name": "SAMMAZ 12",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Extra-early",
+        "maturity_days": "80-85 days",
+        "characteristics": "High yield",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistant to streak virus"
+        ],
+        "release_year": 2001,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_13",
+        "variety_name": "SAMMAZ 13",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Extra-early to Intermediate",
+        "maturity_days": "80-85 days",
+        "characteristics": "High yield",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Resistant to streak virus"
+        ],
+        "release_year": 2001,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_14",
+        "variety_name": "SAMMAZ 14",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 5.8,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "High yield potential and suitable in areas with >600mm rainfall",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga"
+        ],
+        "release_year": 2005,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_15",
+        "variety_name": "SAMMAZ 15",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 6.9,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Good seed quality, high yield potential",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga"
+        ],
+        "release_year": 2008,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_16",
+        "variety_name": "SAMMAZ 16",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 6.4,
+        "maturity_class": "Late Maturing",
+        "maturity_days": "110-120 days",
+        "characteristics": "Good seed quality, high yield",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistant to Striga"
+        ],
+        "release_year": 2008,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_17",
+        "variety_name": "SAMMAZ 17",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 5.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "High yield, medium maturity",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_18",
+        "variety_name": "SAMMAZ 18",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.5,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "High yield",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_19",
+        "variety_name": "SAMMAZ 19",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 5.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "High yield, drought tolerant",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga hermonthica"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_20",
+        "variety_name": "SAMMAZ 20",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Drought tolerance & Low soil nitrogen adaptation",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistant to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_21",
+        "variety_name": "SAMMAZ 21",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 2.0,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "High tolerance to Striga",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Highly tolerant to S. hermonthica"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_22",
+        "variety_name": "SAMMAZ 22",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Highly tolerant to drought and to low soil nitrogen",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistant to streak virus & low soil nitrogen"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_23",
+        "variety_name": "SAMMAZ 23",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Highly tolerant to drought & tolerant to low soil nitrogen",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistance to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_24",
+        "variety_name": "SAMMAZ 24",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Highly tolerant to drought & tolerant to low soil nitrogen",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistance to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_25",
+        "variety_name": "SAMMAZ 25",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Highly tolerant to drought and low soil nitrogen",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistance to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_26",
+        "variety_name": "SAMMAZ 26",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Highly tolerant to drought prone area",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistance to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_27",
+        "variety_name": "SAMMAZ 27",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 5.5,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Drought tolerant and Striga resistant",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga hermonthica & Resistance to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_28",
+        "variety_name": "SAMMAZ 28",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Extra-early",
+        "maturity_days": "80-85 days",
+        "characteristics": "Drought tolerant",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to S. hermonthica and streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_29",
+        "variety_name": "SAMMAZ 29",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Extra-early",
+        "maturity_days": "80-85 days",
+        "characteristics": "Drought escaping",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerance to Striga hermonthica"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_30",
+        "variety_name": "SAMMAZ 30",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Highly tolerant to low soil nitrogen",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Resistance to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_31",
+        "variety_name": "SAMMAZ 31",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Highly tolerant to low soil nitrogen",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Resistance to streak virus"
+        ],
+        "release_year": 2009,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_32",
+        "variety_name": "SAMMAZ 32",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.3,
+        "maturity_class": "Extra-early",
+        "maturity_days": "80-85 days",
+        "characteristics": "Quality protein maize (QPM), good cob and seed size",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Striga resistance and streak virus"
+        ],
+        "release_year": 2011,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_33",
+        "variety_name": "SAMMAZ 33",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 3.9,
+        "maturity_class": "Extra-early",
+        "maturity_days": "80-85 days",
+        "characteristics": "Quality protein maize (QPM), good cob and seed size",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak virus & Striga resistance"
+        ],
+        "release_year": 2011,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_34",
+        "variety_name": "SAMMAZ 34",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.7,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Prolific cob bearing (1-2), good stay green, good seed quality",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak virus"
+        ],
+        "release_year": 2011,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_35",
+        "variety_name": "SAMMAZ 35",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 4.5,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Good grain quality",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus"
+        ],
+        "release_year": 2011,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_36",
+        "variety_name": "SAMMAZ 36",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 5.3,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Good stay green and excellent husk cover",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus"
+        ],
+        "release_year": 2011,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_37",
+        "variety_name": "SAMMAZ 37",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 5.9,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Good quality grains, tolerant to drought",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to streak virus and Striga"
+        ],
+        "release_year": 2011,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_38",
+        "variety_name": "SAMMAZ 38",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 6.4,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Intermediate level of pro-vitamin A content (5.7 ug/g), high yield potential",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerant to streak virus, southern corn leaf spot, and Curvularia leaf spot"
+        ],
+        "release_year": 2013,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_39",
+        "variety_name": "SAMMAZ 39",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 6.8,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "Intermediate level of pro-vitamin A content (6.4 ug/g), high yield potential",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerant to streak virus, southern corn leaf spot, and Curvularia leaf spot"
+        ],
+        "release_year": 2013,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_40",
+        "variety_name": "SAMMAZ 40",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 7.1,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "High yield potential, tolerant to drought and Striga hermonthica",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerance to southern corn leaf blight, southern corn leaf spot, Curvularia leaf spot, maize streak virus, and Striga hermonthica"
+        ],
+        "release_year": 2013,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_41",
+        "variety_name": "SAMMAZ 41",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 7.8,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Early maturing, high grain yield, highly stable, low soil nitrogen tolerant",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga"
+        ],
+        "release_year": 2014,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_42",
+        "variety_name": "SAMMAZ 42",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 7.8,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Early maturing, high grain yield, highly stable, low soil nitrogen tolerant",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga"
+        ],
+        "release_year": 2014,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_43",
+        "variety_name": "SAMMAZ 43",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 9.9,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Intermediate levels of pro-vitamin A content (8.4 ug/g), high grain yield, highly stable",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2015,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_44",
+        "variety_name": "SAMMAZ 44",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 9.7,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Intermediate levels of pro-vitamin A content (8.8 ug/g), high grain yield, highly stable",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2015,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_45",
+        "variety_name": "SAMMAZ 45",
+        "crop_type": "Maize",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Southern Guinea Savanna"
+        ],
+        "potential_yield_tha": 6.2,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Resistance to aflatoxin",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2015,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_46",
+        "variety_name": "SAMMAZ 46",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 9.6,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Early maturity, high grain yield, tolerance to drought, Striga and low soil nitrogen",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2016,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_47",
+        "variety_name": "SAMMAZ 47",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 10.3,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Early maturity, high grain yield, tolerance to drought, Striga and low soil nitrogen",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2016,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_48",
+        "variety_name": "SAMMAZ 48",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 7.8,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Early maturity, stable and high grain yield, tolerance to Striga hermonthica",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2016,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_49",
+        "variety_name": "SAMMAZ 49",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 7.8,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Intermediate levels of pro-vitamin A content (11.3 ug/g)",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2016,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": true,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_50",
+        "variety_name": "SAMMAZ 50",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 9.3,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Tolerance to drought and Striga hermonthica",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2016,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_51",
+        "variety_name": "SAMMAZ 51",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 8.5,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High grain yield, Tolerance to drought and Striga hermonthica",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2016,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_52",
+        "variety_name": "SAMMAZ 52 (DroughtTEGO® WE5229)",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 6.0,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Intermediate levels of provitamin A content (9.8 ug/g)",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2017,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_53",
+        "variety_name": "SAMMAZ 53",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 7.6,
+        "maturity_class": "Extra-Early",
+        "maturity_days": "80-85 days",
+        "characteristics": "Extra-early maturity, high grain yield, tolerance to drought and Striga hermonthica",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2017,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_54",
+        "variety_name": "SAMMAZ 54",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 7.2,
+        "maturity_class": "Extra-Early",
+        "maturity_days": "80-85 days",
+        "characteristics": "Extra-early maturity, high grain yield, tolerance to drought and Striga hermonthica",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2017,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_55",
+        "variety_name": "SAMMAZ 55",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 7.1,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Tolerance to multiple stresses (Striga hermonthica, drought and Low-N)",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2019,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_56",
+        "variety_name": "SAMMAZ 56",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 6.9,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "High quality protein content (14.14%) and stress tolerant",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to streak, rust, leaf blight, curvularia and Striga"
+        ],
+        "release_year": 2019,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_57",
+        "variety_name": "SAMMAZ 57",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 8.4,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High provitamin A content (15.2 ug/g)",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2019,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_58",
+        "variety_name": "SAMMAZ 58",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 8.8,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High yield",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2019,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_59",
+        "variety_name": "SAMMAZ 59",
+        "crop_type": "Maize",
+        "ecology": [
+          "Guinea Savanna ecologies"
+        ],
+        "potential_yield_tha": 5.0,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High provitamin A content of 16.3 ug/g",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2020,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_60",
+        "variety_name": "SAMMAZ 60",
+        "crop_type": "Maize",
+        "ecology": [
+          "Guinea Savanna ecologies"
+        ],
+        "potential_yield_tha": 5.0,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High provitamin A content of 15.53 ug/g",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2020,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_61",
+        "variety_name": "SAMMAZ 61",
+        "crop_type": "Maize",
+        "ecology": [
+          "Guinea Savanna ecologies"
+        ],
+        "potential_yield_tha": 8.0,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High yielding",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2020,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_62",
+        "variety_name": "SAMMAZ 62 (DroughtTEGO® WE5229)",
+        "crop_type": "Maize",
+        "ecology": [
+          "Guinea Savanna ecologies"
+        ],
+        "potential_yield_tha": 8.0,
+        "maturity_class": "Medium",
+        "maturity_days": "100-110 days",
+        "characteristics": "High yield and Stay-green",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2020,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_63",
+        "variety_name": "SAMMAZ 63 (DroughtTEGO® WE5202)",
+        "crop_type": "Maize",
+        "ecology": [
+          "Guinea Savanna and Forest ecologies"
+        ],
+        "potential_yield_tha": 8.0,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High yield and Stay-green",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerance to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2020,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_64",
+        "variety_name": "SAMMAZ 64",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 8.2,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Tolerant to drought and Striga hermonthica",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2022,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_65",
+        "variety_name": "SAMMAZ 65",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 8.7,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "Tolerant to drought and Striga hermonthica",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2022,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_66",
+        "variety_name": "SAMMAZ 66",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 8.4,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High grain yield, tolerant to drought and Striga hermonthica",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2022,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_67",
+        "variety_name": "SAMMAZ 67",
+        "crop_type": "Maize",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 9.7,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High grain yield and intermediate provitamin A content (13.5 ug/g)",
+        "seed_color": "Orange",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2022,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": true
+        }
+      },
+      {
+        "id": "SAMMAZ_68",
+        "variety_name": "SAMMAZ 68",
+        "crop_type": "Maize",
+        "ecology": [
+          "Guinea Savanna ecologies"
+        ],
+        "potential_yield_tha": 8.7,
+        "maturity_class": "Medium",
+        "maturity_days": "110-120 days",
+        "characteristics": "High yield and good standability",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to maize streak virus, rust, leaf blight, and curvularia leaf spot"
+        ],
+        "release_year": 2022,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": false,
+          "drought_tolerance": false,
+          "striga_resistance": false,
+          "provitamin_a_enriched": false
+        }
+      },
+      {
+        "id": "SAMMAZ_69",
+        "variety_name": "SAMMAZ 69",
+        "crop_type": "Maize",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 7.5,
+        "maturity_class": "Early",
+        "maturity_days": "90-95 days",
+        "characteristics": "Tolerance to multiple stresses (Striga hermonthica, drought and low-N) and high grain yield",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerance to streak, rust, leaf blight, curvularia and Striga hermonthica"
+        ],
+        "release_year": 2023,
+        "soil_and_climate_adaptations": {
+          "low_nitrogen_tolerance": true,
+          "drought_tolerance": true,
+          "striga_resistance": true,
+          "provitamin_a_enriched": false
+        }
+      }
+    ],
+    "sorghum": [
+      {
+        "id": "SAMSORG_14",
+        "variety_name": "SAMSORG 14 (KSV 8)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sudan Guinea Savanna"
+        ],
+        "potential_yield_tha": 2.5,
+        "maturity_class": "Medium",
+        "maturity_days": "90-110 days",
+        "characteristics": "Good seed quality and High yielding",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga and major diseases"
+        ],
+        "release_year": 1982
+      },
+      {
+        "id": "SAMSORG_16",
+        "variety_name": "SAMSORG 16",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Southern Guinea Savanna"
+        ],
+        "potential_yield_tha": 3.0,
+        "maturity_class": "Late",
+        "maturity_days": "120-160 days",
+        "characteristics": "Good yield and high flour yield",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga & other major leaf diseases"
+        ],
+        "release_year": 1982
+      },
+      {
+        "id": "SAMSORG_17",
+        "variety_name": "SAMSORG 17 (SK 5912)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Southern Guinea Savanna"
+        ],
+        "potential_yield_tha": 3.5,
+        "maturity_class": "Late",
+        "maturity_days": "120-160 days",
+        "characteristics": "Good for brewing and High yielding",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga and major leaf diseases"
+        ],
+        "release_year": 1970
+      },
+      {
+        "id": "SAMSORG_40",
+        "variety_name": "SAMSORG 40 (ICSV 400)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 2.5,
+        "maturity_class": "Early",
+        "maturity_days": "70-90 days",
+        "characteristics": "Non-lodging, Good food and malting quality, High yielding",
+        "seed_color": "Cream",
+        "pest_disease_tolerance": [
+          "Tolerant to drought"
+        ],
+        "release_year": 1996
+      },
+      {
+        "id": "SAMSORG_45",
+        "variety_name": "SAMSORG 45 (Deko)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 3.0,
+        "maturity_class": "Early",
+        "maturity_days": "70-90 days",
+        "characteristics": "Good malting property, High yielding and Good grains, high grain iron (Fe) content (128.99 ppm/1g)",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to drought"
+        ],
+        "release_year": 2016
+      },
+      {
+        "id": "SAMSORG_46",
+        "variety_name": "SAMSORG 46 (Zabuwa)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 2.5,
+        "maturity_class": "Early",
+        "maturity_days": "70-90 days",
+        "characteristics": "High yield, grains quality, moderate grain iron (Fe) content (53.92 ppm/1g)",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to major diseases"
+        ],
+        "release_year": 2016
+      },
+      {
+        "id": "SAMSORG_47",
+        "variety_name": "SAMSORG 47 (Zauna Inuwa)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Sudan Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 3.0,
+        "maturity_class": "Medium",
+        "maturity_days": "90-110 days",
+        "characteristics": "High yielding and Good fodder quality",
+        "seed_color": "Yellow",
+        "pest_disease_tolerance": [
+          "Tolerant to most leaf diseases but slight susceptible to long smut"
+        ],
+        "release_year": 2018
+      },
+      {
+        "id": "CSR01",
+        "variety_name": "CSR01 (Farafara Ex Kano)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 3.0,
+        "maturity_class": "Medium",
+        "maturity_days": "90-110 days",
+        "characteristics": "Excellent grain quality for Industrial use in malting and brewing",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga and major leaf disease"
+        ],
+        "release_year": 2006
+      },
+      {
+        "id": "CSR02",
+        "variety_name": "CSR02 (Farafara Ex Katsina)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Sudan Savanna",
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna"
+        ],
+        "potential_yield_tha": 3.0,
+        "maturity_class": "Medium",
+        "maturity_days": "90-110 days",
+        "characteristics": "Excellent grain quality for Industrial use in malting and brewing",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga and major leaf diseases"
+        ],
+        "release_year": 2006
+      },
+      {
+        "id": "SAMSORG_50SW",
+        "variety_name": "SAMSORG 50SW (SWSV Dansadau)",
+        "crop_type": "Sweet Sorghum",
+        "ecology": [
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 0.8,
+        "potential_brix_extract_liters_ha": 15000,
+        "maturity_class": "Early",
+        "maturity_days": "70-85 days",
+        "characteristics": "High yielding brix (22%) for juice extraction",
+        "seed_color": "Red",
+        "pest_disease_tolerance": [
+          "Tolerant to zonate leaf spot, anthracnose, stem borer, smut and Striga hermonthica"
+        ],
+        "release_year": 2020
+      },
+      {
+        "id": "SAMSORG_52",
+        "variety_name": "SAMSORG 52 (12KNICSV-297)",
+        "crop_type": "Sorghum",
+        "ecology": [
+          "Sahel Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 3.8,
+        "maturity_class": "Early",
+        "maturity_days": "70-80 days",
+        "characteristics": "Good seed quality and High yielding",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to sorghum long smut"
+        ],
+        "release_year": 2022
+      }
+    ],
+    "cowpea": [
+      {
+        "id": "SAMPEA_10",
+        "variety_name": "SAMPEA 10 (IT97K-499-35)",
+        "crop_type": "Cowpea",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 2.0,
+        "maturity_class": "Medium",
+        "maturity_days": "70-80 days",
+        "characteristics": "Alectra resistant, good seed quality, field tolerance to major insect-pests",
+        "seed_color": "White",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga / Alectra"
+        ],
+        "release_year": 2008
+      },
+      {
+        "id": "SAMPEA_12",
+        "variety_name": "SAMPEA 12 (IT99K-573-1-1)",
+        "crop_type": "Cowpea",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sahel Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 2.6,
+        "maturity_class": "Medium",
+        "maturity_days": "70-80 days",
+        "characteristics": "Good for both rainy and dry seasons, Multiple disease resistance especially Fusarium wilt, drought tolerance, Striga and Alectra resistance",
+        "seed_color": "White seeded with brown eye",
+        "pest_disease_tolerance": [
+          "Tolerant to Striga and major insect pest diseases"
+        ],
+        "release_year": 2011
+      },
+      {
+        "id": "SAMPEA_20",
+        "variety_name": "SAMPEA 20 (IT97KT-PBR / IAR-TC-11-07)",
+        "crop_type": "Cowpea (Pod Borer Resistant)",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sahel Savanna",
+          "Sudan Savanna"
+        ],
+        "potential_yield_tha": 2.5,
+        "maturity_class": "Medium",
+        "maturity_days": "70-80 days",
+        "characteristics": "Good for rainy and dry seasons, resistance to Alectra and bacterial blight",
+        "seed_color": "White with black hilum",
+        "pest_disease_tolerance": [
+          "Resistance to the legume pod borer (Maruca) and tolerant to Striga and major insect pest diseases"
+        ],
+        "release_year": 2019
+      }
+    ],
+    "groundnut": [
+      {
+        "id": "SAMNUT_10",
+        "variety_name": "SAMNUT 10",
+        "crop_type": "Groundnut",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Southern Guinea Savanna"
+        ],
+        "potential_yield_tha": 3.5,
+        "maturity_class": "Late maturity",
+        "maturity_days": "120-140 days",
+        "oil_content_percent": "55-60% dry matter basis",
+        "growth_habit": "Semi erect",
+        "seed_color": "Variegated",
+        "pest_disease_tolerance": [
+          "Resistant to Rosette"
+        ],
+        "release_year": 1988
+      },
+      {
+        "id": "SAMNUT_24",
+        "variety_name": "SAMNUT 24",
+        "crop_type": "Groundnut",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 2.5,
+        "maturity_class": "Early",
+        "maturity_days": "80-100 days",
+        "oil_content_percent": "Very high",
+        "growth_habit": "Erect",
+        "seed_color": "Tan",
+        "pest_disease_tolerance": [
+          "Resistant to Rosette"
+        ],
+        "release_year": 2000
+      },
+      {
+        "id": "SAMNUT_28",
+        "variety_name": "SAMNUT 28",
+        "crop_type": "Groundnut",
+        "ecology": [
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 3.0,
+        "maturity_class": "Early",
+        "maturity_days": "80-100 days",
+        "oil_content_percent": "High",
+        "growth_habit": "Erect",
+        "seed_color": "Red",
+        "pest_disease_tolerance": [
+          "Resistant to Rosette"
+        ],
+        "release_year": 2018
+      }
+    ],
+    "sunflower": [
+      {
+        "id": "SAMSUN_1",
+        "variety_name": "SAMSUN 1",
+        "crop_type": "Sunflower",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 2.21,
+        "maturity_class": "Early",
+        "maturity_days": "80 days",
+        "characteristics": "Drought tolerant with Vitamin A, good seed quality and very good antioxidant",
+        "seed_color": "Light ash colour",
+        "pest_disease_tolerance": [
+          "Early maturing, drought tolerant"
+        ],
+        "release_year": 2010
+      },
+      {
+        "id": "SAMSUN_4",
+        "variety_name": "SAMSUN 4",
+        "crop_type": "Sunflower",
+        "ecology": [
+          "Southern Guinea Savanna",
+          "Northern Guinea Savanna",
+          "Sudan Savanna",
+          "Sahel Savanna"
+        ],
+        "potential_yield_tha": 2.38,
+        "maturity_class": "Extra-early",
+        "maturity_days": "72 days",
+        "characteristics": "Drought tolerant with Vitamin A, C, E and good for intercropping with legumes",
+        "seed_color": "Yellow color",
+        "pest_disease_tolerance": [
+          "Tolerant to most beetles, sucking bugs and bacterial blight"
+        ],
+        "release_year": 2010
+      }
+    ]
+  }
+}

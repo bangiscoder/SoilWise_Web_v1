@@ -28,6 +28,10 @@ import { calculateEnvironmentalInfo } from './environmentalCalculationService';
 import { fetchReverseGeocode, fetchNearestLandmark } from './geocodingService';
 import { fetchSoilTexture, fetchLocationEstimatedSoilData } from './soilService';
 import { IsdaSoilServiceResponse } from './isdaSoilService';
+import {
+  normaliseFarmRecommendationInput,
+  generateCropRecommendationDecision,
+} from './cropRecommendationService';
 
 /**
  * Communicates with the SoilWise backend to retrieve the full iSDAsoil location profile.
@@ -269,9 +273,19 @@ export async function performFarmAnalysis(
     location_estimate: locationEstimate,
   };
 
-  // Step 6: Preparing Farm Analysis...
+  // Step 6: Preparing Farm Analysis and Deterministic Crop Recommendations...
   onStepChange?.('preparing_analysis');
   await new Promise((r) => setTimeout(r, 350));
+
+  const normalisedRecInput = normaliseFarmRecommendationInput({
+    location: farmLocation,
+    soilData: effectiveSoilData,
+    rainfallOutlook,
+    soilTexture,
+    environmentalInfo,
+    isUserMeasured,
+  });
+  const cropRecommendationDecision = generateCropRecommendationDecision(normalisedRecInput);
 
   const result: FarmAnalysisResult = {
     id: `FA-${Date.now()}`,
@@ -293,6 +307,7 @@ export async function performFarmAnalysis(
     photoAnalysisResult: soilTestMeta?.photoAnalysisResult || null,
     soilEvidence,
     locationValidation: soilTestMeta?.locationValidation || null,
+    cropRecommendationDecision,
   };
 
   onStepChange?.('completed');
