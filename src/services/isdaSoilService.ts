@@ -92,12 +92,18 @@ export interface IsdaSoilServiceResponse {
 }
 
 // In-memory token cache (strictly server-side, never exposed to browser)
-class IsdaTokenManager {
+export class IsdaTokenManager {
   private token: string | null = null;
   private tokenCreatedAt: number | null = null;
   private tokenExpiresAt: number | null = null;
   private cacheHitsCount = 0;
   private authCallsCount = 0;
+  private inFlightAuthPromise: Promise<{ token: string | null; authDiagnostic: AuthDiagnostic }> | null = null;
+
+  // Conservative cache TTL: 50 minutes (3000 seconds) when iSDA response omits expires_in (standard tokens expire in 60 mins)
+  private readonly DEFAULT_TTL_SECONDS = 50 * 60;
+  // Safety buffer: refresh token if less than 3 minutes remaining before expiry
+  private readonly SAFETY_BUFFER_MS = 3 * 60 * 1000;
 
   public getCacheMetadata(): TokenCacheMetadata {
     const username = typeof process !== 'undefined' ? process.env?.ISDA_USERNAME : undefined;
@@ -121,9 +127,9 @@ class IsdaTokenManager {
     }
 
     const now = Date.now();
-    const isExpired = !this.token || !this.tokenExpiresAt || now >= this.tokenExpiresAt;
+    const isExpired = !this.token || !this.tokenExpiresAt || now >= (this.tokenExpiresAt - this.SAFETY_BUFFER_MS);
     const expiresInSeconds =
-      this.tokenExpiresAt && !isExpired
+      this.tokenExpiresAt && now < this.tokenExpiresAt
         ? Math.max(0, Math.floor((this.tokenExpiresAt - now) / 1000))
         : null;
 
@@ -138,7 +144,7 @@ class IsdaTokenManager {
       credentialsConfigured: hasCreds,
       usernameStatus: hasUsername ? 'loaded' : 'missing',
       passwordStatus: hasPassword ? 'loaded' : 'missing',
-      usernameMasked: null,
+      usernameMasked,
       authEndpoint: 'https://api.isda-africa.com/login',
       source: 'process.env',
       scope: process.env?.ISDA_SCOPE || undefined,
@@ -150,14 +156,74 @@ class IsdaTokenManager {
   public invalidateToken(): void {
     this.token = null;
     this.tokenExpiresAt = null;
+    this.tokenCreatedAt = null;
   }
 
   /**
-   * Performs authentication on-demand against https://api.isda-africa.com/login
-   * Uses application/x-www-form-urlencoded with required form fields.
+   * Invalidates cached token only if it matches the token that produced the 401 error.
+   * Prevents an older request from accidentally invalidating a fresh token acquired by a concurrent request.
+   */
+  public invalidateTokenIfMatches(staleToken: string): boolean {
+    if (this.token && this.token === staleToken) {
+      console.log('[iSDAsoil Auth] iSDAsoil request returned 401; invalidating cached token');
+      this.token = null;
+      this.tokenExpiresAt = null;
+      this.tokenCreatedAt = null;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Returns a valid access token. Uses cached token if not expired, or acquires a new one.
+   * Concurrent requests wait on the same in-flight authentication promise to prevent duplicate /login calls.
    */
   public async getValidToken(
-    logStage: (stage: string, status: 'ok' | 'warning' | 'error' | 'info', message: string) => void
+    logStage?: (stage: string, status: 'ok' | 'warning' | 'error' | 'info', message: string) => void
+  ): Promise<{ token: string | null; authDiagnostic: AuthDiagnostic }> {
+    const now = Date.now();
+
+    // Check if current cached token is valid and not nearing expiry
+    if (this.token && this.tokenExpiresAt && this.tokenExpiresAt - now > this.SAFETY_BUFFER_MS) {
+      this.cacheHitsCount++;
+      const remainingSec = Math.floor((this.tokenExpiresAt - now) / 1000);
+      if (logStage) {
+        logStage(
+          'Token Verification',
+          'ok',
+          `Reusing valid cached iSDAsoil JWT token (Cache hit #${this.cacheHitsCount}). Expires in ${remainingSec}s.`
+        );
+      }
+      return {
+        token: this.token,
+        authDiagnostic: {
+          endpoint: 'https://api.isda-africa.com/login',
+          httpStatus: 200,
+          authentication: 'SUCCESS',
+          tokenReceived: true,
+          message: `Cached token active (${remainingSec}s remaining).`,
+        },
+      };
+    }
+
+    // If authentication is already in progress, await the existing in-flight promise
+    if (this.inFlightAuthPromise) {
+      if (logStage) {
+        logStage('Authentication', 'info', 'Awaiting existing in-flight iSDAsoil authentication request...');
+      }
+      return await this.inFlightAuthPromise;
+    }
+
+    this.inFlightAuthPromise = this.performLogin(logStage);
+    try {
+      return await this.inFlightAuthPromise;
+    } finally {
+      this.inFlightAuthPromise = null;
+    }
+  }
+
+  private async performLogin(
+    logStage?: (stage: string, status: 'ok' | 'warning' | 'error' | 'info', message: string) => void
   ): Promise<{ token: string | null; authDiagnostic: AuthDiagnostic }> {
     const username = typeof process !== 'undefined' ? process.env?.ISDA_USERNAME : undefined;
     const password = typeof process !== 'undefined' ? (process.env?.ISDA_PASSWORD || process.env?.ISDaa_PASSWORD) : undefined;
@@ -166,17 +232,15 @@ class IsdaTokenManager {
     const hasUsername = Boolean(username && username.trim().length > 0);
     const hasPassword = Boolean(password && password.trim().length > 0);
 
-    // Safe debugging diagnostics (NEVER log password or full credentials)
-    console.log('[iSDAsoil Auth Debug] Endpoint:', authEndpoint);
-    console.log('[iSDAsoil Auth Debug] Username configured:', hasUsername ? 'YES' : 'NO');
-    console.log('[iSDAsoil Auth Debug] Password configured:', hasPassword ? 'YES' : 'NO');
-
     if (!hasUsername || !hasPassword) {
-      logStage(
-        'Authentication',
-        'warning',
-        'ISDA_USERNAME and/or ISDA_PASSWORD are not configured in server environment. Cannot authenticate against live iSDAsoil API.'
-      );
+      if (logStage) {
+        logStage(
+          'Authentication',
+          'warning',
+          'ISDA_USERNAME and/or ISDA_PASSWORD are not configured in server environment. Cannot authenticate against live iSDAsoil API.'
+        );
+      }
+      console.warn('[iSDAsoil Auth] iSDAsoil credentials missing in server environment');
       return {
         token: null,
         authDiagnostic: {
@@ -189,29 +253,10 @@ class IsdaTokenManager {
       };
     }
 
-    const now = Date.now();
-    // Use cached token if valid and has at least 3 minutes remaining
-    if (this.token && this.tokenExpiresAt && this.tokenExpiresAt - now > 3 * 60 * 1000) {
-      this.cacheHitsCount++;
-      const remainingSec = Math.floor((this.tokenExpiresAt - now) / 1000);
-      logStage(
-        'Token Verification',
-        'ok',
-        `Reusing valid cached iSDAsoil JWT token (Cache hit #${this.cacheHitsCount}). Expires in ${remainingSec}s.`
-      );
-      return {
-        token: this.token,
-        authDiagnostic: {
-          endpoint: authEndpoint,
-          httpStatus: 200,
-          authentication: 'SUCCESS',
-          tokenReceived: true,
-          message: `Cached token active (${remainingSec}s remaining).`,
-        },
-      };
+    console.log('[iSDAsoil Auth] iSDAsoil token missing or expired; authenticating');
+    if (logStage) {
+      logStage('Authentication', 'info', `Requesting JWT token from ${authEndpoint}...`);
     }
-
-    logStage('Authentication', 'info', `Requesting JWT token from ${authEndpoint}...`);
 
     try {
       this.authCallsCount++;
@@ -241,18 +286,21 @@ class IsdaTokenManager {
       });
 
       clearTimeout(timeoutId);
-
       const httpStatus = resp.status;
 
       if (!resp.ok) {
         const errorText = await resp.text().catch(() => '');
-        logStage(
-          'Authentication',
-          'error',
-          `iSDAsoil authentication failed with HTTP ${httpStatus}: ${errorText.substring(0, 150) || resp.statusText}`
-        );
+        console.warn(`[iSDAsoil Auth] iSDAsoil authentication failed with HTTP ${httpStatus}`);
+        if (logStage) {
+          logStage(
+            'Authentication',
+            'error',
+            `iSDAsoil authentication failed with HTTP ${httpStatus}: ${errorText.substring(0, 150) || resp.statusText}`
+          );
+        }
         this.token = null;
         this.tokenExpiresAt = null;
+        this.tokenCreatedAt = null;
         return {
           token: null,
           authDiagnostic: {
@@ -269,11 +317,14 @@ class IsdaTokenManager {
       const accessToken = data?.access_token;
 
       if (!accessToken || typeof accessToken !== 'string') {
-        logStage(
-          'Authentication',
-          'error',
-          'iSDAsoil login endpoint returned HTTP 200, but no access_token found in response.'
-        );
+        console.warn('[iSDAsoil Auth] iSDAsoil login endpoint returned HTTP 200, but no access_token found in response');
+        if (logStage) {
+          logStage(
+            'Authentication',
+            'error',
+            'iSDAsoil login endpoint returned HTTP 200, but no access_token found in response.'
+          );
+        }
         return {
           token: null,
           authDiagnostic: {
@@ -286,17 +337,23 @@ class IsdaTokenManager {
         };
       }
 
-      // Store in memory (expires in ~55 mins, iSDA tokens standard validity is 1 hour)
+      const now = Date.now();
       this.token = accessToken;
       this.tokenCreatedAt = now;
-      const expiresInSec = typeof data.expires_in === 'number' ? data.expires_in : 55 * 60;
-      this.tokenExpiresAt = now + expiresInSec * 1000;
+      const ttlSec =
+        typeof data.expires_in === 'number' && data.expires_in > 0
+          ? data.expires_in
+          : this.DEFAULT_TTL_SECONDS;
+      this.tokenExpiresAt = now + ttlSec * 1000;
 
-      logStage(
-        'Authentication',
-        'ok',
-        `iSDAsoil authentication SUCCESS (HTTP 200). Token received and cached (${expiresInSec}s).`
-      );
+      console.log('[iSDAsoil Auth] iSDAsoil authentication successful; token refreshed');
+      if (logStage) {
+        logStage(
+          'Authentication',
+          'ok',
+          `iSDAsoil authentication SUCCESS (HTTP 200). Token received and cached (${ttlSec}s).`
+        );
+      }
 
       return {
         token: this.token,
@@ -309,11 +366,14 @@ class IsdaTokenManager {
         },
       };
     } catch (err: any) {
-      logStage(
-        'Authentication',
-        'error',
-        `Network or server error during iSDAsoil login: ${err.message || 'Unknown network error'}`
-      );
+      console.warn(`[iSDAsoil Auth] Network error during iSDAsoil login: ${err.message || 'Unknown network error'}`);
+      if (logStage) {
+        logStage(
+          'Authentication',
+          'error',
+          `Network or server error during iSDAsoil login: ${err.message || 'Unknown network error'}`
+        );
+      }
       return {
         token: null,
         authDiagnostic: {
@@ -328,7 +388,88 @@ class IsdaTokenManager {
   }
 }
 
-export const tokenManager = new IsdaTokenManager();
+export const isdaTokenManager = new IsdaTokenManager();
+export const tokenManager = isdaTokenManager;
+
+/**
+ * Executes an iSDAsoil service request with automatic token lifecycle management.
+ * Catches HTTP 401, clears the cache, calls the login endpoint, and retries the original request exactly once.
+ */
+export async function withAuthRetry(
+  executeRequest: (token: string) => Promise<Response>,
+  logStage?: (stage: string, status: 'ok' | 'warning' | 'error' | 'info', message: string) => void
+): Promise<{
+  resp: Response | null;
+  token: string | null;
+  authDiagnostic: AuthDiagnostic;
+  retried: boolean;
+}> {
+  // 1. Obtain a valid token (cached or fresh)
+  const initialAuth = await isdaTokenManager.getValidToken(logStage);
+  if (!initialAuth.token) {
+    return {
+      resp: null,
+      token: null,
+      authDiagnostic: initialAuth.authDiagnostic,
+      retried: false,
+    };
+  }
+
+  const usedToken = initialAuth.token;
+
+  // 2. Execute original request
+  let resp = await executeRequest(usedToken);
+
+  // 3. Handle HTTP 401 Unauthorized
+  if (resp.status === 401) {
+    console.log('[iSDAsoil Auth] iSDAsoil request returned 401; invalidating cached token');
+    if (logStage) {
+      logStage('iSDAsoil Query', 'warning', 'API returned HTTP 401. Invalidating cached token and retrying once...');
+    }
+
+    // Invalidate cached token only if it matches the token that produced 401
+    isdaTokenManager.invalidateTokenIfMatches(usedToken);
+
+    // Re-authenticate
+    const reAuth = await isdaTokenManager.getValidToken(logStage);
+    if (reAuth.token) {
+      console.log('[iSDAsoil Auth] iSDAsoil request retried with refreshed token');
+      if (logStage) {
+        logStage('iSDAsoil Query', 'info', 'iSDAsoil request retried with refreshed token.');
+      }
+
+      // Retry request ONCE
+      const retryResp = await executeRequest(reAuth.token);
+      if (retryResp.status === 401) {
+        console.warn('[iSDAsoil Auth] iSDAsoil authentication retry failed with HTTP 401');
+        if (logStage) {
+          logStage('iSDAsoil Query', 'error', 'iSDAsoil authentication retry failed with HTTP 401.');
+        }
+      }
+      return {
+        resp: retryResp,
+        token: reAuth.token,
+        authDiagnostic: reAuth.authDiagnostic,
+        retried: true,
+      };
+    } else {
+      console.warn('[iSDAsoil Auth] iSDAsoil authentication retry failed: could not acquire token');
+      return {
+        resp,
+        token: null,
+        authDiagnostic: reAuth.authDiagnostic,
+        retried: true,
+      };
+    }
+  }
+
+  return {
+    resp,
+    token: usedToken,
+    authDiagnostic: initialAuth.authDiagnostic,
+    retried: false,
+  };
+}
 
 /**
  * Creates default unavailable property descriptor adhering to SoilWise Normalised Data Contract
@@ -856,41 +997,9 @@ export async function fetchIsdaSoilData(
 
   logStage('Initialisation', 'info', `Target coordinates: lat=${latitude}, lon=${longitude}`);
 
-  // Step 1: Token retrieval
-  const { token, authDiagnostic } = await tokenManager.getValidToken(logStage);
-  const tokenInfo = tokenManager.getCacheMetadata();
-
   const soilPropertyEndpoint = 'https://api.isda-africa.com/isdasoil/v2/soilproperty';
 
-  if (!token) {
-    logStage(
-      'iSDAsoil Query',
-      'warning',
-      'Skipping live HTTP request to iSDAsoil because no authentication token is available.'
-    );
-    const normalised = normaliseIsdaSoilData(null, tokenInfo.credentialsConfigured);
-    return {
-      success: false,
-      raw: {
-        status: 'unavailable',
-        error: 'Authentication credentials not configured or failed.',
-        endpoint: soilPropertyEndpoint,
-      },
-      authDiagnostic,
-      soilPropertyDiagnostic: {
-        endpoint: soilPropertyEndpoint,
-        httpStatus: null,
-        responseReceived: false,
-        message: 'Request skipped due to missing/invalid token.',
-      },
-      normalised,
-      fullProfile: extractFullIsdaProfile(null),
-      tokenInfo,
-      diagnostics,
-    };
-  }
-
-  // Helper to query /isdasoil/v2/soilproperty
+  // Helper to query /isdasoil/v2/soilproperty with the supplied bearer token
   const querySoilProperty = async (bearerToken: string) => {
     const apiUrl = new URL(soilPropertyEndpoint);
     apiUrl.searchParams.set('lat', String(latitude));
@@ -916,16 +1025,35 @@ export async function fetchIsdaSoilData(
   };
 
   try {
-    let resp = await querySoilProperty(token);
+    const { resp, token, authDiagnostic } = await withAuthRetry(querySoilProperty, logStage);
+    const tokenInfo = isdaTokenManager.getCacheMetadata();
 
-    // If HTTP 401: invalidate cached token, authenticate again, and retry once
-    if (resp.status === 401) {
-      logStage('iSDAsoil Query', 'warning', 'API returned HTTP 401. Invalidating cached token and retrying once...');
-      tokenManager.invalidateToken();
-      const reAuth = await tokenManager.getValidToken(logStage);
-      if (reAuth.token) {
-        resp = await querySoilProperty(reAuth.token);
-      }
+    if (!resp || !token) {
+      logStage(
+        'iSDAsoil Query',
+        'warning',
+        'Skipping live HTTP request to iSDAsoil because no authentication token is available.'
+      );
+      const normalised = normaliseIsdaSoilData(null, tokenInfo.credentialsConfigured);
+      return {
+        success: false,
+        raw: {
+          status: 'unavailable',
+          error: 'Authentication credentials not configured or failed.',
+          endpoint: soilPropertyEndpoint,
+        },
+        authDiagnostic,
+        soilPropertyDiagnostic: {
+          endpoint: soilPropertyEndpoint,
+          httpStatus: null,
+          responseReceived: false,
+          message: 'Request skipped due to missing/invalid token.',
+        },
+        normalised,
+        fullProfile: extractFullIsdaProfile(null),
+        tokenInfo,
+        diagnostics,
+      };
     }
 
     const httpStatus = resp.status;
@@ -950,7 +1078,7 @@ export async function fetchIsdaSoilData(
         },
         normalised,
         fullProfile: extractFullIsdaProfile(null),
-        tokenInfo: tokenManager.getCacheMetadata(),
+        tokenInfo: isdaTokenManager.getCacheMetadata(),
         diagnostics,
       };
     }
@@ -975,7 +1103,7 @@ export async function fetchIsdaSoilData(
       },
       normalised,
       fullProfile: extractFullIsdaProfile(rawData),
-      tokenInfo: tokenManager.getCacheMetadata(),
+      tokenInfo: isdaTokenManager.getCacheMetadata(),
       diagnostics,
     };
   } catch (err: any) {
@@ -984,7 +1112,13 @@ export async function fetchIsdaSoilData(
     return {
       success: false,
       raw: { status: 'error', error: err.message },
-      authDiagnostic,
+      authDiagnostic: {
+        endpoint: 'https://api.isda-africa.com/login',
+        httpStatus: null,
+        authentication: 'FAILED',
+        tokenReceived: false,
+        message: err.message,
+      },
       soilPropertyDiagnostic: {
         endpoint: soilPropertyEndpoint,
         httpStatus: null,
@@ -993,7 +1127,7 @@ export async function fetchIsdaSoilData(
       },
       normalised,
       fullProfile: extractFullIsdaProfile(null),
-      tokenInfo: tokenManager.getCacheMetadata(),
+      tokenInfo: isdaTokenManager.getCacheMetadata(),
       diagnostics,
     };
   }

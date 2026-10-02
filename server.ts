@@ -6,7 +6,7 @@ import { validateNigerianLocation, loadBoundaryData } from './server/services/ni
 import { fetchIsdaSoilData, tokenManager } from './src/services/isdaSoilService.ts';
 
 const containerPort = process.env.PORT;
-dotenv.config();
+dotenv.config({ override: true });
 if (containerPort) {
   process.env.PORT = containerPort;
 }
