@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   MapPin, 
   FlaskConical, 
@@ -25,6 +25,7 @@ import { FarmMapPreview } from './FarmMapPreview';
 import { NimetClimateReport } from './NimetClimateReport';
 import { FutureRecommendationSection } from './FutureRecommendationSection';
 import { SoilwiseAiAssistant } from './SoilwiseAiAssistant';
+import { FloatingAiAssistantBar } from './FloatingAiAssistantBar';
 import { AgronomistConsultationModal } from './AgronomistConsultationModal';
 import { FarmerFeedbackSection } from './FarmerFeedbackSection';
 import { useLanguage } from '../context/LanguageContext';
@@ -66,6 +67,36 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   const [activeDepthTab, setActiveDepthTab] = useState<'0-20' | '20-50' | 'landscape'>('0-20');
   const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false);
   const [isAssistantModalOpen, setIsAssistantModalOpen] = useState(false);
+  const [pendingQuery, setPendingQuery] = useState<string>('');
+  const savedScrollPositionRef = useRef<number>(0);
+
+  const handleOpenAssistant = (query?: string) => {
+    // Record the farmer's exact vertical scroll position before opening the assistant modal
+    const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || window.scrollY || 0;
+    savedScrollPositionRef.current = currentScrollY;
+
+    if (query && query.trim()) {
+      setPendingQuery(query.trim());
+    } else {
+      setPendingQuery('');
+    }
+    setIsAssistantModalOpen(true);
+  };
+
+  const handleCloseAssistant = () => {
+    setIsAssistantModalOpen(false);
+    setPendingQuery('');
+
+    // Restore the exact previous scroll position so the farmer returns to exactly where they were
+    const targetY = savedScrollPositionRef.current;
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: targetY,
+        left: 0,
+        behavior: 'instant' as ScrollBehavior,
+      });
+    });
+  };
 
   // Helper to format uncertainty confidence intervals
   const formatEstimatedRange = (uncertainty?: any, unit?: string | null): string | null => {
@@ -120,7 +151,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   const lgaToDisplay = selectedLga || location.lga || location.address?.county || null;
 
   return (
-    <div className="w-full pb-16 space-y-10 sm:space-y-14">
+    <div className="w-full pb-28 sm:pb-32 space-y-10 sm:space-y-14">
+      {/* Fixed / Floating AI Assistant Entry Bar (Fixed near bottom across all scroll positions) */}
+      <FloatingAiAssistantBar onOpen={handleOpenAssistant} />
+
       {/* 1. RESULT HERO (~50vh) */}
       <section className="relative h-[48vh] sm:h-[50vh] min-h-[390px] w-full flex items-center justify-center overflow-hidden bg-stone-950">
         <img
@@ -478,12 +512,12 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   </p>
                 </div>
 
-                {/* Depth Selection Tabs */}
-                <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl self-start sm:self-auto text-xs font-semibold">
+                {/* Depth Selection Tabs (Responsive equal-width grid on mobile, flex on desktop) */}
+                <div className="w-full sm:w-auto grid grid-cols-3 sm:flex items-center gap-1 bg-stone-100 p-1 rounded-xl text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => setActiveDepthTab('0-20')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold ${
                       activeDepthTab === '0-20'
                         ? 'bg-white text-stone-900 shadow-xs'
                         : 'text-stone-600 hover:text-stone-900'
@@ -494,7 +528,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveDepthTab('20-50')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold ${
                       activeDepthTab === '20-50'
                         ? 'bg-white text-stone-900 shadow-xs'
                         : 'text-stone-600 hover:text-stone-900'
@@ -505,7 +539,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveDepthTab('landscape')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    className={`w-full sm:w-auto text-center px-1.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs leading-snug flex items-center justify-center font-semibold ${
                       activeDepthTab === 'landscape'
                         ? 'bg-white text-stone-900 shadow-xs'
                         : 'text-stone-600 hover:text-stone-900'
@@ -516,10 +550,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 </div>
               </div>
 
-              {/* Complete Multi-Depth Table */}
+              {/* Complete Multi-Depth Table (Responsive horizontally scrollable container with min-width to ensure all results remain visible and readable on mobile) */}
               {isdaLocationAvailable ? (
                 <div className="overflow-x-auto rounded-2xl border border-stone-200/90 shadow-2xs">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[560px] text-left text-xs">
                     <thead className="bg-stone-50 border-b border-stone-200 text-stone-700 font-bold uppercase tracking-wider text-[11px]">
                       <tr>
                         <th className="py-3 px-4">Soil Property</th>
@@ -1051,30 +1085,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           soilTexture={soilTexture}
         />
 
-        {/* 7. SOILWISE ASSISTANT CALLOUT */}
-        <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-1.5 max-w-xl">
-            <div className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-[#1b4332]" />
-              <h3 className="text-lg font-bold text-stone-900">
-                {t('results.assistantTitle')}
-              </h3>
-            </div>
-            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-              {t('results.assistantSubtitle')}
-            </p>
-          </div>
-
-          <button
-            onClick={() => setIsAssistantModalOpen(true)}
-            className="px-5 py-3.5 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-[0.98]"
-          >
-            <Bot className="w-4 h-4 text-emerald-300" />
-            <span>{t('results.assistantButton')}</span>
-          </button>
-        </section>
-
-        {/* 8. TALK TO A CERTIFIED AGRONOMIST DEMO */}
+        {/* 7. TALK TO A CERTIFIED AGRONOMIST DEMO */}
         <section className="p-6 sm:p-7 bg-[#f0f5ee] rounded-3xl border border-[#1b4332]/20 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-1.5 max-w-xl">
             <div className="flex items-center gap-2">
@@ -1110,7 +1121,8 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
         <SoilwiseAiAssistant
           analysis={analysis}
           isOpen={isAssistantModalOpen}
-          onClose={() => setIsAssistantModalOpen(false)}
+          onClose={handleCloseAssistant}
+          initialQuery={pendingQuery}
           onRequestConsultation={() => {
             setIsAssistantModalOpen(false);
             setIsConsultationModalOpen(true);

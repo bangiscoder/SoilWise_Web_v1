@@ -22,6 +22,7 @@ interface SoilwiseAiAssistantProps {
   isOpen?: boolean;
   onClose?: () => void;
   onRequestConsultation?: () => void;
+  initialQuery?: string;
 }
 
 // Architectural flag ensuring no external model or API is queried during MVP validation
@@ -32,6 +33,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   isOpen = true,
   onClose,
   onRequestConsultation,
+  initialQuery,
 }) => {
   const { t } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -45,6 +47,8 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const initialSentRef = useRef<boolean>(false);
 
   const suggestedQuestions = [
     t('assistant.sampleQ1'),
@@ -59,6 +63,31 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  // Lock body scroll and listen for Escape key when open as modal
+  useEffect(() => {
+    if (!isOpen || !onClose) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(timer);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -181,7 +210,8 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
-            title="Close Assistant"
+            title="Close SoilWise AI assistant"
+            aria-label="Close SoilWise AI assistant"
           >
             <X className="w-5 h-5" />
           </button>
@@ -189,7 +219,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
       </div>
 
       {/* Chat Container */}
-      <div className="border border-stone-200 rounded-2xl overflow-hidden bg-stone-50/50 flex flex-col h-[400px]">
+      <div className="border border-stone-200 rounded-2xl overflow-hidden bg-stone-50/50 flex flex-col flex-1 min-h-[260px] sm:min-h-[320px] max-h-[48vh] sm:max-h-[52vh]">
         {/* Messages Stream */}
         <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-3.5">
           {messages.map((m) => {
@@ -265,13 +295,15 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
         {/* Text Input & Send */}
         <div className="p-3 bg-white border-t border-stone-200 flex items-center gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSendMessage();
             }}
-            placeholder={t('assistant.inputPlaceholder')}
+            placeholder="Ask a follow-up question..."
+            aria-label="Ask SoilWise AI a question about your farm"
             disabled={isTyping}
             className="flex-1 px-3.5 py-2 text-xs sm:text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent text-stone-900"
           />
@@ -280,6 +312,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
             disabled={isTyping || !inputText.trim()}
             className="p-2.5 bg-[#1b4332] hover:bg-[#143225] text-white rounded-xl transition-all disabled:opacity-40 cursor-pointer active:scale-95"
             title={t('assistant.send')}
+            aria-label={t('assistant.send')}
           >
             <Send className="w-4 h-4" />
           </button>
@@ -299,8 +332,20 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   // If used as modal (when onClose is provided)
   if (onClose) {
     return (
-      <div className="fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-        <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl border border-stone-200 my-8">
+      <div 
+        className="fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="SoilWise AI Assistant"
+          className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] sm:max-h-[88vh] flex flex-col p-4 sm:p-6 shadow-2xl border border-stone-200 my-auto overflow-hidden"
+        >
           {content}
         </div>
       </div>

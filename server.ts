@@ -5,7 +5,11 @@ import dotenv from 'dotenv';
 import { validateNigerianLocation, loadBoundaryData } from './server/services/nigeriaBoundaryService.ts';
 import { fetchIsdaSoilData, tokenManager } from './src/services/isdaSoilService.ts';
 
-dotenv.config({ override: true });
+const containerPort = process.env.PORT;
+dotenv.config();
+if (containerPort) {
+  process.env.PORT = containerPort;
+}
 
 // Pre-load administrative boundary geojson on server initialization safely
 try {
@@ -17,7 +21,7 @@ try {
 
 const app = express();
 
-// Cloud Run port resolution: check process.env.PORT, then CLI --port, with safe 8080 fallback
+// Port resolution: check CLI --port, then process.env.PORT (Cloud Run / container), with 3000 fallback
 function resolvePort(): number {
   const portArgIndex = process.argv.indexOf('--port');
   if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
@@ -28,7 +32,7 @@ function resolvePort(): number {
     const val = parseInt(process.env.PORT, 10);
     if (!isNaN(val) && val > 0) return val;
   }
-  return 8080;
+  return 3000;
 }
 const port = resolvePort();
 

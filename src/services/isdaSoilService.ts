@@ -1,4 +1,4 @@
-import { IsdaPropertyRecord, IsdaDepthLayer } from '../types/soilwise';
+import type { IsdaPropertyRecord, IsdaDepthLayer } from '../types/soilwise.ts';
 
 export interface NormalisedSoilProperty {
   property: string;
