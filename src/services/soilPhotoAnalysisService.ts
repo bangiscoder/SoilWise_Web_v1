@@ -67,6 +67,65 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 /**
+ * Reads a File and compresses it to a lightweight thumbnail data URL (max 320x320 px, ~15-25 KB).
+ * Prevents huge multi-megabyte base64 strings from exhausting Firestore document limits (1MB limit).
+ */
+export async function createThumbnailDataUrl(file: File, maxDim = 320, quality = 0.70): Promise<string> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return readFileAsDataUrl(file);
+  }
+
+  return new Promise((resolve) => {
+    const rawReader = new FileReader();
+    rawReader.onload = (e) => {
+      const srcUrl = e.target?.result as string;
+      if (!srcUrl) {
+        resolve('');
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(srcUrl);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedUrl);
+      };
+      img.onerror = () => {
+        resolve(srcUrl);
+      };
+      img.src = srcUrl;
+    };
+    rawReader.onerror = () => {
+      resolve('');
+    };
+    rawReader.readAsDataURL(file);
+  });
+}
+
+/**
  * Temporary image processing and preliminary texture estimation workflow.
  * Simulates call to an image-analysis API with fallback resilience.
  */
@@ -76,8 +135,8 @@ export async function analyzeSoilPhoto(file: File): Promise<SoilPhotoAnalysisRes
     throw new Error(validation.error || 'Invalid image file');
   }
 
-  // Step 1: Read data URL for preview
-  const dataUrl = await readFileAsDataUrl(file);
+  // Step 1: Read compressed thumbnail data URL for preview and safe storage
+  const dataUrl = await createThumbnailDataUrl(file);
 
   // Step 2: Temporary image processing (simulate image preprocessing / feature extraction)
   await new Promise((resolve) => setTimeout(resolve, 400));

@@ -848,9 +848,10 @@ export function generateCropRecommendationDecision(
       not_evaluated: 0,
     },
 
-    recommendations: eligibleCandidates,
+    // Return top 10 ranked cultivars and top 15 excluded candidates to keep decision snapshot lightweight and well within Firestore 1MB document limit
+    recommendations: eligibleCandidates.slice(0, 10),
     top_recommendation: topRecommendation,
-    excluded_candidates: excludedCandidates,
+    excluded_candidates: excludedCandidates.slice(0, 15),
 
     farmer_facing: farmerFacing,
 

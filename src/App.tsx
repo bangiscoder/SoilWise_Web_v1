@@ -16,8 +16,10 @@ import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
 import { UserAreaView } from './components/auth/UserAreaView';
+import { AnalysisHistoryView } from './components/history/AnalysisHistoryView';
 import { SoilData, FarmAnalysisResult, AnalysisStep } from './types/soilwise';
 import { performFarmAnalysis } from './services/soilwiseService';
+import { saveAnalysisSnapshot, getAnalysisSnapshot } from './services/analysisHistoryService';
 import { useAuth } from './context/AuthContext';
 import { AlertCircle, Lock } from 'lucide-react';
 
@@ -28,6 +30,7 @@ export type AppView =
   | 'register' 
   | 'forgot-password' 
   | 'account' 
+  | 'my-analyses'
   | 'admin-login' 
   | 'admin-dashboard' 
   | 'admin-soil-data-test';
@@ -42,6 +45,11 @@ export default function App() {
   const [analysisResult, setAnalysisResult] = useState<FarmAnalysisResult | null>(null);
   const [isDocsOpen, setIsDocsOpen] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
+
+  // Historical result mode tracking
+  const [isHistoricalView, setIsHistoricalView] = useState<boolean>(false);
+  const [historicalSavedDate, setHistoricalSavedDate] = useState<string | null>(null);
+  const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null);
 
   // Monitor URL routes on mount and popstate
   useEffect(() => {
@@ -71,6 +79,8 @@ export default function App() {
         setCurrentView('forgot-password');
       } else if (path.includes('/account') || hash.includes('/account')) {
         setCurrentView('account');
+      } else if (path.includes('/my-analyses') || path.includes('/analyses') || hash.includes('/my-analyses')) {
+        setCurrentView('my-analyses');
       }
     };
 
@@ -82,7 +92,7 @@ export default function App() {
   // Protected route enforcement
   useEffect(() => {
     if (!isAuthLoading) {
-      if (currentView === 'account' && !currentUser) {
+      if ((currentView === 'account' || currentView === 'my-analyses') && !currentUser) {
         // Unauthenticated access to protected user area -> redirect to login
         setCurrentView('login');
       } else if ((currentView === 'login' || currentView === 'register') && currentUser) {
@@ -121,6 +131,9 @@ export default function App() {
   ) => {
     setIsSubmitting(true);
     setAppError(null);
+    setSaveStatusMessage(null);
+    setIsHistoricalView(false);
+    setHistoricalSavedDate(null);
     setAnalysisStep('preparing_data');
 
     try {
@@ -134,6 +147,22 @@ export default function App() {
       );
 
       setAnalysisResult(result);
+
+      // If user is authenticated, save analysis snapshot to their account history
+      if (currentUser) {
+        try {
+          const saveRes = await saveAnalysisSnapshot(result, currentUser.uid);
+          if (!saveRes.success) {
+            setSaveStatusMessage('Your analysis is ready, but we could not automatically save it to your account history.');
+          } else {
+            setSaveStatusMessage(null);
+          }
+        } catch (saveErr) {
+          console.warn('Background save analysis error:', saveErr);
+          setSaveStatusMessage('Your analysis is ready, but we could not automatically save it to your account history.');
+        }
+      }
+
       // Small pause to let user see completion
       setTimeout(() => {
         setIsSubmitting(false);
@@ -152,14 +181,55 @@ export default function App() {
   };
 
   const handleEditData = () => {
+    setIsHistoricalView(false);
+    setHistoricalSavedDate(null);
+    setSaveStatusMessage(null);
     setCurrentView('farm-data');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNewAnalysis = () => {
     setAnalysisResult(null);
+    setIsHistoricalView(false);
+    setHistoricalSavedDate(null);
+    setSaveStatusMessage(null);
     setCurrentView('farm-data');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenHistoricalAnalysis = async (analysisId: string) => {
+    if (!currentUser) return;
+    setAppError(null);
+    try {
+      const snapshot = await getAnalysisSnapshot(currentUser.uid, analysisId);
+      if (snapshot && snapshot.fullAnalysis) {
+        setAnalysisResult(snapshot.fullAnalysis);
+        setIsHistoricalView(true);
+        setHistoricalSavedDate(snapshot.createdAt);
+        setSaveStatusMessage(null);
+        setCurrentView('analysis');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setAppError('Could not find the requested historical analysis record.');
+      }
+    } catch (err) {
+      console.error('Failed to open historical analysis:', err);
+      setAppError('Could not load the requested saved analysis. Please try again.');
+    }
+  };
+
+  const handleRetrySave = async () => {
+    if (!currentUser || !analysisResult) return;
+    try {
+      const saveRes = await saveAnalysisSnapshot(analysisResult, currentUser.uid);
+      if (saveRes.success) {
+        setSaveStatusMessage(null);
+      } else {
+        setSaveStatusMessage(saveRes.error || 'Could not save analysis. Please check your internet connection.');
+      }
+    } catch (err) {
+      setSaveStatusMessage('Could not save analysis. Please check your internet connection.');
+    }
   };
 
   const navigateToAdmin = () => {
@@ -174,6 +244,9 @@ export default function App() {
   };
 
   const navigateToHome = () => {
+    setIsHistoricalView(false);
+    setHistoricalSavedDate(null);
+    setSaveStatusMessage(null);
     setCurrentView('farm-data');
     window.history.pushState({}, '', '/');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -243,7 +316,7 @@ export default function App() {
           />
         )}
 
-        {/* 2. Results Page */}
+        {/* 2. Results Page (Supports both live and historical analysis mode) */}
         {currentView === 'analysis' && analysisResult && (
           <FarmAnalysisView
             analysis={analysisResult}
@@ -251,6 +324,11 @@ export default function App() {
             onNewAnalysis={handleNewAnalysis}
             onOpenDocs={handleOpenDocs}
             isAdmin={isAdminUser}
+            isHistorical={isHistoricalView}
+            savedDate={historicalSavedDate ? new Date(historicalSavedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : undefined}
+            onBackToHistory={() => navigateToView('my-analyses')}
+            saveStatusMessage={saveStatusMessage}
+            onRetrySave={handleRetrySave}
           />
         )}
 
@@ -281,11 +359,29 @@ export default function App() {
           />
         )}
 
-        {/* 6. Protected User Area */}
+        {/* 6. User Analysis History ("My Analyses") */}
+        {currentView === 'my-analyses' && (
+          currentUser ? (
+            <AnalysisHistoryView
+              onOpenAnalysis={handleOpenHistoricalAnalysis}
+              onNewAnalysis={handleNewAnalysis}
+            />
+          ) : (
+            <LoginPage
+              onSuccess={() => navigateToView('my-analyses')}
+              onNavigateToRegister={() => navigateToView('register')}
+              onNavigateToForgotPassword={() => navigateToView('forgot-password')}
+              onBackToApp={navigateToHome}
+            />
+          )
+        )}
+
+        {/* 7. Protected User Area ("My Account") */}
         {currentView === 'account' && (
           currentUser ? (
             <UserAreaView
               onNavigateToAnalysis={navigateToHome}
+              onNavigateToHistory={() => navigateToView('my-analyses')}
               onLogout={navigateToHome}
             />
           ) : (
@@ -298,7 +394,7 @@ export default function App() {
           )
         )}
 
-        {/* 7. Admin Login Route */}
+        {/* 8. Admin Login Route */}
         {currentView === 'admin-login' && (
           <AdminLogin
             onSuccess={() => {
@@ -309,7 +405,7 @@ export default function App() {
           />
         )}
 
-        {/* 8. Admin Dashboard Route (Admin only) */}
+        {/* 9. Admin Dashboard Route (Admin only) */}
         {currentView === 'admin-dashboard' && (
           isAdminUser ? (
             <AdminDashboard
@@ -335,7 +431,7 @@ export default function App() {
           )
         )}
 
-        {/* 9. Developer Soil Data & GPS Validation Test (Admin only) */}
+        {/* 10. Developer Soil Data & GPS Validation Test (Admin only) */}
         {currentView === 'admin-soil-data-test' && (
           isAdminUser ? (
             <SoilDataTestView

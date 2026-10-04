@@ -18,7 +18,8 @@ import {
   Sparkles,
   MapPinCheck,
   Camera,
-  CheckCircle2
+  CheckCircle2,
+  Archive
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
@@ -37,6 +38,11 @@ interface FarmAnalysisViewProps {
   onNewAnalysis: () => void;
   onOpenDocs: () => void;
   isAdmin?: boolean;
+  isHistorical?: boolean;
+  savedDate?: string;
+  onBackToHistory?: () => void;
+  saveStatusMessage?: string | null;
+  onRetrySave?: () => void;
 }
 
 export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
@@ -45,6 +51,11 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   onNewAnalysis,
   onOpenDocs,
   isAdmin,
+  isHistorical = false,
+  savedDate,
+  onBackToHistory,
+  saveStatusMessage,
+  onRetrySave,
 }) => {
   const { t } = useLanguage();
   const { 
@@ -195,6 +206,52 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
       {/* Main Content Container */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
+        {/* Historical Analysis Banner */}
+        {isHistorical && (
+          <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-950 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#1b4332] text-white flex items-center justify-center shrink-0">
+                <Archive className="w-4 h-4 text-emerald-300" />
+              </div>
+              <div>
+                <span className="font-bold text-sm block text-stone-900">
+                  Historical Assessment Record
+                </span>
+                <span className="text-[11px] text-stone-600">
+                  Saved on {savedDate || analysisDate} &bull; Immutable historical snapshot
+                </span>
+              </div>
+            </div>
+
+            {onBackToHistory && (
+              <button
+                onClick={onBackToHistory}
+                className="px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 text-xs font-semibold rounded-lg border border-stone-200 shadow-2xs transition-colors self-start sm:self-auto cursor-pointer"
+              >
+                &larr; Back to My Analyses
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Save Status Notification Banner */}
+        {saveStatusMessage && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs text-amber-900">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>{saveStatusMessage}</span>
+            </div>
+            {onRetrySave && (
+              <button
+                onClick={onRetrySave}
+                className="px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white rounded-lg font-bold text-xs cursor-pointer shadow-xs"
+              >
+                Retry Save
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Quick Report Actions Bar */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-stone-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-stone-600">

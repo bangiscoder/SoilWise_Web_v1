@@ -70,6 +70,24 @@ service cloud.firestore {
 
       // Only admin can delete user profiles
       allow delete: if isAdmin();
+
+      // User-owned analysis history subcollection
+      match /analyses/{analysisId} {
+        // Owner can read and list their own analyses; Admin can read all
+        allow read: if isOwner(uid) || isAdmin();
+
+        // Owner can save an analysis snapshot
+        // Must tie userId to their own auth UID and match analysisId
+        allow create: if isOwner(uid) &&
+                         request.resource.data.userId == uid &&
+                         request.resource.data.analysisId == analysisId;
+
+        // Snapshots are immutable historical records; regular user updates are blocked
+        allow update: if isAdmin();
+
+        // Owner can delete their own analysis; Admin can delete any
+        allow delete: if isOwner(uid) || isAdmin();
+      }
     }
 
     // Default deny all other collections

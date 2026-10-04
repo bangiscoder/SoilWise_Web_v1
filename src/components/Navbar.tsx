@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sprout, RotateCcw, User, LogOut, LogIn } from 'lucide-react';
+import { Sprout, RotateCcw, User, LogOut, LogIn, Archive } from 'lucide-react';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -35,12 +35,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
         </button>
 
         {/* Navigation Actions */}
-        <div className="flex items-center gap-2 sm:gap-3.5">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Admin-only Navigation item */}
           {isAdmin && (
             <button
               onClick={onOpenDocs}
-              className="hidden sm:inline-block text-xs sm:text-sm font-medium text-stone-600 hover:text-[#1b4332] transition-colors cursor-pointer"
+              className="hidden md:inline-block text-xs sm:text-sm font-medium text-stone-600 hover:text-[#1b4332] transition-colors cursor-pointer"
             >
               {t('nav.dataArchitecture')}
             </button>
@@ -60,9 +60,24 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
             </button>
           )}
 
-          {/* User Authentication Navigation */}
+          {/* User Authentication & History Navigation */}
           {currentUser ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* My Analyses History Button */}
+              <button
+                onClick={() => onNavigate('my-analyses')}
+                title="View your saved farm analyses"
+                className={`hidden xs:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  currentView === 'my-analyses'
+                    ? 'bg-[#1b4332] text-white border-[#1b4332] shadow-xs'
+                    : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                }`}
+              >
+                <Archive className={`w-3.5 h-3.5 ${currentView === 'my-analyses' ? 'text-emerald-300' : 'text-emerald-700'}`} />
+                <span>My Analyses</span>
+              </button>
+
+              {/* Account Button */}
               <button
                 onClick={() => onNavigate('account')}
                 title="View your personal account"
@@ -82,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
                 ) : (
                   <User className="w-3.5 h-3.5 text-stone-500" />
                 )}
-                <span className="max-w-[100px] truncate hidden sm:inline">
+                <span className="max-w-[90px] truncate hidden sm:inline">
                   {displayName}
                 </span>
                 <span className="sm:hidden text-[11px]">Account</span>

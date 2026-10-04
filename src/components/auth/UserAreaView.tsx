@@ -10,17 +10,20 @@ import {
   Layers, 
   CheckCircle2, 
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Archive
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface UserAreaViewProps {
   onNavigateToAnalysis: () => void;
+  onNavigateToHistory: () => void;
   onLogout: () => void;
 }
 
 export const UserAreaView: React.FC<UserAreaViewProps> = ({
   onNavigateToAnalysis,
+  onNavigateToHistory,
   onLogout,
 }) => {
   const { currentUser, userProfile, isAdmin, logout } = useAuth();
@@ -83,17 +86,24 @@ export const UserAreaView: React.FC<UserAreaViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={onNavigateToHistory}
+            className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-2xs flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Archive className="w-4 h-4 text-emerald-700" />
+            <span>My Analyses</span>
+          </button>
           <button
             onClick={onNavigateToAnalysis}
-            className="px-4 py-2.5 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer active:scale-95"
+            className="px-3.5 py-2 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <Sprout className="w-4 h-4 text-emerald-300" />
-            <span>Farm Analysis</span>
+            <span>Farm Assessment</span>
           </button>
           <button
             onClick={handleLogout}
-            className="px-3.5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <LogOut className="w-4 h-4 text-stone-500" />
             <span>Log Out</span>
@@ -153,19 +163,25 @@ export const UserAreaView: React.FC<UserAreaViewProps> = ({
           </div>
         </div>
 
-        {/* Account Plan & Readiness Card */}
+        {/* Account Plan & History Card */}
         <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold text-stone-700 uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-amber-600" />
-            <span>SoilWise Foundation</span>
+            <Archive className="w-4 h-4 text-[#1b4332]" />
+            <span>Saved Assessments</span>
           </div>
           <div className="space-y-2 text-xs text-stone-600">
             <div>
-              <span className="text-[10px] text-stone-400 uppercase font-semibold block">Subscription Tier</span>
-              <span className="font-bold text-stone-800 block mt-0.5">SoilWise Standard (Free)</span>
+              <span className="text-[10px] text-stone-400 uppercase font-semibold block">Assessment History</span>
+              <button
+                onClick={onNavigateToHistory}
+                className="font-bold text-[#1b4332] hover:underline flex items-center gap-1 mt-0.5 cursor-pointer text-xs"
+              >
+                <span>Browse Saved Analyses</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
             <p className="text-[11px] text-stone-500 leading-relaxed pt-1 border-t border-stone-100">
-              Stage 1 authentication foundation established. In Stage 2, your field analyses and seed recommendations will be automatically linked to this UID.
+              Your field soil properties, seasonal rainfall forecasts, and IAR seed matches are permanently retained in your private subcollection.
             </p>
           </div>
         </div>

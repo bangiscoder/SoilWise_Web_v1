@@ -156,6 +156,70 @@
         }
       },
       "required": ["uid", "email", "role", "accountStatus", "createdAt"]
+    },
+    "FarmAnalysisRecord": {
+      "title": "Saved Farm Analysis Snapshot",
+      "description": "Historical snapshot of a completed soil, climate, and crop variety recommendation assessment.",
+      "type": "object",
+      "properties": {
+        "analysisId": {
+          "type": "string",
+          "description": "Unique identifier for this analysis snapshot."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp of the analysis."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the analysis (completed, partial)."
+        },
+        "farm": {
+          "type": "object",
+          "description": "Location, coordinates, state, LGA, and agro-ecology."
+        },
+        "soil": {
+          "type": "object",
+          "description": "Soil inputs, provenance, texture, and multi-depth evidence."
+        },
+        "climate": {
+          "type": "object",
+          "description": "Seasonal rainfall forecast, duration, and climatological normals."
+        },
+        "recommendation": {
+          "type": "object",
+          "description": "Deterministic decision object, top crop, variety, and matching factors."
+        },
+        "versions": {
+          "type": "object",
+          "description": "Decision rule, IAR dataset, and schema versions active at analysis time."
+        },
+        "sources": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "Data and knowledge sources cited."
+        },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Agricultural and methodological limitations."
+        },
+        "fullAnalysis": {
+          "type": "object",
+          "description": "Complete raw FarmAnalysisResult payload for 100% faithful historical reopening."
+        }
+      },
+      "required": ["analysisId", "userId", "createdAt", "status", "farm", "soil", "climate", "recommendation"]
     }
   },
   "firestore": {
@@ -166,6 +230,10 @@
     "/users/{uid}": {
       "entity": "UserProfile",
       "description": "User profile collection. Users can read and update their own profile; admins can read and manage all profiles."
+    },
+    "/users/{uid}/analyses/{analysisId}": {
+      "entity": "FarmAnalysisRecord",
+      "description": "User-owned immutable historical farm analysis snapshots. Private to owner, read/create/delete by owner, read by admin."
     }
   }
 }

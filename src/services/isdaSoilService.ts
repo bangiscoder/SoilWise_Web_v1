@@ -104,6 +104,10 @@ export class IsdaTokenManager {
   private readonly DEFAULT_TTL_SECONDS = 50 * 60;
   // Safety buffer: refresh token if less than 3 minutes remaining before expiry
   private readonly SAFETY_BUFFER_MS = 3 * 60 * 1000;
+  // Cooldown after an authentication rejection (e.g. HTTP 401) to prevent repetitive failing calls
+  private lastAuthFailedAt: number | null = null;
+  private lastFailureStatus: number | null = null;
+  private readonly FAILURE_COOLDOWN_MS = 10 * 60 * 1000;
 
   public getCacheMetadata(): TokenCacheMetadata {
     const username = typeof process !== 'undefined' ? process.env?.ISDA_USERNAME : undefined;
@@ -157,6 +161,8 @@ export class IsdaTokenManager {
     this.token = null;
     this.tokenExpiresAt = null;
     this.tokenCreatedAt = null;
+    this.lastAuthFailedAt = null;
+    this.lastFailureStatus = null;
   }
 
   /**
@@ -202,6 +208,20 @@ export class IsdaTokenManager {
           authentication: 'SUCCESS',
           tokenReceived: true,
           message: `Cached token active (${remainingSec}s remaining).`,
+        },
+      };
+    }
+
+    // Check if recent authentication attempt failed (cooldown active to prevent repetitive failing calls)
+    if (this.lastAuthFailedAt && now - this.lastAuthFailedAt < this.FAILURE_COOLDOWN_MS) {
+      return {
+        token: null,
+        authDiagnostic: {
+          endpoint: 'https://api.isda-africa.com/login',
+          httpStatus: this.lastFailureStatus,
+          authentication: 'FAILED',
+          tokenReceived: false,
+          message: `iSDAsoil credentials returned HTTP ${this.lastFailureStatus}; utilizing open ISRIC SoilGrids and regional baseline.`,
         },
       };
     }
@@ -290,12 +310,14 @@ export class IsdaTokenManager {
 
       if (!resp.ok) {
         const errorText = await resp.text().catch(() => '');
-        console.warn(`[iSDAsoil Auth] iSDAsoil authentication failed with HTTP ${httpStatus}`);
+        this.lastAuthFailedAt = Date.now();
+        this.lastFailureStatus = httpStatus;
+        console.info(`[iSDAsoil Auth] iSDAsoil authentication returned HTTP ${httpStatus}; utilizing open ISRIC SoilGrids and regional soil baseline.`);
         if (logStage) {
           logStage(
             'Authentication',
-            'error',
-            `iSDAsoil authentication failed with HTTP ${httpStatus}: ${errorText.substring(0, 150) || resp.statusText}`
+            'warning',
+            `iSDAsoil authentication returned HTTP ${httpStatus}: ${errorText.substring(0, 150) || resp.statusText}`
           );
         }
         this.token = null;
@@ -441,9 +463,9 @@ export async function withAuthRetry(
       // Retry request ONCE
       const retryResp = await executeRequest(reAuth.token);
       if (retryResp.status === 401) {
-        console.warn('[iSDAsoil Auth] iSDAsoil authentication retry failed with HTTP 401');
+        console.info('[iSDAsoil Auth] iSDAsoil request retry returned HTTP 401; utilizing ISRIC SoilGrids fallback.');
         if (logStage) {
-          logStage('iSDAsoil Query', 'error', 'iSDAsoil authentication retry failed with HTTP 401.');
+          logStage('iSDAsoil Query', 'warning', 'iSDAsoil request retry returned HTTP 401; utilizing SoilGrids fallback.');
         }
       }
       return {
@@ -453,7 +475,7 @@ export async function withAuthRetry(
         retried: true,
       };
     } else {
-      console.warn('[iSDAsoil Auth] iSDAsoil authentication retry failed: could not acquire token');
+      console.info('[iSDAsoil Auth] iSDAsoil authentication retry skipped: token not available, utilizing SoilGrids fallback.');
       return {
         resp,
         token: null,
