@@ -109,12 +109,63 @@
         }
       },
       "required": ["submittedAt", "likesSoilwise", "wouldUse", "willingnessToPay"]
+    },
+    "UserProfile": {
+      "title": "SoilWise User Profile",
+      "description": "Public user profile and account metadata.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Canonical Firebase Auth UID."
+        },
+        "email": {
+          "type": "string",
+          "description": "Primary email address."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar photo URL if available."
+        },
+        "role": {
+          "type": "string",
+          "description": "User role: user, admin, agronomist."
+        },
+        "authProviders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Authentication providers linked to account."
+        },
+        "accountStatus": {
+          "type": "string",
+          "description": "Account status: active, suspended."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Profile creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp."
+        }
+      },
+      "required": ["uid", "email", "role", "accountStatus", "createdAt"]
     }
   },
   "firestore": {
     "/soilwise_feedback/{feedbackId}": {
       "entity": "Feedback",
       "description": "Collection of all SoilWise AI feedback submissions. Public write-only, admin read/manage."
+    },
+    "/users/{uid}": {
+      "entity": "UserProfile",
+      "description": "User profile collection. Users can read and update their own profile; admins can read and manage all profiles."
     }
   }
 }

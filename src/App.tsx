@@ -12,66 +12,88 @@ import { ApiDocsModal } from './components/ApiDocsModal';
 import { AdminLogin } from './components/admin/AdminLogin';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { SoilDataTestView } from './components/admin/SoilDataTestView';
+import { LoginPage } from './components/auth/LoginPage';
+import { RegisterPage } from './components/auth/RegisterPage';
+import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
+import { UserAreaView } from './components/auth/UserAreaView';
 import { SoilData, FarmAnalysisResult, AnalysisStep } from './types/soilwise';
 import { performFarmAnalysis } from './services/soilwiseService';
-import { auth, AUTHORIZED_ADMIN_EMAIL, isAdmin } from './lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { useAuth } from './context/AuthContext';
 import { AlertCircle, Lock } from 'lucide-react';
 
+export type AppView = 
+  | 'farm-data' 
+  | 'analysis' 
+  | 'login' 
+  | 'register' 
+  | 'forgot-password' 
+  | 'account' 
+  | 'admin-login' 
+  | 'admin-dashboard' 
+  | 'admin-soil-data-test';
+
 export default function App() {
+  const { currentUser, isAdmin: isAdminUser, isLoading: isAuthLoading } = useAuth();
+
   // Start directly with Farm Analysis as the primary experience
-  const [currentView, setCurrentView] = useState<'farm-data' | 'analysis' | 'admin-login' | 'admin-dashboard' | 'admin-soil-data-test'>('farm-data');
+  const [currentView, setCurrentView] = useState<AppView>('farm-data');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep>('idle');
   const [analysisResult, setAnalysisResult] = useState<FarmAnalysisResult | null>(null);
   const [isDocsOpen, setIsDocsOpen] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
-  
-  // Single central authentication state for entire application
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const isAdminUser = isAdmin(currentUser);
 
-  // Monitor Firebase Auth state & handle URL routing
+  // Monitor URL routes on mount and popstate
   useEffect(() => {
-    // Check initial path, hash, or query parameters
-    const path = window.location.pathname.toLowerCase();
-    const hash = window.location.hash.toLowerCase();
-    const searchParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '');
-    
-    const mode = searchParams.get('mode') || hashParams.get('mode');
-    const oobCode = searchParams.get('oobCode') || hashParams.get('oobCode');
+    const handleLocationChange = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      const searchParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '');
+      
+      const mode = searchParams.get('mode') || hashParams.get('mode');
+      const oobCode = searchParams.get('oobCode') || hashParams.get('oobCode');
 
-    // Route for password reset or action links
-    if (mode === 'resetPassword' || oobCode || path.includes('/reset-password') || hash.includes('/reset-password')) {
-      setCurrentView('admin-login');
-    } else if (path.includes('/admin/soil-data-test') || hash.includes('/admin/soil-data-test')) {
-      setCurrentView('admin-soil-data-test');
-    } else if (path.includes('/admin/dashboard') || hash.includes('/admin/dashboard')) {
-      setCurrentView('admin-dashboard');
-    } else if (path.includes('/admin') || hash.includes('/admin')) {
-      setCurrentView('admin-login');
-    }
+      // Admin password reset / action links
+      if (mode === 'resetPassword' || oobCode || path.includes('/reset-password') || hash.includes('/reset-password')) {
+        setCurrentView('admin-login');
+      } else if (path.includes('/admin/soil-data-test') || hash.includes('/admin/soil-data-test')) {
+        setCurrentView('admin-soil-data-test');
+      } else if (path.includes('/admin/dashboard') || hash.includes('/admin/dashboard')) {
+        setCurrentView('admin-dashboard');
+      } else if (path.includes('/admin') || hash.includes('/admin')) {
+        setCurrentView('admin-login');
+      } else if (path.includes('/login') || hash.includes('/login')) {
+        setCurrentView('login');
+      } else if (path.includes('/register') || hash.includes('/register')) {
+        setCurrentView('register');
+      } else if (path.includes('/forgot-password') || hash.includes('/forgot-password')) {
+        setCurrentView('forgot-password');
+      } else if (path.includes('/account') || hash.includes('/account')) {
+        setCurrentView('account');
+      }
+    };
 
-    // Central Auth listener
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setCurrentUser(user);
-        if (user && isAdmin(user)) {
-          // If authorized admin landed on admin login or test view, preserve view
-          if (currentView === 'admin-dashboard' || currentView === 'admin-soil-data-test') {
-            // Keep current admin view
-          }
-        } else {
-          // Block non-admins from dashboard and developer test
-          if (currentView === 'admin-dashboard' || currentView === 'admin-soil-data-test') {
-            setCurrentView('admin-login');
-          }
-        }
-      });
-      return () => unsubscribe();
+    handleLocationChange();
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
+
+  // Protected route enforcement
+  useEffect(() => {
+    if (!isAuthLoading) {
+      if (currentView === 'account' && !currentUser) {
+        // Unauthenticated access to protected user area -> redirect to login
+        setCurrentView('login');
+      } else if ((currentView === 'login' || currentView === 'register') && currentUser) {
+        // Authenticated user on login/register -> redirect to account
+        setCurrentView('account');
+      } else if ((currentView === 'admin-dashboard' || currentView === 'admin-soil-data-test') && !isAdminUser) {
+        // Non-admin trying to access admin dashboard -> redirect to admin-login
+        setCurrentView('admin-login');
+      }
     }
-  }, [currentView]);
+  }, [currentView, currentUser, isAdminUser, isAuthLoading]);
 
   const handleFormSubmit = async (
     soilData: SoilData,
@@ -157,6 +179,14 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const navigateToView = (view: AppView) => {
+    setAppError(null);
+    setCurrentView(view);
+    const path = view === 'farm-data' ? '/' : `/${view}`;
+    window.history.pushState({}, '', path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Guard for Data Architecture & API: only authorized administrator may open
   const handleOpenDocs = () => {
     if (!isAdminUser) {
@@ -167,17 +197,18 @@ export default function App() {
     setIsDocsOpen(true);
   };
 
+  const isNavVisible = 
+    currentView !== 'admin-login' && 
+    currentView !== 'admin-dashboard' && 
+    currentView !== 'admin-soil-data-test';
+
   return (
     <div className="min-h-screen bg-[#fbfbf9] text-stone-900 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
-      {/* Top Bar Navigation (shown on main public app) */}
-      {currentView !== 'admin-login' && currentView !== 'admin-dashboard' && currentView !== 'admin-soil-data-test' && (
+      {/* Top Bar Navigation (shown on main app views) */}
+      {isNavVisible && (
         <Navbar
           currentView={currentView}
-          onNavigate={(view) => {
-            setAppError(null);
-            setCurrentView(view);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+          onNavigate={(view) => navigateToView(view as AppView)}
           onOpenDocs={handleOpenDocs}
           isAdmin={isAdminUser}
         />
@@ -204,7 +235,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Primary Experience: Farm Analysis Form */}
+        {/* 1. Primary Experience: Farm Analysis Form */}
         {currentView === 'farm-data' && (
           <FarmDataForm
             onSubmit={handleFormSubmit}
@@ -212,7 +243,7 @@ export default function App() {
           />
         )}
 
-        {/* Results Page */}
+        {/* 2. Results Page */}
         {currentView === 'analysis' && analysisResult && (
           <FarmAnalysisView
             analysis={analysisResult}
@@ -223,7 +254,51 @@ export default function App() {
           />
         )}
 
-        {/* Admin Login Route */}
+        {/* 3. Public Login Page */}
+        {currentView === 'login' && (
+          <LoginPage
+            onSuccess={() => navigateToView('account')}
+            onNavigateToRegister={() => navigateToView('register')}
+            onNavigateToForgotPassword={() => navigateToView('forgot-password')}
+            onBackToApp={navigateToHome}
+          />
+        )}
+
+        {/* 4. Public Registration Page */}
+        {currentView === 'register' && (
+          <RegisterPage
+            onSuccess={() => navigateToView('account')}
+            onNavigateToLogin={() => navigateToView('login')}
+            onBackToApp={navigateToHome}
+          />
+        )}
+
+        {/* 5. Public Forgot Password Page */}
+        {currentView === 'forgot-password' && (
+          <ForgotPasswordPage
+            onNavigateToLogin={() => navigateToView('login')}
+            onBackToApp={navigateToHome}
+          />
+        )}
+
+        {/* 6. Protected User Area */}
+        {currentView === 'account' && (
+          currentUser ? (
+            <UserAreaView
+              onNavigateToAnalysis={navigateToHome}
+              onLogout={navigateToHome}
+            />
+          ) : (
+            <LoginPage
+              onSuccess={() => navigateToView('account')}
+              onNavigateToRegister={() => navigateToView('register')}
+              onNavigateToForgotPassword={() => navigateToView('forgot-password')}
+              onBackToApp={navigateToHome}
+            />
+          )
+        )}
+
+        {/* 7. Admin Login Route */}
         {currentView === 'admin-login' && (
           <AdminLogin
             onSuccess={() => {
@@ -234,7 +309,7 @@ export default function App() {
           />
         )}
 
-        {/* Admin Dashboard Route (Admin only) */}
+        {/* 8. Admin Dashboard Route (Admin only) */}
         {currentView === 'admin-dashboard' && (
           isAdminUser ? (
             <AdminDashboard
@@ -260,7 +335,7 @@ export default function App() {
           )
         )}
 
-        {/* Developer Soil Data & GPS Validation Test (Admin only) */}
+        {/* 9. Developer Soil Data & GPS Validation Test (Admin only) */}
         {currentView === 'admin-soil-data-test' && (
           isAdminUser ? (
             <SoilDataTestView
@@ -284,7 +359,7 @@ export default function App() {
       </main>
 
       {/* Footer with Discreet Admin Access */}
-      {currentView !== 'admin-login' && currentView !== 'admin-dashboard' && currentView !== 'admin-soil-data-test' && (
+      {isNavVisible && (
         <footer className="py-6 border-t border-stone-200/80 bg-stone-50/50 text-center text-xs text-stone-500">
           <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <span>SoilWise AI &bull; Agricultural Intelligence MVP</span>
@@ -302,7 +377,7 @@ export default function App() {
       {/* Analysis Progress Dialog */}
       {isSubmitting && <AnalysisProgressModal currentStep={analysisStep} />}
 
-      {/* API Documentation and Schema Modal (Protected) */}
+      {/* API Documentation and Schema Modal (Protected for Admin) */}
       {isAdminUser && (
         <ApiDocsModal
           isOpen={isDocsOpen}
