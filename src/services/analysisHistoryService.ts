@@ -96,8 +96,12 @@ export async function saveAnalysisSnapshot(
       createdAt: analysis.createdAt || nowIso,
       updatedAt: nowIso,
       status: analysis.status || 'completed',
+      farmId: analysis.farmId || undefined,
+      farmName: analysis.farmName || undefined,
 
       farm: {
+        farmId: analysis.farmId || undefined,
+        farmName: analysis.farmName || undefined,
         location: analysis.location,
         ecology: farmEcology,
         state: analysis.selectedState || analysis.location?.state,
@@ -211,6 +215,8 @@ export async function getUserAnalysisHistory(userId: string): Promise<SavedAnaly
         score: data.recommendation?.score ?? 0,
         potentialYield: data.recommendation?.potentialYield ?? 0,
         status: data.status || 'completed',
+        farmId: data.farmId || data.farm?.farmId,
+        farmName: data.farmName || data.farm?.farmName,
       });
     });
 

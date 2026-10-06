@@ -835,10 +835,10 @@ export const SoilDataTestView: React.FC<SoilDataTestViewProps> = ({
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-stone-900">
-                    Section C — SoilWise Normalised Profile vs Raw iSDAsoil Data
+                    Section C — Complete Digital Soil Profile &mdash; iSDAsoil Diagnostic
                   </h2>
                   <p className="text-xs text-stone-500">
-                    Verify data contract normalisation, depth (0-20cm), 30m resolution, Mehlich-3 extraction metadata, and EC unavailability.
+                    Complete end-to-end diagnostic summary, data contract normalisation, depth increments (0-20cm, 20-50cm), and raw payload.
                   </p>
                 </div>
               </div>
@@ -875,6 +875,304 @@ export const SoilDataTestView: React.FC<SoilDataTestViewProps> = ({
                 >
                   Diagnostic Audit Log
                 </button>
+              </div>
+            </div>
+
+            {/* Admin Diagnostic Summary & Classification (Requirement 13 & 15) */}
+            <div className="bg-stone-50/80 border border-stone-200/90 rounded-2xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-200/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#1b4332]" />
+                  <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                    Diagnostic Lifecycle Summary
+                  </h3>
+                </div>
+
+                {/* Classification Badge */}
+                {pipelineResult.soilData.classification && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-stone-500">Pipeline Classification:</span>
+                    <span
+                      className={`text-xs font-mono font-bold px-3 py-1 rounded-lg border flex items-center gap-1.5 ${
+                        pipelineResult.soilData.classification === 'SUCCESS'
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          : pipelineResult.soilData.classification === 'NO_SOIL_DATA_RETURNED'
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-rose-100 text-rose-900 border-rose-300'
+                      }`}
+                    >
+                      {pipelineResult.soilData.classification === 'SUCCESS' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-700" />
+                      )}
+                      <span>{pipelineResult.soilData.classification}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Status Message */}
+              {pipelineResult.soilData.classificationMessage && (
+                <div
+                  className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
+                    pipelineResult.soilData.classification === 'SUCCESS'
+                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-900 border border-rose-200'
+                  }`}
+                >
+                  <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Diagnostic Status: </span>
+                    <span>{pipelineResult.soilData.classificationMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 4-Stage Diagnostic Lifecycle Checklist */}
+              {pipelineResult.soilData.diagnosticSummary ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                  {/* Stage 1: Authentication */}
+                  <div className="bg-white p-3.5 rounded-xl border border-stone-200/80 space-y-2">
+                    <div className="font-bold text-stone-800 text-[11px] uppercase tracking-wider border-b border-stone-100 pb-1.5 flex items-center justify-between">
+                      <span>1. Authentication</span>
+                      {pipelineResult.soilData.diagnosticSummary.authentication.authSuccessful ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                      )}
+                    </div>
+                    <ul className="space-y-1.5 text-[11px]">
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.authentication.credentialsLoaded ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">Credentials loaded</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.authentication.authSuccessful ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">Authentication successful</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.authentication.tokenObtained ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">Access token obtained</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Stage 2: Soil Request */}
+                  <div className="bg-white p-3.5 rounded-xl border border-stone-200/80 space-y-2">
+                    <div className="font-bold text-stone-800 text-[11px] uppercase tracking-wider border-b border-stone-100 pb-1.5 flex items-center justify-between">
+                      <span>2. Soil Request</span>
+                      {pipelineResult.soilData.diagnosticSummary.soilRequest.soilProfileReturned ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                      )}
+                    </div>
+                    <ul className="space-y-1.5 text-[11px]">
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.soilRequest.endpointReachable ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">Endpoint reachable</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.soilRequest.requestAuthenticated ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">Request authenticated</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.soilRequest.coordinatesAccepted ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">Coordinates accepted</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.soilRequest.soilProfileReturned ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">
+                          Soil profile returned{' '}
+                          {pipelineResult.soilData.diagnosticSummary.soilRequest.httpStatus
+                            ? `(HTTP ${pipelineResult.soilData.diagnosticSummary.soilRequest.httpStatus})`
+                            : ''}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Stage 3: Response */}
+                  <div className="bg-white p-3.5 rounded-xl border border-stone-200/80 space-y-2">
+                    <div className="font-bold text-stone-800 text-[11px] uppercase tracking-wider border-b border-stone-100 pb-1.5 flex items-center justify-between">
+                      <span>3. Response</span>
+                      {pipelineResult.soilData.diagnosticSummary.response.propertiesDetected ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      )}
+                    </div>
+                    <ul className="space-y-1.5 text-[11px]">
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.response.jsonReceived ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">JSON response received</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.response.propertiesDetected ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">
+                          Soil properties detected ({pipelineResult.soilData.diagnosticSummary.response.detectedPropertiesCount})
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.response.parsedSuccessfully ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">✕</span>
+                        )}
+                        <span className="text-stone-700">Response parsed successfully</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Stage 4: Profile Mapping */}
+                  <div className="bg-white p-3.5 rounded-xl border border-stone-200/80 space-y-2">
+                    <div className="font-bold text-stone-800 text-[11px] uppercase tracking-wider border-b border-stone-100 pb-1.5 flex items-center justify-between">
+                      <span>4. Profile</span>
+                      {pipelineResult.soilData.diagnosticSummary.profile.availablePropertiesCount > 0 ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      )}
+                    </div>
+                    <ul className="space-y-1 text-[11px]">
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.profile.phAvailable ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-stone-400 font-bold">○</span>
+                        )}
+                        <span className="text-stone-700">
+                          pH {pipelineResult.soilData.diagnosticSummary.profile.phAvailable ? 'available' : 'unavailable'}
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.profile.nitrogenAvailable ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-stone-400 font-bold">○</span>
+                        )}
+                        <span className="text-stone-700">
+                          Nitrogen {pipelineResult.soilData.diagnosticSummary.profile.nitrogenAvailable ? 'available' : 'unavailable'}
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.profile.phosphorusAvailable ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-stone-400 font-bold">○</span>
+                        )}
+                        <span className="text-stone-700">
+                          Phosphorus {pipelineResult.soilData.diagnosticSummary.profile.phosphorusAvailable ? 'available' : 'unavailable'}
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.profile.potassiumAvailable ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-stone-400 font-bold">○</span>
+                        )}
+                        <span className="text-stone-700">
+                          Potassium {pipelineResult.soilData.diagnosticSummary.profile.potassiumAvailable ? 'available' : 'unavailable'}
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.profile.textureAvailable ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-stone-400 font-bold">○</span>
+                        )}
+                        <span className="text-stone-700">
+                          Texture {pipelineResult.soilData.diagnosticSummary.profile.textureAvailable ? 'available' : 'unavailable'}
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {pipelineResult.soilData.diagnosticSummary.profile.additionalPropertiesAvailable ? (
+                          <span className="text-emerald-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-stone-400 font-bold">○</span>
+                        )}
+                        <span className="text-stone-700">Additional properties available</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className="text-stone-400 font-bold">○</span>
+                        <span className="text-stone-500 italic">EC unavailable from iSDAsoil</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Tab Navigation */}
+              <div className="flex items-center justify-between border-t border-stone-100 pt-4">
+                <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setActiveTab('normalised')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      activeTab === 'normalised'
+                        ? 'bg-white text-stone-900 shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    Normalised Profile
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('raw')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      activeTab === 'raw'
+                        ? 'bg-white text-stone-900 shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    Raw iSDAsoil JSON
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('diagnostics')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      activeTab === 'diagnostics'
+                        ? 'bg-white text-stone-900 shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    Diagnostic Audit Log
+                  </button>
+                </div>
               </div>
             </div>
 

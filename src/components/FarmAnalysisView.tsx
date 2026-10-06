@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
+import { FarmOpenMeteoWeatherSection } from './FarmOpenMeteoWeatherSection';
 import { NimetClimateReport } from './NimetClimateReport';
 import { FutureRecommendationSection } from './FutureRecommendationSection';
 import { SoilwiseAiAssistant } from './SoilwiseAiAssistant';
@@ -30,6 +31,7 @@ import { FloatingAiAssistantBar } from './FloatingAiAssistantBar';
 import { AgronomistConsultationModal } from './AgronomistConsultationModal';
 import { FarmerFeedbackSection } from './FarmerFeedbackSection';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import resultHeroBg from '../assets/images/result_hero_bg_1790608469988.jpg';
 
 interface FarmAnalysisViewProps {
@@ -43,6 +45,7 @@ interface FarmAnalysisViewProps {
   onBackToHistory?: () => void;
   saveStatusMessage?: string | null;
   onRetrySave?: () => void;
+  onNavigateToLogin?: () => void;
 }
 
 export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
@@ -56,8 +59,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   onBackToHistory,
   saveStatusMessage,
   onRetrySave,
+  onNavigateToLogin,
 }) => {
   const { t } = useLanguage();
+  const { currentUser } = useAuth();
   const { 
     soilData, 
     location, 
@@ -144,9 +149,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
     return null;
   };
 
+  const isdaProps = analysis.soilEvidence?.location_estimate?.properties || {};
+  const hasAvailableIsdaProperties = Object.values(isdaProps).some((p) => p.status === 'available');
   const isdaLocationAvailable = Boolean(
-    analysis.soilEvidence?.location_estimate?.available ||
-    (analysis.soilEvidence?.location_estimate?.properties && Object.keys(analysis.soilEvidence.location_estimate.properties).length > 0)
+    analysis.soilEvidence?.location_estimate?.available || hasAvailableIsdaProperties
   );
 
   const handlePrint = () => {
@@ -167,7 +173,11 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   return (
     <div className="w-full pb-28 sm:pb-32 space-y-10 sm:space-y-14">
       {/* Fixed / Floating AI Assistant Entry Bar (Fixed near bottom across all scroll positions) */}
-      <FloatingAiAssistantBar onOpen={handleOpenAssistant} />
+      <FloatingAiAssistantBar
+        onOpen={handleOpenAssistant}
+        isAuthenticated={Boolean(currentUser)}
+        onSignInClick={onNavigateToLogin}
+      />
 
       {/* 1. RESULT HERO (~50vh) */}
       <section className="relative h-[48vh] sm:h-[50vh] min-h-[390px] w-full flex items-center justify-center overflow-hidden bg-stone-950">
@@ -408,8 +418,8 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   </div>
                   <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-2 block">
                     {isUserMeasured
-                      ? soilData.ph.toFixed(1)
-                      : (analysis.soilEvidence?.location_estimate?.profile?.ph.value ?? soilData.ph.toFixed(1))}
+                      ? (soilData.ph != null ? soilData.ph.toFixed(1) : '—')
+                      : (analysis.soilEvidence?.location_estimate?.profile?.ph.value ?? (soilData.ph != null ? soilData.ph.toFixed(1) : '—'))}
                   </span>
                   <span className="text-[10px] text-stone-400 block">pH (1:5 H2O)</span>
                 </div>
@@ -539,7 +549,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                   {isUserMeasured ? (
                     <>
                       <span className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 mt-2 block">
-                        {soilData.ec.toFixed(2)}
+                        {soilData.ec != null ? soilData.ec.toFixed(2) : '—'}
                       </span>
                       <span className="text-[10px] text-stone-400 block">dS/m (Measured)</span>
                     </>
@@ -1165,10 +1175,13 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </div>
         </section>
 
-        {/* 5. CLIMATE REPORT — FUTURE INTEGRATION DEMO (Includes consolidated Climate Outlook & Agricultural Implication) */}
+        {/* 5. OPEN-METEO 7-DAY AG-WEATHER FORECAST & HISTORICAL RAINFALL PATTERNS */}
+        <FarmOpenMeteoWeatherSection location={location} />
+
+        {/* 6. CLIMATE REPORT — FUTURE INTEGRATION DEMO (Includes consolidated Climate Outlook & Agricultural Implication) */}
         <NimetClimateReport location={location} />
 
-        {/* 6. RECOMMENDATION (Major visual highlight) */}
+        {/* 7. RECOMMENDATION (Major visual highlight) */}
         <FutureRecommendationSection
           soilData={soilData}
           rainfallOutlook={rainfallOutlook}
@@ -1177,7 +1190,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           location={location}
         />
 
-        {/* 7. TALK TO A CERTIFIED AGRONOMIST DEMO */}
+        {/* 8. TALK TO A CERTIFIED AGRONOMIST DEMO */}
         <section className="p-6 sm:p-7 bg-[#f0f5ee] rounded-3xl border border-[#1b4332]/20 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-1.5 max-w-xl">
             <div className="flex items-center gap-2">
@@ -1215,6 +1228,8 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           isOpen={isAssistantModalOpen}
           onClose={handleCloseAssistant}
           initialQuery={pendingQuery}
+          isHistorical={isHistorical}
+          onSignInClick={onNavigateToLogin}
           onRequestConsultation={() => {
             setIsAssistantModalOpen(false);
             setIsConsultationModalOpen(true);

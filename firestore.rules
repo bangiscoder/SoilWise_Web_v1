@@ -62,14 +62,31 @@ service cloud.firestore {
                        request.resource.data.role == 'user' &&
                        (!('admin' in request.resource.data) || request.resource.data.admin == false);
 
-      // User can update basic profile fields (displayName, photoURL, authProviders, updatedAt)
+      // User can update basic profile fields and preferences (displayName, photoURL, authProviders, updatedAt, profile, activeFarmId)
       // Cannot elevate privileges (role, accountStatus, admin, subscription)
       allow update: if (isOwner(uid) &&
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'authProviders', 'updatedAt'])
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'authProviders', 'updatedAt', 'profile', 'activeFarmId'])
                        ) || isAdmin();
 
       // Only admin can delete user profiles
       allow delete: if isAdmin();
+
+      // User-owned farms subcollection (Stage 3)
+      match /farms/{farmId} {
+        // Owner can read their own farms; Admin can read all
+        allow read: if isOwner(uid) || isAdmin();
+
+        // Owner can create a farm for their own account
+        allow create: if isOwner(uid) &&
+                         request.resource.data.userId == uid &&
+                         request.resource.data.farmId == farmId;
+
+        // Owner can update their own farm; userId cannot be transferred
+        allow update: if (isOwner(uid) && request.resource.data.userId == uid) || isAdmin();
+
+        // Owner can delete their own farm; Admin can delete any
+        allow delete: if isOwner(uid) || isAdmin();
+      }
 
       // User-owned analysis history subcollection
       match /analyses/{analysisId} {

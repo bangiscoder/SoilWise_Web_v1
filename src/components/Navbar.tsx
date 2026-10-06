@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sprout, RotateCcw, User, LogOut, LogIn, Archive } from 'lucide-react';
+import { Sprout, RotateCcw, User, LogOut, LogIn, Archive, Compass } from 'lucide-react';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -63,6 +63,20 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
           {/* User Authentication & History Navigation */}
           {currentUser ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* My Farms Button */}
+              <button
+                onClick={() => onNavigate('my-farms')}
+                title="View and manage your saved farms"
+                className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  currentView === 'my-farms'
+                    ? 'bg-[#1b4332] text-white border-[#1b4332] shadow-xs'
+                    : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                }`}
+              >
+                <Compass className={`w-3.5 h-3.5 ${currentView === 'my-farms' ? 'text-emerald-300' : 'text-emerald-700'}`} />
+                <span>My Farms</span>
+              </button>
+
               {/* My Analyses History Button */}
               <button
                 onClick={() => onNavigate('my-analyses')}
@@ -82,7 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
                 onClick={() => onNavigate('account')}
                 title="View your personal account"
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                  currentView === 'account'
+                  currentView === 'account' || currentView === 'profile'
                     ? 'bg-[#1b4332] text-white border-[#1b4332] shadow-xs'
                     : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
                 }`}

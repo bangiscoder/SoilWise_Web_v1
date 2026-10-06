@@ -4,57 +4,181 @@ import {
   Send, 
   User, 
   Sparkles, 
-  AlertCircle,
-  X
+  X, 
+  Lock,
+  ArrowRight,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { useLanguage } from '../context/LanguageContext';
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  text: string;
-  timestamp: string;
-}
+import { useAuth } from '../context/AuthContext';
+import { 
+  buildGeminiContext, 
+} from '../services/geminiContextService';
+import { 
+  sendChatMessageToGemini, 
+  AssistantChatMessage 
+} from '../services/aiAssistantService';
+import { getUserAnalysisHistory } from '../services/analysisHistoryService';
+import { getUserFarms } from '../services/farmService';
+import { SavedAnalysisSummary } from '../types/analysisHistory';
+import { FarmProfileDocument } from '../types/farm';
 
 interface SoilwiseAiAssistantProps {
-  analysis: FarmAnalysisResult;
+  analysis?: FarmAnalysisResult | null;
   isOpen?: boolean;
   onClose?: () => void;
   onRequestConsultation?: () => void;
+  onSignInClick?: () => void;
   initialQuery?: string;
+  isHistorical?: boolean;
 }
 
-// Architectural flag ensuring no external model or API is queried during MVP validation
-export const AI_ASSISTANT_MODE: 'mock' | 'gemini' = 'mock';
+export const AI_ASSISTANT_MODE: 'mock' | 'gemini' = 'gemini';
+
+/**
+ * Formats simple markdown (*, -, numbered bullets, and **bold**) into clean JSX elements
+ */
+function FormattedAssistantText({ text }: { text: string }) {
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed text-stone-800">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return <div key={idx} className="h-1" />;
+        }
+
+        const isBullet = trimmed.startsWith('* ') || trimmed.startsWith('- ') || trimmed.startsWith('• ');
+        const isNumbered = /^\d+\.\s/.test(trimmed);
+
+        const content = isBullet 
+          ? trimmed.replace(/^[\*\-•]\s*/, '')
+          : isNumbered
+          ? trimmed.replace(/^\d+\.\s*/, '')
+          : trimmed;
+
+        // Parse **bold** parts
+        const parts = content.split(/(\*\*.*?\*\*)/g);
+        const renderedContent = parts.map((part, pIdx) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <strong key={pIdx} className="font-bold text-stone-900">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          }
+          return part;
+        });
+
+        if (isBullet || isNumbered) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1.5">
+              <span className="text-emerald-700 font-bold shrink-0 mt-0.5">
+                {isNumbered ? trimmed.match(/^\d+\./)?.[0] : '•'}
+              </span>
+              <div className="flex-1">{renderedContent}</div>
+            </div>
+          );
+        }
+
+        return <p key={idx}>{renderedContent}</p>;
+      })}
+    </div>
+  );
+}
 
 export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   analysis,
   isOpen = true,
   onClose,
   onRequestConsultation,
+  onSignInClick,
   initialQuery,
+  isHistorical = false,
 }) => {
   const { t } = useLanguage();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'init-1',
-      role: 'assistant',
-      text: "Hello! I'm your SoilWise AI Assistant. Here you can chat with your tailored AI Assistant for more information on any question you may have.",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const { currentUser, userProfile } = useAuth();
+
+  const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [historyDocs, setHistoryDocs] = useState<SavedAnalysisSummary[]>([]);
+  const [userFarms, setUserFarms] = useState<FarmProfileDocument[]>([]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialSentRef = useRef<boolean>(false);
+  const activeAnalysisIdRef = useRef<string | null>(null);
 
-  const suggestedQuestions = [
-    t('assistant.sampleQ1'),
-    t('assistant.sampleQ2'),
-    t('assistant.sampleQ3'),
-  ];
+  // Load user history and farms in background to feed context builder
+  useEffect(() => {
+    if (currentUser) {
+      getUserAnalysisHistory(currentUser.uid)
+        .then((docs) => setHistoryDocs(docs))
+        .catch((err) => console.warn('History load notice:', err));
+
+      getUserFarms(currentUser.uid)
+        .then((farms) => setUserFarms(farms))
+        .catch((err) => console.warn('Farms load notice:', err));
+    }
+  }, [currentUser]);
+
+  // Context Switching: Initialize greeting message
+  useEffect(() => {
+    const nextId = analysis?.id || 'no-analysis';
+    if (activeAnalysisIdRef.current !== nextId) {
+      activeAnalysisIdRef.current = nextId;
+
+      let welcomeText = "Hello! I'm your SoilWise AI Agronomist. How can I help you with your farm today?";
+
+      if (analysis) {
+        const topCrop = analysis.cropRecommendationDecision?.top_recommendation?.crop.name;
+        const topVar = analysis.cropRecommendationDecision?.top_recommendation?.variety.name;
+        const loc = analysis.selectedState || analysis.location?.state || 'your land';
+
+        if (isHistorical) {
+          welcomeText = `Welcome! Viewing archived farm assessment for ${loc}. Recommended crop was ${topCrop || 'crop'} (${topVar || 'variety'}). What would you like to review?`;
+        } else if (topCrop && topVar) {
+          welcomeText = `Hello! Farm assessment for ${loc} loaded. Top recommendation is **${topCrop}** (${topVar}). Ask me about fertilizer rates, planting dates, soil nutrients, or variety management.`;
+        } else {
+          welcomeText = `Hello! Farm assessment for ${loc} loaded. Ask me about your soil nutrients, rainfall outlook, or recommended varieties.`;
+        }
+      }
+
+      setMessages([
+        {
+          id: `init-${Date.now()}`,
+          role: 'assistant',
+          text: welcomeText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+      initialSentRef.current = false;
+    }
+  }, [analysis?.id, isHistorical]);
+
+  // Active Farm resolution
+  const activeFarm = userFarms.find((f) => f.farmId === userProfile?.activeFarmId) || 
+    (analysis?.farmId ? userFarms.find((f) => f.farmId === analysis.farmId) : null) || 
+    (userFarms.length > 0 ? userFarms[0] : null);
+
+  // Quick-prompt suggestions (Section 2)
+  const quickPrompts = (() => {
+    const base = [
+      'What fertilizer ratio should I use?',
+      'When should I plant?',
+      'How can I improve soil pH?',
+    ];
+
+    if (analysis?.cropRecommendationDecision?.top_recommendation?.crop.name) {
+      const topCrop = analysis.cropRecommendationDecision.top_recommendation.crop.name;
+      return [`Why was ${topCrop} recommended?`, ...base];
+    }
+
+    return base;
+  })();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -63,6 +187,14 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  // Handle initialQuery if passed (from floating bar)
+  useEffect(() => {
+    if (isOpen && currentUser && initialQuery && !initialSentRef.current) {
+      initialSentRef.current = true;
+      handleSendMessage(initialQuery);
+    }
+  }, [isOpen, currentUser, initialQuery]);
 
   // Lock body scroll and listen for Escape key when open as modal
   useEffect(() => {
@@ -80,7 +212,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
 
     const timer = setTimeout(() => {
       inputRef.current?.focus();
-    }, 100);
+    }, 150);
 
     return () => {
       document.body.style.overflow = originalOverflow;
@@ -91,75 +223,16 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
 
   if (!isOpen) return null;
 
-  /**
-   * Prepares the full agricultural analysis context for the assistant architecture.
-   * Ready for future live model activation without sending data externally in the MVP.
-   */
-  const preparedFarmContext = {
-    analysisDate: analysis.analysisDate,
-    latitude: analysis.location.latitude,
-    longitude: analysis.location.longitude,
-    address: analysis.location.address?.fullAddress || '',
-    nearestLandmark: analysis.location.landmark?.name || '',
-    elevation: analysis.location.elevationMeters,
-    soilPh: analysis.soilData.ph,
-    nitrogen: analysis.soilData.nitrogen,
-    phosphorus: analysis.soilData.phosphorus,
-    potassium: analysis.soilData.potassium,
-    ec: analysis.soilData.ec,
-    clayPercent: analysis.soilTexture.clayPercent,
-    sandPercent: analysis.soilTexture.sandPercent,
-    siltPercent: analysis.soilTexture.siltPercent,
-    texturalClass: analysis.soilTexture.texturalClass,
-    rainfallOutlook: analysis.rainfallOutlook.seasonalOutlook,
-    expectedOnset: analysis.rainfallOutlook.expectedOnset,
-    expectedCessation: analysis.rainfallOutlook.expectedCessation,
-    seasonDuration: analysis.rainfallOutlook.estimatedSeasonDurationDays,
-    remainingDays: analysis.rainfallOutlook.estimatedRemainingDaysText,
-    approximatePeakPeriod: analysis.rainfallOutlook.approximatePeakPeriod,
-    onsetStatus: analysis.rainfallOutlook.rainfallOnsetStatus,
-    meanAnnualTemp: analysis.environmentalInfo.meanAnnualTemperatureC,
-    annualRainfall: analysis.environmentalInfo.annualPrecipitationMm,
-    climateZone: analysis.environmentalInfo.climateZone,
-  };
-
-  const generateMockResponse = (userQuery: string): string => {
-    const q = userQuery.toLowerCase();
-
-    if (q.includes('ph')) {
-      const ph = preparedFarmContext.soilPh;
-      const phClass = ph < 5.5 ? 'strongly acidic' : ph < 6.5 ? 'moderately acidic' : ph <= 7.5 ? 'near-neutral' : 'alkaline';
-      return `[Prototype Response] According to your farm data, your soil pH is ${ph.toFixed(1)} (${phClass}). In general agronomy, pH influences how easily plants take up primary nutrients (N, P, K). For specific crop requirements or liming advice, please consult a certified agronomist.`;
-    }
-
-    if (q.includes('rainfall') || q.includes('rain') || q.includes('onset') || q.includes('cessation')) {
-      return `[Prototype Response] Based on the model-based rainfall outlook for your farm (${preparedFarmContext.latitude.toFixed(4)}°, ${preparedFarmContext.longitude.toFixed(4)}°):\n• Expected Onset: ${preparedFarmContext.expectedOnset || 'Not determined'}\n• Expected Cessation: ${preparedFarmContext.expectedCessation || 'Not determined'}\n• Estimated Season Duration: ${preparedFarmContext.seasonDuration ? `${preparedFarmContext.seasonDuration} days` : 'Not determined'}\n• Remaining Days: ${preparedFarmContext.remainingDays}\n• Peak Period: ${preparedFarmContext.approximatePeakPeriod}`;
-    }
-
-    if (q.includes('agronomist') || q.includes('discuss')) {
-      return `[Prototype Response] Recommended topics to discuss with a certified agronomist based on your farm profile:\n1. Your soil pH (${preparedFarmContext.soilPh.toFixed(1)}) and nutrient levels (N: ${preparedFarmContext.nitrogen} mg/kg, P: ${preparedFarmContext.phosphorus} mg/kg, K: ${preparedFarmContext.potassium} mg/kg)\n2. Your soil texture (${preparedFarmContext.texturalClass || 'ISRIC model'} - Sand: ${preparedFarmContext.sandPercent ?? 'N/A'}%, Clay: ${preparedFarmContext.clayPercent ?? 'N/A'}%)\n3. Appropriate planting dates aligned with your expected rainfall onset (${preparedFarmContext.expectedOnset || 'onset window'})\n4. Certified drought-tolerant seed varieties suited for your ${preparedFarmContext.seasonDuration ?? '120-150'}-day season.`;
-    }
-
-    if (q.includes('seed') || q.includes('variety')) {
-      return `[Prototype Response] Before choosing a seed variety, verify:\n• Your estimated rainy season duration (~${preparedFarmContext.seasonDuration ?? '120-150'} days)\n• Soil drainage & texture (${preparedFarmContext.texturalClass || 'soil texture'})\n• Certified seed availability from registered local seed producers\n• Pest and disease pressure history on your land.\n\nNote: SoilWise AI does not generate automated seed prescriptions in this MVP without certified institutional data.`;
-    }
-
-    if (q.includes('nimet') || q.includes('climate report')) {
-      return `[Prototype Response] Official NiMet seasonal forecasts are published independently by the Nigerian Meteorological Agency. SoilWise AI distinguishes open climate models (Open-Meteo) from official NiMet information and does not invent NiMet predictions.`;
-    }
-
-    if (q.includes('fertilizer') || q.includes('fertiliser') || q.includes('crop')) {
-      return `[Prototype Response] SoilWise AI does not provide automated fertiliser application rates or commercial crop endorsements in this MVP. Your recorded soil values (N: ${preparedFarmContext.nitrogen}, P: ${preparedFarmContext.phosphorus}, K: ${preparedFarmContext.potassium}, EC: ${preparedFarmContext.ec}) can be reviewed with a qualified agronomist through the consultation option below.`;
-    }
-
-    return `[Prototype Response] I can help you explore the data in this farm analysis profile (such as soil pH ${preparedFarmContext.soilPh.toFixed(1)}, rainfall onset/cessation, and soil texture). What specific measurement from your report would you like to review?`;
-  };
-
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
     if (!query || isTyping) return;
 
-    const userMsg: ChatMessage = {
+    if (!currentUser) {
+      onSignInClick?.();
+      return;
+    }
+
+    const userMsg: AssistantChatMessage = {
       id: `usr-${Date.now()}`,
       role: 'user',
       text: query,
@@ -170,130 +243,238 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
     setInputText('');
     setIsTyping(true);
 
-    // Simulate realistic typing delay without calling external API
-    setTimeout(() => {
-      const replyText = generateMockResponse(query);
-      const botMsg: ChatMessage = {
+    const contextForTurn = buildGeminiContext({
+      analysis: analysis || null,
+      userProfile: userProfile || null,
+      activeFarm,
+      history: historyDocs,
+      userQuery: query,
+      isHistoricalView: isHistorical,
+    });
+
+    try {
+      const authToken = await currentUser.getIdToken();
+      const response = await sendChatMessageToGemini(
+        query,
+        contextForTurn,
+        [...messages, userMsg],
+        authToken
+      );
+
+      const botMsg: AssistantChatMessage = {
         id: `bot-${Date.now()}`,
         role: 'assistant',
-        text: replyText,
+        text: response.reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
+
       setMessages((prev) => [...prev, botMsg]);
+    } catch (err: any) {
+      console.error('[AI Assistant Client Error]:', err);
+      const errorMsg: AssistantChatMessage = {
+        id: `bot-err-${Date.now()}`,
+        role: 'assistant',
+        text: 'The SoilWise assistant is temporarily unavailable. Your farm analysis and recommendation are still available.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 450);
+    }
   };
 
-  const content = (
-    <div className="space-y-4">
+  // Farm Context Indicator string
+  const contextIndicator = (() => {
+    if (!analysis) return 'Context: General Agricultural Guidance';
+    const lga = analysis.selectedLga || analysis.location?.lga;
+    const state = analysis.selectedState || analysis.location?.state;
+    if (lga && state) return `Context: Farm Analysis for ${lga}, ${state}`;
+    if (state) return `Context: Farm Analysis for ${state}`;
+    return 'Context: Active Farm Analysis';
+  })();
+
+  // 1. Unauthenticated View: Friendly authentication required prompt (Section 1)
+  const unauthenticatedContent = (
+    <div className="flex flex-col h-full space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+      <div className="flex items-center justify-between pb-3 border-b border-stone-200">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#1b4332]">
-              SoilWise AI Assistant
-            </span>
-            <span className="text-stone-300">&bull;</span>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-              Prototype
-            </span>
-          </div>
-          <h2 className="text-xl font-bold text-stone-900 tracking-tight mt-1">
-            {t('assistant.modalTitle')}
+          <h2 className="text-lg font-bold text-stone-900 tracking-tight flex items-center gap-2">
+            <Bot className="w-5 h-5 text-[#1b4332]" />
+            <span>SoilWise AI Agronomist</span>
           </h2>
-          <p className="text-xs text-stone-600 mt-0.5">
-            {t('assistant.modalSubtitle')}
+          <p className="text-xs text-stone-500 font-medium mt-0.5">
+            {contextIndicator}
           </p>
         </div>
-
         {onClose && (
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
-            title="Close SoilWise AI assistant"
-            aria-label="Close SoilWise AI assistant"
+            className="p-1.5 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      {/* Chat Container */}
-      <div className="border border-stone-200 rounded-2xl overflow-hidden bg-stone-50/50 flex flex-col flex-1 min-h-[260px] sm:min-h-[320px] max-h-[48vh] sm:max-h-[52vh]">
-        {/* Messages Stream */}
-        <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-3.5">
-          {messages.map((m) => {
-            const isUser = m.role === 'user';
-            return (
+      {/* Main Authentication Card */}
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8 bg-stone-50 rounded-2xl border border-stone-200/90 space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-100/80 text-[#1b4332] border border-emerald-200 flex items-center justify-center shadow-xs">
+          <Lock className="w-7 h-7 text-emerald-800" />
+        </div>
+
+        <div className="space-y-1.5 max-w-md">
+          <h3 className="text-lg font-bold text-stone-900">
+            Sign in to consult the SoilWise AI Assistant
+          </h3>
+          <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+            The AI Agronomist provides interactive answers grounded in your specific soil tests, rainfall outlook, and recommended crop varieties. Sign in to your account to start the consultation.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 w-full sm:w-auto">
+          <button
+            onClick={() => {
+              onClose?.();
+              onSignInClick?.();
+            }}
+            className="w-full sm:w-auto px-6 py-2.5 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+          >
+            <span>Sign In to Continue</span>
+            <ArrowRight className="w-4 h-4 text-emerald-300" />
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="w-full sm:w-auto px-4 py-2.5 text-xs text-stone-600 hover:text-stone-900 rounded-xl transition-colors cursor-pointer font-medium"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+
+        <p className="text-[11px] text-stone-400 pt-3">
+          Your farm recommendations and soil analysis remain accessible without signing in.
+        </p>
+      </div>
+    </div>
+  );
+
+  // 2. Authenticated View: Simplified, clean chat modal (Section 2)
+  const authenticatedContent = (
+    <div className="flex flex-col h-full min-h-[460px] max-h-[82vh] sm:max-h-[80vh]">
+      {/* Header (Section 2) */}
+      <div className="flex items-center justify-between pb-3 border-b border-stone-200 shrink-0">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-stone-900 tracking-tight flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <span>SoilWise AI Agronomist</span>
+            </h2>
+            {isHistorical && (
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                Archived Record
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-stone-500 font-medium mt-0.5">
+            {contextIndicator}
+          </p>
+        </div>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Conversation Area (Scrollable Message Stream) */}
+      <div className="flex-1 overflow-y-auto py-4 px-1 space-y-3.5 overscroll-contain">
+        {messages.map((m) => {
+          const isUser = m.role === 'user';
+          return (
+            <div
+              key={m.id}
+              className={`flex items-start gap-2.5 ${isUser ? 'flex-row-reverse' : ''}`}
+            >
               <div
-                key={m.id}
-                className={`flex items-start gap-2.5 ${isUser ? 'flex-row-reverse' : ''}`}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 shadow-2xs ${
+                  isUser
+                    ? 'bg-[#1b4332] text-white'
+                    : 'bg-[#f0f5ee] text-[#1b4332] border border-[#1b4332]/20'
+                }`}
               >
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                    isUser
-                      ? 'bg-[#1b4332] text-white'
-                      : 'bg-[#f0f5ee] text-[#1b4332] border border-[#1b4332]/20'
+                {isUser ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+              </div>
+
+              <div
+                className={`max-w-[88%] sm:max-w-[82%] rounded-2xl px-4 py-2.5 shadow-2xs ${
+                  isUser
+                    ? 'bg-[#1b4332] text-white rounded-tr-xs'
+                    : 'bg-stone-50/90 text-stone-900 border border-stone-200/90 rounded-tl-xs'
+                }`}
+              >
+                {isUser ? (
+                  <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                ) : (
+                  <FormattedAssistantText text={m.text} />
+                )}
+                <span
+                  className={`block text-[10px] mt-1 text-right font-mono ${
+                    isUser ? 'text-emerald-200/80' : 'text-stone-400'
                   }`}
                 >
-                  {isUser ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
-                </div>
-
-                <div
-                  className={`max-w-[84%] sm:max-w-[76%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed shadow-2xs ${
-                    isUser
-                      ? 'bg-[#1b4332] text-white rounded-tr-xs'
-                      : 'bg-white text-stone-800 border border-stone-200/80 rounded-tl-xs'
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{m.text}</p>
-                  <span
-                    className={`block text-[10px] mt-1 text-right ${
-                      isUser ? 'text-emerald-200' : 'text-stone-400'
-                    }`}
-                  >
-                    {m.timestamp}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-
-          {isTyping && (
-            <div className="flex items-center gap-2 text-stone-500 text-xs py-1">
-              <div className="w-7 h-7 rounded-lg bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center border border-[#1b4332]/20">
-                <Bot className="w-3.5 h-3.5 animate-pulse" />
-              </div>
-              <div className="bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs text-stone-500">
-                {t('assistant.thinking')}
+                  {m.timestamp}
+                </span>
               </div>
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          );
+        })}
 
-        {/* Suggested Questions Pills */}
-        <div className="p-3 bg-white border-t border-stone-200/80">
-          <div className="flex items-center gap-1.5 text-[11px] text-stone-500 mb-2">
-            <Sparkles className="w-3 h-3 text-[#1b4332]" />
-            <span>Suggested questions:</span>
+        {isTyping && (
+          <div className="flex items-center gap-2.5 text-stone-500 text-xs py-1">
+            <div className="w-7 h-7 rounded-lg bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center border border-[#1b4332]/20 shrink-0">
+              <Bot className="w-3.5 h-3.5 animate-pulse" />
+            </div>
+            <div className="bg-stone-50 border border-stone-200/80 rounded-2xl px-4 py-2 text-xs text-stone-600 flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 text-[#1b4332] animate-spin" />
+              <span>Consulting SoilWise agricultural intelligence...</span>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {suggestedQuestions.map((q) => (
-              <button
-                key={q}
-                onClick={() => handleSendMessage(q)}
-                disabled={isTyping}
-                className="px-2.5 py-1 text-[11px] bg-stone-100 hover:bg-[#f0f5ee] hover:text-[#1b4332] text-stone-700 rounded-lg border border-stone-200 transition-colors text-left disabled:opacity-50 cursor-pointer"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
 
-        {/* Text Input & Send */}
-        <div className="p-3 bg-white border-t border-stone-200 flex items-center gap-2">
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Quick-Prompt Suggestions (Section 2) */}
+      <div className="py-2 border-t border-stone-100 shrink-0">
+        <div className="flex items-center gap-1.5 text-[11px] text-stone-500 mb-1.5 px-0.5">
+          <Sparkles className="w-3 h-3 text-[#1b4332]" />
+          <span>Quick questions:</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {quickPrompts.map((q) => (
+            <button
+              key={q}
+              onClick={() => handleSendMessage(q)}
+              disabled={isTyping}
+              className="px-2.5 py-1 text-[11px] bg-stone-100 hover:bg-[#f0f5ee] hover:text-[#1b4332] text-stone-700 rounded-lg border border-stone-200/80 transition-colors text-left disabled:opacity-50 cursor-pointer"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Input Area (Fixed at bottom) */}
+      <div className="pt-2 border-t border-stone-200 shrink-0">
+        <div className="flex items-center gap-2 bg-stone-50 border border-stone-300 rounded-2xl p-1.5 focus-within:ring-2 focus-within:ring-[#1b4332] focus-within:border-transparent transition-all">
           <input
             ref={inputRef}
             type="text"
@@ -302,34 +483,45 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSendMessage();
             }}
-            placeholder="Ask a follow-up question..."
+            placeholder="Ask about fertilizer ratio, planting dates, soil nutrients..."
             aria-label="Ask SoilWise AI a question about your farm"
             disabled={isTyping}
-            className="flex-1 px-3.5 py-2 text-xs sm:text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b4332] focus:border-transparent text-stone-900"
+            className="flex-1 px-3 py-1.5 text-xs sm:text-sm bg-transparent focus:outline-none text-stone-900 placeholder:text-stone-400"
           />
           <button
             onClick={() => handleSendMessage()}
             disabled={isTyping || !inputText.trim()}
-            className="p-2.5 bg-[#1b4332] hover:bg-[#143225] text-white rounded-xl transition-all disabled:opacity-40 cursor-pointer active:scale-95"
+            className="p-2.5 bg-[#1b4332] hover:bg-[#143225] text-white rounded-xl transition-all disabled:opacity-40 cursor-pointer active:scale-95 shrink-0"
             title={t('assistant.send')}
             aria-label={t('assistant.send')}
           >
-            <Send className="w-4 h-4" />
+            {isTyping ? (
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-200" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </button>
         </div>
-      </div>
 
-      {/* Prototype Disclaimer */}
-      <div className="text-[11px] text-stone-500 flex items-start gap-1.5">
-        <AlertCircle className="w-3.5 h-3.5 text-stone-400 shrink-0 mt-0.5" />
-        <p>
-          {t('assistant.disclaimer')}
-        </p>
+        {/* Small collapsed footnote disclaimer */}
+        <div className="flex items-center justify-between text-[10px] text-stone-400 px-1 pt-2">
+          <span>Advisory recommendations are evidence-grounded. Consult certified agronomists for field verification.</span>
+          {onRequestConsultation && (
+            <button
+              onClick={onRequestConsultation}
+              className="text-[#1b4332] font-bold hover:underline shrink-0 ml-2 cursor-pointer"
+            >
+              Field Consultation
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 
-  // If used as modal (when onClose is provided)
+  const activeContent = currentUser ? authenticatedContent : unauthenticatedContent;
+
+  // Render modal
   if (onClose) {
     return (
       <div 
@@ -343,10 +535,10 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
         <div 
           role="dialog"
           aria-modal="true"
-          aria-label="SoilWise AI Assistant"
+          aria-label="SoilWise AI Agronomist"
           className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] sm:max-h-[88vh] flex flex-col p-4 sm:p-6 shadow-2xl border border-stone-200 my-auto overflow-hidden"
         >
-          {content}
+          {activeContent}
         </div>
       </div>
     );
@@ -355,7 +547,7 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
   // Fallback inline container
   return (
     <div className="bg-white rounded-2xl p-5 sm:p-7 border border-stone-200/80 shadow-xs">
-      {content}
+      {activeContent}
     </div>
   );
 };

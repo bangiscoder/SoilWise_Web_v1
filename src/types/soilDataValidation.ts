@@ -124,6 +124,48 @@ export interface SoilPropertyDiagnostic {
   message?: string;
 }
 
+export type IsdaClassification =
+  | 'AUTHENTICATION_FAILED'
+  | 'AUTHENTICATION_SUCCESS_SOIL_REQUEST_FAILED'
+  | 'INVALID_COORDINATES'
+  | 'INVALID_REQUEST_PARAMETERS'
+  | 'NO_SOIL_DATA_RETURNED'
+  | 'SOIL_DATA_RETURNED_BUT_NOT_PARSED'
+  | 'SOIL_DATA_RETURNED_BUT_MAPPING_FAILED'
+  | 'SUCCESS';
+
+export interface IsdaDiagnosticSummary {
+  authentication: {
+    credentialsLoaded: boolean;
+    authSuccessful: boolean;
+    tokenObtained: boolean;
+    details: string;
+  };
+  soilRequest: {
+    endpointReachable: boolean;
+    requestAuthenticated: boolean;
+    coordinatesAccepted: boolean;
+    soilProfileReturned: boolean;
+    httpStatus: number | null;
+  };
+  response: {
+    jsonReceived: boolean;
+    propertiesDetected: boolean;
+    parsedSuccessfully: boolean;
+    detectedPropertiesCount: number;
+  };
+  profile: {
+    phAvailable: boolean;
+    nitrogenAvailable: boolean;
+    phosphorusAvailable: boolean;
+    potassiumAvailable: boolean;
+    textureAvailable: boolean;
+    additionalPropertiesAvailable: boolean;
+    ecStatus: 'unavailable';
+    availablePropertiesCount: number;
+  };
+}
+
 export interface PipelineRunResult {
   success: boolean;
   locationValidation: LocationValidationResult;
@@ -133,7 +175,11 @@ export interface PipelineRunResult {
     authDiagnostic?: AuthDiagnostic;
     soilPropertyDiagnostic?: SoilPropertyDiagnostic;
     normalised: SoilWiseNormalisedProfile;
+    fullProfile?: Record<string, any>;
     tokenInfo: TokenCacheMetadata;
+    classification?: IsdaClassification;
+    classificationMessage?: string;
+    diagnosticSummary?: IsdaDiagnosticSummary;
     diagnostics: {
       timestamp: string;
       stage: string;

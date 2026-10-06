@@ -88,6 +88,8 @@ export async function performFarmAnalysis(
       fileName?: string;
     } | null;
     locationValidation?: import('../types/soilDataValidation').LocationValidationResult | null;
+    farmId?: string;
+    farmName?: string;
   }
 ): Promise<FarmAnalysisResult> {
   const { latitude, longitude } = coordinates;
@@ -308,6 +310,8 @@ export async function performFarmAnalysis(
     soilEvidence,
     locationValidation: soilTestMeta?.locationValidation || null,
     cropRecommendationDecision,
+    farmId: soilTestMeta?.farmId,
+    farmName: soilTestMeta?.farmName,
   };
 
   onStepChange?.('completed');

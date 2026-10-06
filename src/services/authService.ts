@@ -32,7 +32,8 @@ import { auth, db, isFirebaseConfigured, isAdmin } from '../lib/firebase';
 import { 
   SoilWiseUserProfile, 
   UserRegistrationInput, 
-  UserLoginInput 
+  UserLoginInput,
+  UpdateProfileInput 
 } from '../types/auth';
 
 /**
@@ -287,3 +288,90 @@ export async function logoutUser(): Promise<void> {
   if (!auth) return;
   await signOut(auth);
 }
+
+/**
+ * Updates a user's display name and agricultural personalization preferences (Stage 3).
+ * Enforces role isolation: regular users cannot elevate roles or modify security fields.
+ */
+export async function updateUserProfileData(
+  uid: string,
+  input: UpdateProfileInput
+): Promise<SoilWiseUserProfile> {
+  if (!uid) {
+    throw new Error('User identifier is required.');
+  }
+  if (!db || !isFirebaseConfigured) {
+    throw new Error('Database service is temporarily unavailable.');
+  }
+
+  const existingProfile = await getUserProfile(uid);
+  if (!existingProfile) {
+    throw new Error('User profile record not found.');
+  }
+
+  const nowIso = new Date().toISOString();
+
+  // If displayName was updated, also update Firebase Auth user displayName if available
+  if (input.displayName && auth?.currentUser && auth.currentUser.uid === uid) {
+    try {
+      await updateProfile(auth.currentUser, { displayName: input.displayName.trim() });
+    } catch (err) {
+      console.warn('Could not update Firebase Auth user displayName:', err);
+    }
+  }
+
+  const nextDisplayName = input.displayName !== undefined
+    ? (input.displayName.trim() || null)
+    : existingProfile.displayName;
+
+  // Build merged preferences cleanly
+  const existingProfilePrefs = existingProfile.profile || {};
+  const nextProfilePrefs = {
+    ...existingProfilePrefs,
+    ...(input.preferredLanguage !== undefined ? { preferredLanguage: input.preferredLanguage } : {}),
+    ...(input.farmingExperience !== undefined ? { farmingExperience: input.farmingExperience } : {}),
+    ...(input.primaryFarmingInterest !== undefined ? { primaryFarmingInterest: input.primaryFarmingInterest } : {}),
+    ...(input.farmingInterests !== undefined ? { farmingInterests: input.farmingInterests } : {}),
+    ...(input.preferredCrops !== undefined ? { preferredCrops: input.preferredCrops } : {}),
+  };
+
+  const nextActiveFarmId = input.activeFarmId !== undefined
+    ? input.activeFarmId
+    : existingProfile.activeFarmId;
+
+  const updatedProfile: SoilWiseUserProfile = {
+    ...existingProfile,
+    displayName: nextDisplayName,
+    profile: nextProfilePrefs,
+    activeFarmId: nextActiveFarmId ?? null,
+    updatedAt: nowIso,
+  };
+
+  // Update in Firestore
+  const userDocRef = doc(db, 'users', uid);
+  await setDoc(userDocRef, {
+    displayName: nextDisplayName,
+    profile: nextProfilePrefs,
+    activeFarmId: nextActiveFarmId ?? null,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+
+  return updatedProfile;
+}
+
+/**
+ * Updates the user's active/selected farm.
+ */
+export async function setActiveFarmId(
+  uid: string,
+  activeFarmId: string | null
+): Promise<void> {
+  if (!uid || !db || !isFirebaseConfigured) return;
+
+  const userDocRef = doc(db, 'users', uid);
+  await setDoc(userDocRef, {
+    activeFarmId: activeFarmId ?? null,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+

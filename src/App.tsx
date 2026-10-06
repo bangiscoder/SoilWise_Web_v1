@@ -17,6 +17,9 @@ import { RegisterPage } from './components/auth/RegisterPage';
 import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
 import { UserAreaView } from './components/auth/UserAreaView';
 import { AnalysisHistoryView } from './components/history/AnalysisHistoryView';
+import { UserProfileView } from './components/profile/UserProfileView';
+import { FarmsManagementView } from './components/farms/FarmsManagementView';
+import { FarmProfileDocument } from './types/farm';
 import { SoilData, FarmAnalysisResult, AnalysisStep } from './types/soilwise';
 import { performFarmAnalysis } from './services/soilwiseService';
 import { saveAnalysisSnapshot, getAnalysisSnapshot } from './services/analysisHistoryService';
@@ -30,7 +33,9 @@ export type AppView =
   | 'register' 
   | 'forgot-password' 
   | 'account' 
-  | 'my-analyses'
+  | 'profile'
+  | 'my-farms'
+  | 'my-analyses' 
   | 'admin-login' 
   | 'admin-dashboard' 
   | 'admin-soil-data-test';
@@ -40,6 +45,7 @@ export default function App() {
 
   // Start directly with Farm Analysis as the primary experience
   const [currentView, setCurrentView] = useState<AppView>('farm-data');
+  const [preselectedFarm, setPreselectedFarm] = useState<FarmProfileDocument | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep>('idle');
   const [analysisResult, setAnalysisResult] = useState<FarmAnalysisResult | null>(null);
@@ -79,6 +85,10 @@ export default function App() {
         setCurrentView('forgot-password');
       } else if (path.includes('/account') || hash.includes('/account')) {
         setCurrentView('account');
+      } else if (path.includes('/profile') || hash.includes('/profile')) {
+        setCurrentView('profile');
+      } else if (path.includes('/my-farms') || path.includes('/farms') || hash.includes('/my-farms')) {
+        setCurrentView('my-farms');
       } else if (path.includes('/my-analyses') || path.includes('/analyses') || hash.includes('/my-analyses')) {
         setCurrentView('my-analyses');
       }
@@ -92,7 +102,7 @@ export default function App() {
   // Protected route enforcement
   useEffect(() => {
     if (!isAuthLoading) {
-      if ((currentView === 'account' || currentView === 'my-analyses') && !currentUser) {
+      if ((currentView === 'account' || currentView === 'profile' || currentView === 'my-farms' || currentView === 'my-analyses') && !currentUser) {
         // Unauthenticated access to protected user area -> redirect to login
         setCurrentView('login');
       } else if ((currentView === 'login' || currentView === 'register') && currentUser) {
@@ -127,6 +137,8 @@ export default function App() {
         fileName?: string;
       } | null;
       locationValidation?: import('./types/soilDataValidation').LocationValidationResult | null;
+      farmId?: string;
+      farmName?: string;
     }
   ) => {
     setIsSubmitting(true);
@@ -329,6 +341,7 @@ export default function App() {
             onBackToHistory={() => navigateToView('my-analyses')}
             saveStatusMessage={saveStatusMessage}
             onRetrySave={handleRetrySave}
+            onNavigateToLogin={() => navigateToView('login')}
           />
         )}
 
@@ -382,11 +395,59 @@ export default function App() {
             <UserAreaView
               onNavigateToAnalysis={navigateToHome}
               onNavigateToHistory={() => navigateToView('my-analyses')}
+              onNavigateToProfile={() => navigateToView('profile')}
+              onNavigateToFarms={() => navigateToView('my-farms')}
               onLogout={navigateToHome}
             />
           ) : (
             <LoginPage
               onSuccess={() => navigateToView('account')}
+              onNavigateToRegister={() => navigateToView('register')}
+              onNavigateToForgotPassword={() => navigateToView('forgot-password')}
+              onBackToApp={navigateToHome}
+            />
+          )
+        )}
+
+        {/* 7b. Protected Profile & Preferences */}
+        {currentView === 'profile' && (
+          currentUser ? (
+            <UserProfileView
+              onNavigateToFarms={() => navigateToView('my-farms')}
+              onNavigateToHistory={() => navigateToView('my-analyses')}
+              onNavigateToAnalysis={() => {
+                setPreselectedFarm(null);
+                navigateToView('farm-data');
+              }}
+            />
+          ) : (
+            <LoginPage
+              onSuccess={() => navigateToView('profile')}
+              onNavigateToRegister={() => navigateToView('register')}
+              onNavigateToForgotPassword={() => navigateToView('forgot-password')}
+              onBackToApp={navigateToHome}
+            />
+          )
+        )}
+
+        {/* 7c. Protected Farm Profiles Management */}
+        {currentView === 'my-farms' && (
+          currentUser ? (
+            <FarmsManagementView
+              onStartAnalysisWithFarm={(farm) => {
+                setPreselectedFarm(farm);
+                navigateToView('farm-data');
+              }}
+              onNavigateToProfile={() => navigateToView('profile')}
+              onNavigateToHistory={() => navigateToView('my-analyses')}
+              onNavigateToAnalysis={() => {
+                setPreselectedFarm(null);
+                navigateToView('farm-data');
+              }}
+            />
+          ) : (
+            <LoginPage
+              onSuccess={() => navigateToView('my-farms')}
               onNavigateToRegister={() => navigateToView('register')}
               onNavigateToForgotPassword={() => navigateToView('forgot-password')}
               onBackToApp={navigateToHome}

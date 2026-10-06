@@ -2,11 +2,12 @@ import { SoilWiseNormalisedProfile, LocationValidationResult } from './soilDataV
 import { CropRecommendationDecision } from './cropRecommendation';
 
 export interface SoilData {
-  ph: number;
-  nitrogen: number; // mg/kg or ppm
-  phosphorus: number; // mg/kg or ppm
-  potassium: number; // mg/kg or ppm
-  ec: number; // dS/m or mS/cm
+  ph: number | null;
+  nitrogen: number | null; // mg/kg, g/kg or ppm
+  phosphorus: number | null; // mg/kg or ppm
+  potassium: number | null; // mg/kg or ppm
+  ec: number | null; // dS/m or mS/cm
+  ecStatus?: 'available' | 'unavailable';
 }
 
 export interface FarmLocation {
@@ -40,7 +41,7 @@ export interface SoilTexture {
   source: string;
   isAvailable: boolean;
   unavailabilityReason?: string;
-  soilDataSource?: 'SoilGrids' | 'OpenLandMap' | string | null;
+  soilDataSource?: 'iSDAsoil' | string | null;
 }
 
 export type RainfallOnsetClassification = 
@@ -171,6 +172,8 @@ export interface FarmAnalysisResult {
   soilEvidence?: SoilEvidence;
   locationValidation?: LocationValidationResult | null;
   cropRecommendationDecision?: CropRecommendationDecision;
+  farmId?: string;
+  farmName?: string;
 }
 
 export type AnalysisStep =

@@ -4,6 +4,8 @@ import { useLanguage } from '../context/LanguageContext';
 
 interface FloatingAiAssistantBarProps {
   onOpen: (initialQuery?: string) => void;
+  isAuthenticated?: boolean;
+  onSignInClick?: () => void;
 }
 
 const ROTATING_MESSAGES = [
@@ -14,7 +16,11 @@ const ROTATING_MESSAGES = [
   'What would you like to know about your farm?',
 ];
 
-export const FloatingAiAssistantBar: React.FC<FloatingAiAssistantBarProps> = ({ onOpen }) => {
+export const FloatingAiAssistantBar: React.FC<FloatingAiAssistantBarProps> = ({
+  onOpen,
+  isAuthenticated = false,
+  onSignInClick,
+}) => {
   const { t } = useLanguage();
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -24,6 +30,8 @@ export const FloatingAiAssistantBar: React.FC<FloatingAiAssistantBarProps> = ({ 
 
   // Typewriter animation effect
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     // If the user has typed or the input is focused, pause the typewriter animation
     if (isFocused || inputValue.length > 0) {
       return;
@@ -58,10 +66,14 @@ export const FloatingAiAssistantBar: React.FC<FloatingAiAssistantBarProps> = ({ 
     }
 
     return () => clearTimeout(timer);
-  }, [displayedText, isDeleting, currentMessageIndex, isFocused, inputValue]);
+  }, [displayedText, isDeleting, currentMessageIndex, isFocused, inputValue, isAuthenticated]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!isAuthenticated) {
+      onSignInClick?.();
+      return;
+    }
     const query = inputValue.trim();
     setInputValue('');
     onOpen(query || undefined);
@@ -74,6 +86,59 @@ export const FloatingAiAssistantBar: React.FC<FloatingAiAssistantBarProps> = ({ 
     }
   };
 
+  // Unauthenticated user: Replace with clear, friendly prompt to sign in (Section 1)
+  if (!isAuthenticated) {
+    return (
+      <div
+        className="fixed bottom-4 sm:bottom-6 left-0 right-0 z-30 px-3 sm:px-4 pointer-events-none transition-all duration-300"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="pointer-events-auto max-w-xl mx-auto">
+          <div
+            onClick={() => onSignInClick?.()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSignInClick?.();
+              }
+            }}
+            className="bg-white/95 backdrop-blur-md rounded-2xl border border-stone-200/90 shadow-xl hover:shadow-2xl transition-all duration-200 p-2 sm:p-2.5 flex items-center justify-between gap-3 group ring-1 ring-stone-900/5 cursor-pointer hover:border-[#1b4332]/50"
+            title="Sign in to consult the SoilWise AI Assistant"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#1b4332] text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <Bot className="w-4 h-4 text-emerald-300" />
+              </div>
+              <div className="truncate text-left">
+                <div className="text-xs sm:text-sm font-bold text-stone-900 group-hover:text-[#1b4332] transition-colors truncate">
+                  Sign in to consult the SoilWise AI Assistant
+                </div>
+                <div className="hidden sm:block text-[11px] text-stone-500 truncate">
+                  Ask agronomic questions tailored to your farm analysis
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSignInClick?.();
+              }}
+              className="px-3 py-1.5 bg-[#1b4332] hover:bg-[#143225] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shrink-0 transition-colors shadow-xs cursor-pointer"
+            >
+              <span>Sign In</span>
+              <ArrowRight className="w-3.5 h-3.5 text-emerald-300" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Authenticated user: Full floating interaction bar
   return (
     <div
       className="fixed bottom-4 sm:bottom-6 left-0 right-0 z-30 px-3 sm:px-4 pointer-events-none transition-all duration-300"

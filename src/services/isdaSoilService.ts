@@ -1,4 +1,4 @@
-import type { IsdaPropertyRecord, IsdaDepthLayer } from '../types/soilwise.ts';
+import type { IsdaPropertyRecord, IsdaDepthLayer, SoilData } from '../types/soilwise.ts';
 
 export interface NormalisedSoilProperty {
   property: string;
@@ -75,14 +75,59 @@ export interface SoilPropertyDiagnostic {
   message?: string;
 }
 
+export type IsdaClassification =
+  | 'AUTHENTICATION_FAILED'
+  | 'AUTHENTICATION_SUCCESS_SOIL_REQUEST_FAILED'
+  | 'INVALID_COORDINATES'
+  | 'INVALID_REQUEST_PARAMETERS'
+  | 'NO_SOIL_DATA_RETURNED'
+  | 'SOIL_DATA_RETURNED_BUT_NOT_PARSED'
+  | 'SOIL_DATA_RETURNED_BUT_MAPPING_FAILED'
+  | 'SUCCESS';
+
+export interface IsdaDiagnosticSummary {
+  authentication: {
+    credentialsLoaded: boolean;
+    authSuccessful: boolean;
+    tokenObtained: boolean;
+    details: string;
+  };
+  soilRequest: {
+    endpointReachable: boolean;
+    requestAuthenticated: boolean;
+    coordinatesAccepted: boolean;
+    soilProfileReturned: boolean;
+    httpStatus: number | null;
+  };
+  response: {
+    jsonReceived: boolean;
+    propertiesDetected: boolean;
+    parsedSuccessfully: boolean;
+    detectedPropertiesCount: number;
+  };
+  profile: {
+    phAvailable: boolean;
+    nitrogenAvailable: boolean;
+    phosphorusAvailable: boolean;
+    potassiumAvailable: boolean;
+    textureAvailable: boolean;
+    additionalPropertiesAvailable: boolean;
+    ecStatus: 'unavailable';
+    availablePropertiesCount: number;
+  };
+}
+
 export interface IsdaSoilServiceResponse {
   success: boolean;
+  classification: IsdaClassification;
+  classificationMessage: string;
   raw: any;
   authDiagnostic: AuthDiagnostic;
   soilPropertyDiagnostic: SoilPropertyDiagnostic;
   normalised: SoilWiseNormalisedProfile;
   fullProfile?: Record<string, IsdaPropertyRecord>;
   tokenInfo: TokenCacheMetadata;
+  diagnosticSummary: IsdaDiagnosticSummary;
   diagnostics: {
     timestamp: string;
     stage: string;
@@ -104,16 +149,14 @@ export class IsdaTokenManager {
   private readonly DEFAULT_TTL_SECONDS = 50 * 60;
   // Safety buffer: refresh token if less than 3 minutes remaining before expiry
   private readonly SAFETY_BUFFER_MS = 3 * 60 * 1000;
-  // Cooldown after an authentication rejection (e.g. HTTP 401) to prevent repetitive failing calls
   private lastAuthFailedAt: number | null = null;
   private lastFailureStatus: number | null = null;
-  private readonly FAILURE_COOLDOWN_MS = 10 * 60 * 1000;
 
   public getCacheMetadata(): TokenCacheMetadata {
     const username = typeof process !== 'undefined' ? process.env?.ISDA_USERNAME : undefined;
-    const password = typeof process !== 'undefined' ? (process.env?.ISDA_PASSWORD || process.env?.ISDaa_PASSWORD) : undefined;
+    const password = typeof process !== 'undefined' ? process.env?.ISDA_PASSWORD : undefined;
     const hasUsername = Boolean(username && username.trim().length > 0);
-    const hasPassword = Boolean(password && password.trim().length > 0);
+    const hasPassword = Boolean(password && password.length > 0);
     const hasCreds = hasUsername && hasPassword;
 
     // Mask username for safe diagnostic display (e.g., "mye***@gmail.com")
@@ -193,6 +236,7 @@ export class IsdaTokenManager {
     if (this.token && this.tokenExpiresAt && this.tokenExpiresAt - now > this.SAFETY_BUFFER_MS) {
       this.cacheHitsCount++;
       const remainingSec = Math.floor((this.tokenExpiresAt - now) / 1000);
+      console.log(`[iSDAsoil Auth] iSDAsoil authentication: SUCCESS\nToken available: YES\nToken expiry known: YES\nToken reused/refreshed: REUSED (${remainingSec}s remaining)`);
       if (logStage) {
         logStage(
           'Token Verification',
@@ -208,20 +252,6 @@ export class IsdaTokenManager {
           authentication: 'SUCCESS',
           tokenReceived: true,
           message: `Cached token active (${remainingSec}s remaining).`,
-        },
-      };
-    }
-
-    // Check if recent authentication attempt failed (cooldown active to prevent repetitive failing calls)
-    if (this.lastAuthFailedAt && now - this.lastAuthFailedAt < this.FAILURE_COOLDOWN_MS) {
-      return {
-        token: null,
-        authDiagnostic: {
-          endpoint: 'https://api.isda-africa.com/login',
-          httpStatus: this.lastFailureStatus,
-          authentication: 'FAILED',
-          tokenReceived: false,
-          message: `iSDAsoil credentials returned HTTP ${this.lastFailureStatus}; utilizing open ISRIC SoilGrids and regional baseline.`,
         },
       };
     }
@@ -246,11 +276,11 @@ export class IsdaTokenManager {
     logStage?: (stage: string, status: 'ok' | 'warning' | 'error' | 'info', message: string) => void
   ): Promise<{ token: string | null; authDiagnostic: AuthDiagnostic }> {
     const username = typeof process !== 'undefined' ? process.env?.ISDA_USERNAME : undefined;
-    const password = typeof process !== 'undefined' ? (process.env?.ISDA_PASSWORD || process.env?.ISDaa_PASSWORD) : undefined;
+    const password = typeof process !== 'undefined' ? process.env?.ISDA_PASSWORD : undefined;
     const authEndpoint = 'https://api.isda-africa.com/login';
 
     const hasUsername = Boolean(username && username.trim().length > 0);
-    const hasPassword = Boolean(password && password.trim().length > 0);
+    const hasPassword = Boolean(password && password.length > 0);
 
     if (!hasUsername || !hasPassword) {
       if (logStage) {
@@ -260,7 +290,7 @@ export class IsdaTokenManager {
           'ISDA_USERNAME and/or ISDA_PASSWORD are not configured in server environment. Cannot authenticate against live iSDAsoil API.'
         );
       }
-      console.warn('[iSDAsoil Auth] iSDAsoil credentials missing in server environment');
+      console.warn('[iSDAsoil Auth] iSDAsoil authentication: FAILED\nToken available: NO\nToken expiry known: NO\nToken reused/refreshed: FAILED (Missing credentials in server environment)');
       return {
         token: null,
         authDiagnostic: {
@@ -286,14 +316,21 @@ export class IsdaTokenManager {
       // Verified working request specification:
       // POST https://api.isda-africa.com/login
       // Content-Type: application/x-www-form-urlencoded
-      // Body: grant_type=password&username=USERNAME&password=PASSWORD&scope=&client_id=string&client_secret=string
+      // Body: grant_type=password&username=USERNAME&password=PASSWORD
       const formParams = new URLSearchParams();
       formParams.append('grant_type', 'password');
-      formParams.append('username', username as string);
+      formParams.append('username', (username as string).trim());
+      // Section 7: Do not trim or mutate the password value before authentication
       formParams.append('password', password as string);
-      formParams.append('scope', process.env?.ISDA_SCOPE || '');
-      formParams.append('client_id', process.env?.ISDA_CLIENT_ID || 'string');
-      formParams.append('client_secret', process.env?.ISDA_CLIENT_SECRET || 'string');
+      if (process.env?.ISDA_SCOPE) {
+        formParams.append('scope', process.env.ISDA_SCOPE);
+      }
+      if (process.env?.ISDA_CLIENT_ID) {
+        formParams.append('client_id', process.env.ISDA_CLIENT_ID);
+      }
+      if (process.env?.ISDA_CLIENT_SECRET) {
+        formParams.append('client_secret', process.env.ISDA_CLIENT_SECRET);
+      }
 
       const resp = await fetch(authEndpoint, {
         method: 'POST',
@@ -312,7 +349,7 @@ export class IsdaTokenManager {
         const errorText = await resp.text().catch(() => '');
         this.lastAuthFailedAt = Date.now();
         this.lastFailureStatus = httpStatus;
-        console.info(`[iSDAsoil Auth] iSDAsoil authentication returned HTTP ${httpStatus}; utilizing open ISRIC SoilGrids and regional soil baseline.`);
+        console.warn(`[iSDAsoil Auth] iSDAsoil authentication: FAILED\nToken available: NO\nToken expiry known: NO\nToken reused/refreshed: FAILED (HTTP ${httpStatus})`);
         if (logStage) {
           logStage(
             'Authentication',
@@ -368,7 +405,7 @@ export class IsdaTokenManager {
           : this.DEFAULT_TTL_SECONDS;
       this.tokenExpiresAt = now + ttlSec * 1000;
 
-      console.log('[iSDAsoil Auth] iSDAsoil authentication successful; token refreshed');
+      console.log(`[iSDAsoil Auth] iSDAsoil authentication: SUCCESS\nToken available: YES\nToken expiry known: ${typeof data.expires_in === 'number' ? 'YES' : 'NO'}\nToken reused/refreshed: REFRESHED (${ttlSec}s)`);
       if (logStage) {
         logStage(
           'Authentication',
@@ -396,6 +433,7 @@ export class IsdaTokenManager {
           `Network or server error during iSDAsoil login: ${err.message || 'Unknown network error'}`
         );
       }
+      console.warn('[iSDAsoil Auth] iSDAsoil authentication: FAILED\nToken available: NO\nToken expiry known: NO\nToken reused/refreshed: FAILED');
       return {
         token: null,
         authDiagnostic: {
@@ -463,9 +501,9 @@ export async function withAuthRetry(
       // Retry request ONCE
       const retryResp = await executeRequest(reAuth.token);
       if (retryResp.status === 401) {
-        console.info('[iSDAsoil Auth] iSDAsoil request retry returned HTTP 401; utilizing ISRIC SoilGrids fallback.');
+        console.warn('[iSDAsoil Auth] iSDAsoil request retry returned HTTP 401; request unauthenticated.');
         if (logStage) {
-          logStage('iSDAsoil Query', 'warning', 'iSDAsoil request retry returned HTTP 401; utilizing SoilGrids fallback.');
+          logStage('iSDAsoil Query', 'warning', 'iSDAsoil request retry returned HTTP 401; request unauthenticated.');
         }
       }
       return {
@@ -475,7 +513,7 @@ export async function withAuthRetry(
         retried: true,
       };
     } else {
-      console.info('[iSDAsoil Auth] iSDAsoil authentication retry skipped: token not available, utilizing SoilGrids fallback.');
+      console.warn('[iSDAsoil Auth] iSDAsoil authentication retry skipped: token not available.');
       return {
         resp,
         token: null,
@@ -520,29 +558,56 @@ function createUnavailableProperty(
 }
 
 const PROPERTY_METADATA: Record<string, { name: string; method?: string }> = {
-  ph: { name: 'Soil pH', method: '1:5 H2O suspension prediction' },
-  nitrogen_total: { name: 'Total Nitrogen', method: 'Dumas dry combustion equivalent' },
-  phosphorous_extractable: { name: 'Extractable Phosphorus (Mehlich-3)', method: 'Mehlich-3 extraction prediction' },
-  phosphorus_extractable: { name: 'Extractable Phosphorus (Mehlich-3)', method: 'Mehlich-3 extraction prediction' },
-  potassium_extractable: { name: 'Extractable Potassium (Mehlich-3)', method: 'Mehlich-3 extraction prediction' },
-  carbon_organic: { name: 'Organic Carbon', method: 'Dry combustion prediction' },
-  carbon_total: { name: 'Total Carbon', method: 'Dry combustion prediction' },
-  calcium_extractable: { name: 'Extractable Calcium', method: 'Mehlich-3 extraction prediction' },
-  magnesium_extractable: { name: 'Extractable Magnesium', method: 'Mehlich-3 extraction prediction' },
-  iron_extractable: { name: 'Extractable Iron', method: 'Mehlich-3 extraction prediction' },
-  zinc_extractable: { name: 'Extractable Zinc', method: 'Mehlich-3 extraction prediction' },
-  sulphur_extractable: { name: 'Extractable Sulphur', method: 'Mehlich-3 extraction prediction' },
-  aluminium_extractable: { name: 'Extractable Aluminium', method: 'Mehlich-3 extraction prediction' },
-  bulk_density: { name: 'Bulk Density', method: 'Pedotransfer function prediction' },
-  stone_content: { name: 'Stone Content', method: 'Coarse fragments prediction' },
-  sand_content: { name: 'Sand Content', method: 'Laser diffraction / Pipette equivalent' },
-  silt_content: { name: 'Silt Content', method: 'Laser diffraction / Pipette equivalent' },
-  clay_content: { name: 'Clay Content', method: 'Laser diffraction / Pipette equivalent' },
-  texture_class: { name: 'USDA Texture Class', method: 'USDA 12-class textural classification' },
-  cation_exchange_capacity: { name: 'Cation Exchange Capacity (CEC)', method: 'Cobalt-hexamine equivalent' },
-  bedrock_depth: { name: 'Depth to Bedrock', method: 'Spatial machine-learning prediction' },
-  slope_angle: { name: 'Slope Angle', method: 'SRTM / Digital Elevation Model' },
-  fcc: { name: 'Fertility Capability Classification', method: 'FCC system' },
+  ph: { name: 'Soil pH', method: 'iSDAsoil digital soil prediction' },
+  nitrogen_total: { name: 'Total Nitrogen', method: 'iSDAsoil digital soil prediction' },
+  nitrogen: { name: 'Total Nitrogen', method: 'iSDAsoil digital soil prediction' },
+  phosphorus_extractable: { name: 'Extractable Phosphorus (Mehlich-3)', method: 'iSDAsoil digital soil prediction' },
+  phosphorous_extractable: { name: 'Extractable Phosphorus (Mehlich-3)', method: 'iSDAsoil digital soil prediction' },
+  phosphorus: { name: 'Extractable Phosphorus (Mehlich-3)', method: 'iSDAsoil digital soil prediction' },
+  potassium_extractable: { name: 'Extractable Potassium (Mehlich-3)', method: 'iSDAsoil digital soil prediction' },
+  potassium: { name: 'Extractable Potassium (Mehlich-3)', method: 'iSDAsoil digital soil prediction' },
+  carbon_organic: { name: 'Organic Carbon', method: 'iSDAsoil digital soil prediction' },
+  organic_carbon: { name: 'Organic Carbon', method: 'iSDAsoil digital soil prediction' },
+  soc: { name: 'Organic Carbon', method: 'iSDAsoil digital soil prediction' },
+  carbon_total: { name: 'Total Carbon', method: 'iSDAsoil digital soil prediction' },
+  calcium_extractable: { name: 'Extractable Calcium', method: 'iSDAsoil digital soil prediction' },
+  calcium: { name: 'Extractable Calcium', method: 'iSDAsoil digital soil prediction' },
+  magnesium_extractable: { name: 'Extractable Magnesium', method: 'iSDAsoil digital soil prediction' },
+  magnesium: { name: 'Extractable Magnesium', method: 'iSDAsoil digital soil prediction' },
+  iron_extractable: { name: 'Extractable Iron', method: 'iSDAsoil digital soil prediction' },
+  iron: { name: 'Extractable Iron', method: 'iSDAsoil digital soil prediction' },
+  zinc_extractable: { name: 'Extractable Zinc', method: 'iSDAsoil digital soil prediction' },
+  zinc: { name: 'Extractable Zinc', method: 'iSDAsoil digital soil prediction' },
+  sulphur_extractable: { name: 'Extractable Sulphur', method: 'iSDAsoil digital soil prediction' },
+  sulfur_extractable: { name: 'Extractable Sulphur', method: 'iSDAsoil digital soil prediction' },
+  sulphur: { name: 'Extractable Sulphur', method: 'iSDAsoil digital soil prediction' },
+  aluminium_extractable: { name: 'Extractable Aluminium', method: 'iSDAsoil digital soil prediction' },
+  bulk_density: { name: 'Bulk Density', method: 'iSDAsoil digital soil prediction' },
+  stone_content: { name: 'Stone Content', method: 'iSDAsoil digital soil prediction' },
+  sand_content: { name: 'Sand Content', method: 'iSDAsoil digital soil prediction' },
+  sand: { name: 'Sand Content', method: 'iSDAsoil digital soil prediction' },
+  silt_content: { name: 'Silt Content', method: 'iSDAsoil digital soil prediction' },
+  silt: { name: 'Silt Content', method: 'iSDAsoil digital soil prediction' },
+  clay_content: { name: 'Clay Content', method: 'iSDAsoil digital soil prediction' },
+  clay: { name: 'Clay Content', method: 'iSDAsoil digital soil prediction' },
+  texture_class: { name: 'USDA Texture Class', method: 'iSDAsoil digital soil prediction' },
+  texture: { name: 'USDA Texture Class', method: 'iSDAsoil digital soil prediction' },
+  cation_exchange_capacity: { name: 'Cation Exchange Capacity (CEC)', method: 'iSDAsoil digital soil prediction' },
+  cec: { name: 'Cation Exchange Capacity (CEC)', method: 'iSDAsoil digital soil prediction' },
+  bedrock_depth: { name: 'Depth to Bedrock', method: 'iSDAsoil digital soil prediction' },
+  slope_angle: { name: 'Slope Angle', method: 'iSDAsoil digital soil prediction' },
+  slope: { name: 'Slope Angle', method: 'iSDAsoil digital soil prediction' },
+  fcc: { name: 'Fertility Capability Classification', method: 'iSDAsoil digital soil prediction' },
+  land_cover_2015: { name: 'Land Cover (2015)', method: 'Copernicus Global Land Cover' },
+  crop_cover_2015: { name: 'Crop Cover (2015)', method: 'Copernicus Global Land Cover' },
+  land_cover_2016: { name: 'Land Cover (2016)', method: 'Copernicus Global Land Cover' },
+  crop_cover_2016: { name: 'Crop Cover (2016)', method: 'Copernicus Global Land Cover' },
+  land_cover_2017: { name: 'Land Cover (2017)', method: 'Copernicus Global Land Cover' },
+  crop_cover_2017: { name: 'Crop Cover (2017)', method: 'Copernicus Global Land Cover' },
+  land_cover_2018: { name: 'Land Cover (2018)', method: 'Copernicus Global Land Cover' },
+  crop_cover_2018: { name: 'Crop Cover (2018)', method: 'Copernicus Global Land Cover' },
+  land_cover_2019: { name: 'Land Cover (2019)', method: 'Copernicus Global Land Cover' },
+  crop_cover_2019: { name: 'Crop Cover (2019)', method: 'Copernicus Global Land Cover' },
 };
 
 /**
@@ -551,21 +616,52 @@ const PROPERTY_METADATA: Record<string, { name: string; method?: string }> = {
  */
 export function extractFullIsdaProfile(rawData: any): Record<string, IsdaPropertyRecord> {
   const result: Record<string, IsdaPropertyRecord> = {};
-  const propertySource = rawData?.property || rawData?.properties || (rawData && typeof rawData === 'object' && !rawData.status && !rawData.error ? rawData : null);
+  const propertySource =
+    rawData?.property ||
+    rawData?.properties ||
+    rawData?.data?.property ||
+    rawData?.result?.property ||
+    (rawData && typeof rawData === 'object' && !rawData.status && !rawData.error ? rawData : null);
 
   if (propertySource && typeof propertySource === 'object') {
-    for (const [key, value] of Object.entries(propertySource)) {
-      if (key === 'status' || key === 'error' || key === 'code' || key === 'detail') continue;
+    for (const [rawKey, value] of Object.entries(propertySource)) {
+      if (rawKey === 'status' || rawKey === 'error' || rawKey === 'code' || rawKey === 'detail') continue;
+
+      // Section 8: Normalize historical misspelled 'phosphorous_extractable' immediately to canonical 'phosphorus_extractable'
+      const key = rawKey === 'phosphorous_extractable' ? 'phosphorus_extractable' : rawKey;
 
       const meta = PROPERTY_METADATA[key] || {
         name: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        method: null,
+        method: 'iSDAsoil digital soil prediction',
       };
 
       if (Array.isArray(value)) {
         const layers: IsdaDepthLayer[] = value.map((entry: any) => {
-          const depthVal = entry?.depth?.value ? String(entry.depth.value) : '0-20';
-          const depthUnit = entry?.depth?.unit ? String(entry.depth.unit) : 'cm';
+          const rawDepth = entry?.depth?.value !== undefined && entry?.depth?.value !== null ? String(entry.depth.value).trim() : null;
+          let depthVal = rawDepth;
+          let depthUnit = entry?.depth?.unit ? String(entry.depth.unit).trim() : 'cm';
+          let displayDepth: string;
+
+          if (!rawDepth || rawDepth === '0' || rawDepth.toLowerCase().includes('landscape') || rawDepth.toLowerCase().includes('surface')) {
+            depthVal = 'landscape';
+            depthUnit = '';
+            displayDepth = 'Site & Landscape';
+          } else if (rawDepth.includes('0-20') || rawDepth.includes('0–20')) {
+            depthVal = '0-20';
+            depthUnit = depthUnit || 'cm';
+            displayDepth = `0–20 ${depthUnit}`.trim();
+          } else if (rawDepth.includes('20-50') || rawDepth.includes('20–50')) {
+            depthVal = '20-50';
+            depthUnit = depthUnit || 'cm';
+            displayDepth = `20–50 ${depthUnit}`.trim();
+          } else if (rawDepth.includes('0-200') || rawDepth.includes('0–200')) {
+            depthVal = '0-200';
+            depthUnit = depthUnit || 'cm';
+            displayDepth = `0–200 ${depthUnit}`.trim();
+          } else {
+            displayDepth = `${depthVal}${depthUnit ? ` ${depthUnit}` : ''}`;
+          }
+
           const rawVal =
             typeof entry?.value === 'object' && entry?.value !== null
               ? entry.value.value
@@ -598,8 +694,8 @@ export function extractFullIsdaProfile(rawData: any): Record<string, IsdaPropert
           }
 
           return {
-            depth: `${depthVal}${depthUnit}`,
-            depthValue: depthVal,
+            depth: displayDepth,
+            depthValue: depthVal || 'landscape',
             depthUnit,
             value: rawVal,
             unit,
@@ -607,7 +703,7 @@ export function extractFullIsdaProfile(rawData: any): Record<string, IsdaPropert
           };
         });
 
-        const topsoil = layers.find((l) => l.depthValue === '0-20') || layers[0] || null;
+        const topsoil = layers.find((l) => l.depthValue === '0-20') || null;
         const subsoil = layers.find((l) => l.depthValue === '20-50') || null;
 
         result[key] = {
@@ -617,13 +713,13 @@ export function extractFullIsdaProfile(rawData: any): Record<string, IsdaPropert
           topsoilLayer: topsoil,
           subsoilLayer: subsoil,
           status: layers.length > 0 && layers.some((l) => l.value !== null) ? 'available' : 'unavailable',
-          analyticalMethod: meta.method || null,
+          analyticalMethod: meta.method || 'iSDAsoil digital soil prediction',
         };
       }
     }
   }
 
-  // Ensure EC is explicitly recorded with transparent zero-fabrication contract
+  // Ensure EC is explicitly recorded with transparent zero-fabrication contract (Section 10)
   result['ec'] = {
     key: 'ec',
     name: 'Electrical Conductivity',
@@ -632,7 +728,7 @@ export function extractFullIsdaProfile(rawData: any): Record<string, IsdaPropert
     subsoilLayer: null,
     status: 'unavailable',
     unavailabilityReason:
-      'Electrical Conductivity (EC) is not measured or exposed by the iSDAsoil API v2 dataset. SoilWise policy strictly prohibits estimating or fabricating EC from pH or texture proxies.',
+      'Electrical Conductivity is not available from the iSDAsoil dataset used by SoilWise.',
   };
 
   return result;
@@ -716,16 +812,16 @@ export function normaliseIsdaSoilData(
         stdev: phExtracted.stdev !== null ? parseFloat(Number(phExtracted.stdev).toFixed(2)) : null,
       },
       status: !isNaN(phVal) ? 'available' : 'unavailable',
-      analytical_method: '1:5 H2O suspension prediction',
+      analytical_method: 'iSDAsoil digital soil prediction',
       notes: 'Soil reaction (acidity/alkalinity) estimated at 30m resolution.',
     };
   } else {
-    phProp = createUnavailableProperty('pH', 'pH', defaultReason, '0-20cm', 30, '1:5 H2O suspension');
+    phProp = createUnavailableProperty('pH', 'pH', defaultReason, '0-20cm', 30, 'iSDAsoil digital soil prediction');
   }
 
   // 2. Total Nitrogen
   let nProp: NormalisedSoilProperty;
-  const nExtracted = getPropData(['nitrogen_total']);
+  const nExtracted = getPropData(['nitrogen_total', 'nitrogen']);
   if (nExtracted && nExtracted.value !== undefined && nExtracted.value !== null) {
     const origVal = Number(nExtracted.value);
     const origUnit = nExtracted.unit || 'g/kg';
@@ -758,7 +854,7 @@ export function normaliseIsdaSoilData(
       original_unit: origUnit,
       normalised_value: normVal,
       normalised_unit: normUnit,
-      analytical_method: 'Total Nitrogen (Dumas dry combustion equivalent prediction)',
+      analytical_method: 'iSDAsoil digital soil prediction',
       notes: `Original unit: ${origUnit}. Normalised unit: ${normUnit} (${normVal}%).`,
     };
   } else {
@@ -768,7 +864,7 @@ export function normaliseIsdaSoilData(
       defaultReason,
       '0-20cm',
       30,
-      'Total Nitrogen (Dumas dry combustion equivalent)'
+      'iSDAsoil digital soil prediction'
     );
     nProp.original_unit = 'g/kg';
     nProp.normalised_unit = '%';
@@ -776,7 +872,7 @@ export function normaliseIsdaSoilData(
 
   // 3. Extractable Phosphorus (supports phosphorus_extractable and phosphorous_extractable)
   let pProp: NormalisedSoilProperty;
-  const pExtracted = getPropData(['phosphorous_extractable', 'phosphorus_extractable']);
+  const pExtracted = getPropData(['phosphorus_extractable', 'phosphorous_extractable', 'phosphorus']);
   if (pExtracted && pExtracted.value !== undefined && pExtracted.value !== null) {
     const pVal = Number(pExtracted.value);
     const pUnit = pExtracted.unit || 'mg/kg';
@@ -798,7 +894,7 @@ export function normaliseIsdaSoilData(
       original_unit: pUnit,
       normalised_value: !isNaN(pVal) ? parseFloat(pVal.toFixed(2)) : null,
       normalised_unit: 'mg/kg (ppm)',
-      analytical_method: 'Mehlich-3 extraction prediction',
+      analytical_method: 'iSDAsoil digital soil prediction',
       notes: 'Mehlich-3 extractable P. Location-derived estimate.',
     };
   } else {
@@ -808,13 +904,13 @@ export function normaliseIsdaSoilData(
       defaultReason,
       '0-20cm',
       30,
-      'Mehlich-3 extraction prediction'
+      'iSDAsoil digital soil prediction'
     );
   }
 
   // 4. Extractable Potassium
   let kProp: NormalisedSoilProperty;
-  const kExtracted = getPropData(['potassium_extractable']);
+  const kExtracted = getPropData(['potassium_extractable', 'potassium']);
   if (kExtracted && kExtracted.value !== undefined && kExtracted.value !== null) {
     const kVal = Number(kExtracted.value);
     const kUnit = kExtracted.unit || 'mg/kg';
@@ -836,7 +932,7 @@ export function normaliseIsdaSoilData(
       original_unit: kUnit,
       normalised_value: !isNaN(kVal) ? parseFloat(kVal.toFixed(2)) : null,
       normalised_unit: 'mg/kg (ppm)',
-      analytical_method: 'Mehlich-3 extraction prediction',
+      analytical_method: 'iSDAsoil digital soil prediction',
       notes: 'Mehlich-3 extractable K. Location-derived estimate.',
     };
   } else {
@@ -846,13 +942,13 @@ export function normaliseIsdaSoilData(
       defaultReason,
       '0-20cm',
       30,
-      'Mehlich-3 extraction prediction'
+      'iSDAsoil digital soil prediction'
     );
   }
 
   // 5. Sand Content
   let sandProp: NormalisedSoilProperty;
-  const sandExtracted = getPropData(['sand_content']);
+  const sandExtracted = getPropData(['sand_content', 'sand']);
   if (sandExtracted && sandExtracted.value !== undefined && sandExtracted.value !== null) {
     const sandVal = Number(sandExtracted.value);
     sandProp = {
@@ -869,7 +965,7 @@ export function normaliseIsdaSoilData(
         stdev: sandExtracted.stdev !== null ? parseFloat(Number(sandExtracted.stdev).toFixed(1)) : null,
       },
       status: !isNaN(sandVal) ? 'available' : 'unavailable',
-      analytical_method: 'Laser diffraction / Pipette method equivalent prediction',
+      analytical_method: 'iSDAsoil digital soil prediction',
     };
   } else {
     sandProp = createUnavailableProperty('Sand Content', '%', defaultReason);
@@ -877,7 +973,7 @@ export function normaliseIsdaSoilData(
 
   // 6. Silt Content
   let siltProp: NormalisedSoilProperty;
-  const siltExtracted = getPropData(['silt_content']);
+  const siltExtracted = getPropData(['silt_content', 'silt']);
   if (siltExtracted && siltExtracted.value !== undefined && siltExtracted.value !== null) {
     const siltVal = Number(siltExtracted.value);
     siltProp = {
@@ -894,7 +990,7 @@ export function normaliseIsdaSoilData(
         stdev: siltExtracted.stdev !== null ? parseFloat(Number(siltExtracted.stdev).toFixed(1)) : null,
       },
       status: !isNaN(siltVal) ? 'available' : 'unavailable',
-      analytical_method: 'Laser diffraction / Pipette method equivalent prediction',
+      analytical_method: 'iSDAsoil digital soil prediction',
     };
   } else {
     siltProp = createUnavailableProperty('Silt Content', '%', defaultReason);
@@ -902,7 +998,7 @@ export function normaliseIsdaSoilData(
 
   // 7. Clay Content
   let clayProp: NormalisedSoilProperty;
-  const clayExtracted = getPropData(['clay_content']);
+  const clayExtracted = getPropData(['clay_content', 'clay']);
   if (clayExtracted && clayExtracted.value !== undefined && clayExtracted.value !== null) {
     const clayVal = Number(clayExtracted.value);
     clayProp = {
@@ -919,7 +1015,7 @@ export function normaliseIsdaSoilData(
         stdev: clayExtracted.stdev !== null ? parseFloat(Number(clayExtracted.stdev).toFixed(1)) : null,
       },
       status: !isNaN(clayVal) ? 'available' : 'unavailable',
-      analytical_method: 'Laser diffraction / Pipette method equivalent prediction',
+      analytical_method: 'iSDAsoil digital soil prediction',
     };
   } else {
     clayProp = createUnavailableProperty('Clay Content', '%', defaultReason);
@@ -927,7 +1023,7 @@ export function normaliseIsdaSoilData(
 
   // 8. USDA Texture Class
   let textureClassProp: NormalisedSoilProperty;
-  const tcExtracted = getPropData(['texture_class']);
+  const tcExtracted = getPropData(['texture_class', 'texture']);
   if (tcExtracted && tcExtracted.value !== undefined && tcExtracted.value !== null) {
     const tcVal = String(tcExtracted.value);
     textureClassProp = {
@@ -940,13 +1036,13 @@ export function normaliseIsdaSoilData(
       resolution_m: 30,
       uncertainty: { lower: null, upper: null },
       status: 'available',
-      analytical_method: 'USDA 12-class textural classification',
+      analytical_method: 'iSDAsoil digital soil prediction',
     };
   } else {
     textureClassProp = createUnavailableProperty('USDA Texture Class', 'textural class', defaultReason);
   }
 
-  // 9. Electrical Conductivity (EC) — Requirement 8: Strictly unavailable. Never calculated.
+  // 9. Electrical Conductivity (EC) — Requirement 8, 9 & 10: Strictly unavailable. Never calculated.
   const ecProp: NormalisedSoilProperty = {
     property: 'EC',
     value: null,
@@ -958,7 +1054,7 @@ export function normaliseIsdaSoilData(
     uncertainty: { lower: null, upper: null },
     status: 'unavailable',
     unavailability_reason:
-      'Electrical Conductivity (EC) is not measured or exposed by the iSDAsoil API v2 dataset. SoilWise policy strictly prohibits estimating or fabricating EC from pH or texture proxies.',
+      'Electrical Conductivity is not available from the iSDAsoil dataset used by SoilWise.',
     notes: 'EC unavailable from iSDAsoil. Never estimated from other properties.',
   };
 
@@ -993,10 +1089,10 @@ export function normaliseIsdaSoilData(
  * Main function: Fetch location soil data from iSDAsoil API.
  * Follows strict on-demand lifecycle:
  * 1. Check or obtain valid token from POST https://api.isda-africa.com/login
- * 2. GET https://api.isda-africa.com/isdasoil/v2/soilproperty
+ * 2. GET https://api.isda-africa.com/isdasoil/v2/soilproperty?lat=<lat>&lon=<lon>
  * 3. If HTTP 401: invalidate token, authenticate again, and retry once.
  * 4. Never calls /layers.
- * 5. Returns actual raw response.
+ * 5. Returns actual raw response, classification, and diagnostic summary.
  */
 export async function fetchIsdaSoilData(
   latitude: number,
@@ -1017,9 +1113,85 @@ export async function fetchIsdaSoilData(
     });
   };
 
-  logStage('Initialisation', 'info', `Target coordinates: lat=${latitude}, lon=${longitude}`);
-
   const soilPropertyEndpoint = 'https://api.isda-africa.com/isdasoil/v2/soilproperty';
+
+  // Section 5: Verify latitude and longitude
+  const isInvalidCoords =
+    typeof latitude !== 'number' ||
+    typeof longitude !== 'number' ||
+    isNaN(latitude) ||
+    isNaN(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180;
+
+  console.log(`iSDAsoil coordinates:\nlatitude: ${latitude}\nlongitude: ${longitude}`);
+
+  if (isInvalidCoords) {
+    const errorMsg = 'Latitude and longitude must be valid numeric coordinates within valid geographic bounds.';
+    logStage('Coordinates Validation', 'error', errorMsg);
+    const tokenInfo = isdaTokenManager.getCacheMetadata();
+    const normalised = normaliseIsdaSoilData(null, tokenInfo.credentialsConfigured);
+    const fullProfile = extractFullIsdaProfile(null);
+
+    return {
+      success: false,
+      classification: 'INVALID_COORDINATES',
+      classificationMessage: errorMsg,
+      raw: { status: 'invalid_coordinates', error: errorMsg },
+      authDiagnostic: {
+        endpoint: 'https://api.isda-africa.com/login',
+        httpStatus: null,
+        authentication: 'SKIPPED',
+        tokenReceived: false,
+        message: errorMsg,
+      },
+      soilPropertyDiagnostic: {
+        endpoint: soilPropertyEndpoint,
+        httpStatus: null,
+        responseReceived: false,
+        message: errorMsg,
+      },
+      normalised,
+      fullProfile,
+      tokenInfo,
+      diagnosticSummary: {
+        authentication: {
+          credentialsLoaded: tokenInfo.credentialsConfigured,
+          authSuccessful: false,
+          tokenObtained: false,
+          details: 'Skipped due to invalid coordinates',
+        },
+        soilRequest: {
+          endpointReachable: false,
+          requestAuthenticated: false,
+          coordinatesAccepted: false,
+          soilProfileReturned: false,
+          httpStatus: null,
+        },
+        response: {
+          jsonReceived: false,
+          propertiesDetected: false,
+          parsedSuccessfully: false,
+          detectedPropertiesCount: 0,
+        },
+        profile: {
+          phAvailable: false,
+          nitrogenAvailable: false,
+          phosphorusAvailable: false,
+          potassiumAvailable: false,
+          textureAvailable: false,
+          additionalPropertiesAvailable: false,
+          ecStatus: 'unavailable',
+          availablePropertiesCount: 0,
+        },
+      },
+      diagnostics,
+    };
+  }
+
+  logStage('Initialisation', 'info', `Target coordinates: lat=${latitude}, lon=${longitude}`);
 
   // Helper to query /isdasoil/v2/soilproperty with the supplied bearer token
   const querySoilProperty = async (bearerToken: string) => {
@@ -1029,6 +1201,7 @@ export async function fetchIsdaSoilData(
     // Omitting depth returns all available depth increments (0-20cm and 20-50cm) in a single request
 
     logStage('iSDAsoil Query', 'info', `Executing GET ${apiUrl.toString()}`);
+    console.log('Soil request: START');
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -1043,6 +1216,8 @@ export async function fetchIsdaSoilData(
     });
 
     clearTimeout(timeoutId);
+    console.log(`Soil request status: ${resp.status}`);
+    console.log(`Soil request response received: ${resp.ok ? 'YES' : 'NO'}`);
     return resp;
   };
 
@@ -1050,18 +1225,20 @@ export async function fetchIsdaSoilData(
     const { resp, token, authDiagnostic } = await withAuthRetry(querySoilProperty, logStage);
     const tokenInfo = isdaTokenManager.getCacheMetadata();
 
-    if (!resp || !token) {
-      logStage(
-        'iSDAsoil Query',
-        'warning',
-        'Skipping live HTTP request to iSDAsoil because no authentication token is available.'
-      );
+    // Case 1: Authentication failure (no token returned)
+    if (!token) {
+      const authFailedMsg = 'iSDAsoil authentication failed. Please check the server-side API credentials and authentication response.';
+      logStage('iSDAsoil Query', 'warning', 'Skipping live HTTP request to iSDAsoil because authentication failed.');
       const normalised = normaliseIsdaSoilData(null, tokenInfo.credentialsConfigured);
+      const fullProfile = extractFullIsdaProfile(null);
+
       return {
         success: false,
+        classification: 'AUTHENTICATION_FAILED',
+        classificationMessage: authFailedMsg,
         raw: {
           status: 'unavailable',
-          error: 'Authentication credentials not configured or failed.',
+          error: authFailedMsg,
           endpoint: soilPropertyEndpoint,
         },
         authDiagnostic,
@@ -1072,24 +1249,124 @@ export async function fetchIsdaSoilData(
           message: 'Request skipped due to missing/invalid token.',
         },
         normalised,
-        fullProfile: extractFullIsdaProfile(null),
+        fullProfile,
         tokenInfo,
+        diagnosticSummary: {
+          authentication: {
+            credentialsLoaded: tokenInfo.credentialsConfigured,
+            authSuccessful: false,
+            tokenObtained: false,
+            details: authDiagnostic.message || authFailedMsg,
+          },
+          soilRequest: {
+            endpointReachable: false,
+            requestAuthenticated: false,
+            coordinatesAccepted: true,
+            soilProfileReturned: false,
+            httpStatus: null,
+          },
+          response: {
+            jsonReceived: false,
+            propertiesDetected: false,
+            parsedSuccessfully: false,
+            detectedPropertiesCount: 0,
+          },
+          profile: {
+            phAvailable: false,
+            nitrogenAvailable: false,
+            phosphorusAvailable: false,
+            potassiumAvailable: false,
+            textureAvailable: false,
+            additionalPropertiesAvailable: false,
+            ecStatus: 'unavailable',
+            availablePropertiesCount: 0,
+          },
+        },
+        diagnostics,
+      };
+    }
+
+    if (!resp) {
+      const errMessage = 'iSDAsoil authentication succeeded, but the soil profile request failed.';
+      logStage('iSDAsoil Query', 'error', errMessage);
+      const normalised = normaliseIsdaSoilData(null, true);
+      const fullProfile = extractFullIsdaProfile(null);
+
+      return {
+        success: false,
+        classification: 'AUTHENTICATION_SUCCESS_SOIL_REQUEST_FAILED',
+        classificationMessage: errMessage,
+        raw: { status: 'error', error: errMessage },
+        authDiagnostic,
+        soilPropertyDiagnostic: {
+          endpoint: soilPropertyEndpoint,
+          httpStatus: null,
+          responseReceived: false,
+          message: errMessage,
+        },
+        normalised,
+        fullProfile,
+        tokenInfo,
+        diagnosticSummary: {
+          authentication: {
+            credentialsLoaded: tokenInfo.credentialsConfigured,
+            authSuccessful: true,
+            tokenObtained: true,
+            details: 'Access token acquired',
+          },
+          soilRequest: {
+            endpointReachable: false,
+            requestAuthenticated: true,
+            coordinatesAccepted: true,
+            soilProfileReturned: false,
+            httpStatus: null,
+          },
+          response: {
+            jsonReceived: false,
+            propertiesDetected: false,
+            parsedSuccessfully: false,
+            detectedPropertiesCount: 0,
+          },
+          profile: {
+            phAvailable: false,
+            nitrogenAvailable: false,
+            phosphorusAvailable: false,
+            potassiumAvailable: false,
+            textureAvailable: false,
+            additionalPropertiesAvailable: false,
+            ecStatus: 'unavailable',
+            availablePropertiesCount: 0,
+          },
+        },
         diagnostics,
       };
     }
 
     const httpStatus = resp.status;
 
+    // Case 2: HTTP error returned by /isdasoil/v2/soilproperty
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
+      const isParamError = httpStatus === 400 || httpStatus === 422;
+      const classification: IsdaClassification = isParamError
+        ? 'INVALID_REQUEST_PARAMETERS'
+        : 'AUTHENTICATION_SUCCESS_SOIL_REQUEST_FAILED';
+      const classificationMessage = isParamError
+        ? 'Invalid request parameters sent to iSDAsoil API.'
+        : 'iSDAsoil authentication succeeded, but the soil profile request failed.';
+
       logStage(
         'iSDAsoil Query',
         'error',
         `iSDAsoil API responded with HTTP ${httpStatus}: ${errText.substring(0, 200) || resp.statusText}`
       );
       const normalised = normaliseIsdaSoilData(null, true);
+      const fullProfile = extractFullIsdaProfile(null);
+
       return {
         success: false,
+        classification,
+        classificationMessage,
         raw: { status: 'error', code: httpStatus, response: errText || resp.statusText },
         authDiagnostic,
         soilPropertyDiagnostic: {
@@ -1099,22 +1376,233 @@ export async function fetchIsdaSoilData(
           message: `HTTP ${httpStatus}: ${errText.substring(0, 150) || resp.statusText}`,
         },
         normalised,
-        fullProfile: extractFullIsdaProfile(null),
+        fullProfile,
         tokenInfo: isdaTokenManager.getCacheMetadata(),
+        diagnosticSummary: {
+          authentication: {
+            credentialsLoaded: tokenInfo.credentialsConfigured,
+            authSuccessful: true,
+            tokenObtained: true,
+            details: 'Access token acquired',
+          },
+          soilRequest: {
+            endpointReachable: true,
+            requestAuthenticated: true,
+            coordinatesAccepted: !isParamError,
+            soilProfileReturned: false,
+            httpStatus,
+          },
+          response: {
+            jsonReceived: false,
+            propertiesDetected: false,
+            parsedSuccessfully: false,
+            detectedPropertiesCount: 0,
+          },
+          profile: {
+            phAvailable: false,
+            nitrogenAvailable: false,
+            phosphorusAvailable: false,
+            potassiumAvailable: false,
+            textureAvailable: false,
+            additionalPropertiesAvailable: false,
+            ecStatus: 'unavailable',
+            availablePropertiesCount: 0,
+          },
+        },
         diagnostics,
       };
     }
 
-    const rawData = await resp.json();
+    // Case 3: HTTP 200 - Parse JSON
+    let rawData: any = null;
+    try {
+      rawData = await resp.json();
+    } catch (parseErr: any) {
+      const parseFailMsg = 'iSDAsoil returned a response, but the data structure could not be parsed.';
+      logStage('Response Parsing', 'error', parseFailMsg);
+      const normalised = normaliseIsdaSoilData(null, true);
+      const fullProfile = extractFullIsdaProfile(null);
+
+      return {
+        success: false,
+        classification: 'SOIL_DATA_RETURNED_BUT_NOT_PARSED',
+        classificationMessage: parseFailMsg,
+        raw: { status: 'parse_error', error: parseErr.message },
+        authDiagnostic,
+        soilPropertyDiagnostic: {
+          endpoint: soilPropertyEndpoint,
+          httpStatus: 200,
+          responseReceived: true,
+          message: parseFailMsg,
+        },
+        normalised,
+        fullProfile,
+        tokenInfo: isdaTokenManager.getCacheMetadata(),
+        diagnosticSummary: {
+          authentication: {
+            credentialsLoaded: tokenInfo.credentialsConfigured,
+            authSuccessful: true,
+            tokenObtained: true,
+            details: 'Access token active',
+          },
+          soilRequest: {
+            endpointReachable: true,
+            requestAuthenticated: true,
+            coordinatesAccepted: true,
+            soilProfileReturned: true,
+            httpStatus: 200,
+          },
+          response: {
+            jsonReceived: false,
+            propertiesDetected: false,
+            parsedSuccessfully: false,
+            detectedPropertiesCount: 0,
+          },
+          profile: {
+            phAvailable: false,
+            nitrogenAvailable: false,
+            phosphorusAvailable: false,
+            potassiumAvailable: false,
+            textureAvailable: false,
+            additionalPropertiesAvailable: false,
+            ecStatus: 'unavailable',
+            availablePropertiesCount: 0,
+          },
+        },
+        diagnostics,
+      };
+    }
+
     logStage('iSDAsoil Query', 'ok', 'Successfully received raw soil property payload from iSDAsoil (HTTP 200).');
 
-    // Normalisation layer
-    logStage('Normalisation', 'info', 'Applying SoilWise normalisation layer to raw iSDAsoil response.');
+    // Case 4: Inspect properties inside raw response
+    const propertyObj = rawData?.property || rawData?.properties;
+    const propertyKeys = propertyObj && typeof propertyObj === 'object' ? Object.keys(propertyObj) : [];
+
+    if (propertyKeys.length === 0) {
+      const noDataMsg = 'iSDAsoil responded successfully, but no soil profile data was returned for this location.';
+      logStage('Soil Properties Detection', 'warning', noDataMsg);
+      const normalised = normaliseIsdaSoilData(rawData, true);
+      const fullProfile = extractFullIsdaProfile(rawData);
+
+      return {
+        success: false,
+        classification: 'NO_SOIL_DATA_RETURNED',
+        classificationMessage: noDataMsg,
+        raw: rawData,
+        authDiagnostic,
+        soilPropertyDiagnostic: {
+          endpoint: soilPropertyEndpoint,
+          httpStatus: 200,
+          responseReceived: true,
+          message: noDataMsg,
+        },
+        normalised,
+        fullProfile,
+        tokenInfo: isdaTokenManager.getCacheMetadata(),
+        diagnosticSummary: {
+          authentication: {
+            credentialsLoaded: tokenInfo.credentialsConfigured,
+            authSuccessful: true,
+            tokenObtained: true,
+            details: 'Access token active',
+          },
+          soilRequest: {
+            endpointReachable: true,
+            requestAuthenticated: true,
+            coordinatesAccepted: true,
+            soilProfileReturned: true,
+            httpStatus: 200,
+          },
+          response: {
+            jsonReceived: true,
+            propertiesDetected: false,
+            parsedSuccessfully: true,
+            detectedPropertiesCount: 0,
+          },
+          profile: {
+            phAvailable: false,
+            nitrogenAvailable: false,
+            phosphorusAvailable: false,
+            potassiumAvailable: false,
+            textureAvailable: false,
+            additionalPropertiesAvailable: false,
+            ecStatus: 'unavailable',
+            availablePropertiesCount: 0,
+          },
+        },
+        diagnostics,
+      };
+    }
+
+    // Case 5: Normalisation & multi-depth mapping
+    logStage('Normalisation', 'info', `Applying SoilWise normalisation layer to ${propertyKeys.length} returned iSDAsoil properties.`);
     const normalised = normaliseIsdaSoilData(rawData, true);
-    logStage('Normalisation', 'ok', `Normalised soil profile ready (overall_status: ${normalised.overall_status}).`);
+    const fullProfile = extractFullIsdaProfile(rawData);
+
+    const availablePropertiesCount = Object.values(fullProfile).filter((p) => p.status === 'available').length;
+
+    if (availablePropertiesCount === 0 || normalised.overall_status === 'unavailable') {
+      const mappingFailMsg = 'iSDAsoil returned a response, but SoilWise could not map the returned soil properties into the SoilWise schema.';
+      logStage('Normalisation', 'error', mappingFailMsg);
+
+      return {
+        success: false,
+        classification: 'SOIL_DATA_RETURNED_BUT_MAPPING_FAILED',
+        classificationMessage: mappingFailMsg,
+        raw: rawData,
+        authDiagnostic,
+        soilPropertyDiagnostic: {
+          endpoint: soilPropertyEndpoint,
+          httpStatus: 200,
+          responseReceived: true,
+          message: mappingFailMsg,
+        },
+        normalised,
+        fullProfile,
+        tokenInfo: isdaTokenManager.getCacheMetadata(),
+        diagnosticSummary: {
+          authentication: {
+            credentialsLoaded: tokenInfo.credentialsConfigured,
+            authSuccessful: true,
+            tokenObtained: true,
+            details: 'Access token active',
+          },
+          soilRequest: {
+            endpointReachable: true,
+            requestAuthenticated: true,
+            coordinatesAccepted: true,
+            soilProfileReturned: true,
+            httpStatus: 200,
+          },
+          response: {
+            jsonReceived: true,
+            propertiesDetected: true,
+            parsedSuccessfully: false,
+            detectedPropertiesCount: propertyKeys.length,
+          },
+          profile: {
+            phAvailable: false,
+            nitrogenAvailable: false,
+            phosphorusAvailable: false,
+            potassiumAvailable: false,
+            textureAvailable: false,
+            additionalPropertiesAvailable: false,
+            ecStatus: 'unavailable',
+            availablePropertiesCount: 0,
+          },
+        },
+        diagnostics,
+      };
+    }
+
+    // Case 6: SUCCESS
+    logStage('Normalisation', 'ok', `Normalised soil profile ready (overall_status: ${normalised.overall_status}, ${availablePropertiesCount} properties mapped).`);
 
     return {
       success: true,
+      classification: 'SUCCESS',
+      classificationMessage: 'Soil profile successfully retrieved and mapped.',
       raw: rawData,
       authDiagnostic,
       soilPropertyDiagnostic: {
@@ -1124,33 +1612,120 @@ export async function fetchIsdaSoilData(
         message: 'Raw soilproperty response successfully retrieved.',
       },
       normalised,
-      fullProfile: extractFullIsdaProfile(rawData),
+      fullProfile,
       tokenInfo: isdaTokenManager.getCacheMetadata(),
+      diagnosticSummary: {
+        authentication: {
+          credentialsLoaded: tokenInfo.credentialsConfigured,
+          authSuccessful: true,
+          tokenObtained: true,
+          details: 'Access token active and cached',
+        },
+        soilRequest: {
+          endpointReachable: true,
+          requestAuthenticated: true,
+          coordinatesAccepted: true,
+          soilProfileReturned: true,
+          httpStatus: 200,
+        },
+        response: {
+          jsonReceived: true,
+          propertiesDetected: true,
+          parsedSuccessfully: true,
+          detectedPropertiesCount: propertyKeys.length,
+        },
+        profile: {
+          phAvailable: normalised.ph.status === 'available',
+          nitrogenAvailable: normalised.nitrogen_total.status === 'available',
+          phosphorusAvailable: normalised.phosphorus_extractable.status === 'available',
+          potassiumAvailable: normalised.potassium_extractable.status === 'available',
+          textureAvailable: normalised.texture_class.status === 'available' || normalised.sand_content.status === 'available',
+          additionalPropertiesAvailable: Object.keys(fullProfile).length > 8,
+          ecStatus: 'unavailable',
+          availablePropertiesCount,
+        },
+      },
       diagnostics,
     };
   } catch (err: any) {
-    logStage('iSDAsoil Query', 'error', `Network or fetch failure: ${err.message || 'Unknown network error'}`);
+    const catchMsg = err.message || 'Unknown network error';
+    logStage('iSDAsoil Query', 'error', `Network or fetch failure: ${catchMsg}`);
+    const tokenInfo = isdaTokenManager.getCacheMetadata();
     const normalised = normaliseIsdaSoilData(null, true);
+    const fullProfile = extractFullIsdaProfile(null);
+
     return {
       success: false,
-      raw: { status: 'error', error: err.message },
+      classification: 'AUTHENTICATION_SUCCESS_SOIL_REQUEST_FAILED',
+      classificationMessage: `Network exception during soilprofile request: ${catchMsg}`,
+      raw: { status: 'error', error: catchMsg },
       authDiagnostic: {
         endpoint: 'https://api.isda-africa.com/login',
         httpStatus: null,
         authentication: 'FAILED',
         tokenReceived: false,
-        message: err.message,
+        message: catchMsg,
       },
       soilPropertyDiagnostic: {
         endpoint: soilPropertyEndpoint,
         httpStatus: null,
         responseReceived: false,
-        message: err.message || 'Network exception during soilproperty request.',
+        message: catchMsg,
       },
       normalised,
-      fullProfile: extractFullIsdaProfile(null),
-      tokenInfo: isdaTokenManager.getCacheMetadata(),
+      fullProfile,
+      tokenInfo,
+      diagnosticSummary: {
+        authentication: {
+          credentialsLoaded: tokenInfo.credentialsConfigured,
+          authSuccessful: false,
+          tokenObtained: false,
+          details: catchMsg,
+        },
+        soilRequest: {
+          endpointReachable: false,
+          requestAuthenticated: false,
+          coordinatesAccepted: true,
+          soilProfileReturned: false,
+          httpStatus: null,
+        },
+        response: {
+          jsonReceived: false,
+          propertiesDetected: false,
+          parsedSuccessfully: false,
+          detectedPropertiesCount: 0,
+        },
+        profile: {
+          phAvailable: false,
+          nitrogenAvailable: false,
+          phosphorusAvailable: false,
+          potassiumAvailable: false,
+          textureAvailable: false,
+          additionalPropertiesAvailable: false,
+          ecStatus: 'unavailable',
+          availablePropertiesCount: 0,
+        },
+      },
       diagnostics,
     };
   }
+}
+
+/**
+ * Canonical mapping between iSDAsoil normalised profile and SoilWise recommendation soil data input.
+ * Adheres strictly to Section 16 of the architecture:
+ * - Preserves actual iSDAsoil property values (or null if unavailable)
+ * - Preserves provenance as 'location_estimated'
+ * - EC is strictly null and 'unavailable' (zero fabrication)
+ */
+export function mapIsdaSoilToRecommendationSoilData(isdaResponse: IsdaSoilServiceResponse): SoilData {
+  const norm = isdaResponse.normalised;
+  return {
+    ph: typeof norm.ph.value === 'number' ? norm.ph.value : null,
+    nitrogen: typeof norm.nitrogen_total.value === 'number' ? norm.nitrogen_total.value : null,
+    phosphorus: typeof norm.phosphorus_extractable.value === 'number' ? norm.phosphorus_extractable.value : null,
+    potassium: typeof norm.potassium_extractable.value === 'number' ? norm.potassium_extractable.value : null,
+    ec: null,
+    ecStatus: 'unavailable',
+  };
 }

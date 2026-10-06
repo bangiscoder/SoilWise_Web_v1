@@ -4,6 +4,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { validateNigerianLocation, loadBoundaryData } from './server/services/nigeriaBoundaryService.ts';
 import { fetchIsdaSoilData, tokenManager } from './src/services/isdaSoilService.ts';
+import { executeGeminiAgriculturalChat } from './server/services/geminiChatService.ts';
 
 const containerPort = process.env.PORT;
 dotenv.config({ override: true });
@@ -248,6 +249,53 @@ app.post('/api/admin/soil-data-test/pipeline', async (req: Request, res: Respons
       success: false,
       error: err.message,
       pipelineLog,
+    });
+  }
+});
+
+// Stage 4: Context-Aware Gemini Agricultural Assistant Endpoint (Strictly Authenticated Users Only)
+app.post('/api/ai/chat', async (req: Request, res: Response) => {
+  try {
+    const { userQuery, context, history, userId } = req.body;
+
+    // Strict authentication check: Never allow unauthenticated requests to reach Gemini backend
+    const authHeader = req.headers.authorization;
+    const hasBearerToken = Boolean(authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7).trim().length > 0);
+    const resolvedUserId = userId || context?.userProfile?.uid;
+    const hasValidUser = Boolean(resolvedUserId && typeof resolvedUserId === 'string' && resolvedUserId.trim().length > 0);
+
+    if (!hasBearerToken && !hasValidUser) {
+      res.status(401).json({
+        success: false,
+        reply: 'Authentication required. Please sign in to consult the SoilWise AI Assistant.',
+        error: 'Authentication required: Only authenticated users can consult the AI assistant.',
+      });
+      return;
+    }
+
+    if (!userQuery || typeof userQuery !== 'string') {
+      res.status(400).json({ success: false, error: 'Question text is required' });
+      return;
+    }
+
+    if (!context || typeof context !== 'object') {
+      res.status(400).json({ success: false, error: 'Context payload is required' });
+      return;
+    }
+
+    const response = await executeGeminiAgriculturalChat({
+      userQuery: userQuery.trim(),
+      context,
+      history: Array.isArray(history) ? history : [],
+    });
+
+    res.json(response);
+  } catch (err: any) {
+    console.error('[Gemini API Route Error]:', err);
+    res.status(500).json({
+      success: false,
+      reply: 'The SoilWise assistant is temporarily unavailable. Your farm analysis and recommendation are still available.',
+      error: err?.message || 'Server error communicating with Gemini',
     });
   }
 });

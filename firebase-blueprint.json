@@ -144,6 +144,21 @@
           "type": "string",
           "description": "Account status: active, suspended."
         },
+        "profile": {
+          "type": "object",
+          "description": "User preferences: preferredLanguage, farmingExperience, primaryFarmingInterest, farmingInterests, preferredCrops.",
+          "properties": {
+            "preferredLanguage": { "type": "string" },
+            "farmingExperience": { "type": "string" },
+            "primaryFarmingInterest": { "type": "string" },
+            "farmingInterests": { "type": "array", "items": { "type": "string" } },
+            "preferredCrops": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "activeFarmId": {
+          "type": "string",
+          "description": "Identifier of currently active or selected farm profile."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",
@@ -156,6 +171,52 @@
         }
       },
       "required": ["uid", "email", "role", "accountStatus", "createdAt"]
+    },
+    "FarmProfile": {
+      "title": "SoilWise Farm Profile",
+      "description": "Farmer-owned farm entity with location, derived agro-ecology, and management metadata.",
+      "type": "object",
+      "properties": {
+        "farmId": {
+          "type": "string",
+          "description": "Unique identifier for this farm."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "name": {
+          "type": "string",
+          "description": "Farmer-given name for the farm (e.g. My Main Farm)."
+        },
+        "location": {
+          "type": "object",
+          "description": "Geographic location containing coordinates, state, LGA, and optional address."
+        },
+        "ecology": {
+          "type": "object",
+          "description": "Agro-ecological zone derived from verified SoilWise location classification."
+        },
+        "sizeHectares": {
+          "type": "number",
+          "description": "Farm land area in hectares (optional)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status: active, archived, deleted."
+        }
+      },
+      "required": ["farmId", "userId", "name", "location", "ecology", "createdAt", "status"]
     },
     "FarmAnalysisRecord": {
       "title": "Saved Farm Analysis Snapshot",
@@ -234,6 +295,10 @@
     "/users/{uid}/analyses/{analysisId}": {
       "entity": "FarmAnalysisRecord",
       "description": "User-owned immutable historical farm analysis snapshots. Private to owner, read/create/delete by owner, read by admin."
+    },
+    "/users/{uid}/farms/{farmId}": {
+      "entity": "FarmProfile",
+      "description": "User-owned farm profiles. Private to owner, read/create/update/delete by owner, read by admin."
     }
   }
 }

@@ -11,19 +11,27 @@ import {
   CheckCircle2, 
   ArrowRight,
   Sparkles,
-  Archive
+  Archive,
+  Compass,
+  Globe,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { calculateProfileCompletion } from '../../services/farmService';
 
 interface UserAreaViewProps {
   onNavigateToAnalysis: () => void;
   onNavigateToHistory: () => void;
+  onNavigateToProfile: () => void;
+  onNavigateToFarms: () => void;
   onLogout: () => void;
 }
 
 export const UserAreaView: React.FC<UserAreaViewProps> = ({
   onNavigateToAnalysis,
   onNavigateToHistory,
+  onNavigateToProfile,
+  onNavigateToFarms,
   onLogout,
 }) => {
   const { currentUser, userProfile, isAdmin, logout } = useAuth();
@@ -88,6 +96,20 @@ export const UserAreaView: React.FC<UserAreaViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            onClick={onNavigateToProfile}
+            className="px-3.5 py-2 bg-white hover:bg-stone-50 text-stone-800 border border-stone-200 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-2xs flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <UserIcon className="w-4 h-4 text-[#1b4332]" />
+            <span>My Profile</span>
+          </button>
+          <button
+            onClick={onNavigateToFarms}
+            className="px-3.5 py-2 bg-white hover:bg-stone-50 text-stone-800 border border-stone-200 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-2xs flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Compass className="w-4 h-4 text-emerald-700" />
+            <span>My Farms</span>
+          </button>
+          <button
             onClick={onNavigateToHistory}
             className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-2xs flex items-center gap-2 cursor-pointer active:scale-95"
           >
@@ -107,6 +129,90 @@ export const UserAreaView: React.FC<UserAreaViewProps> = ({
           >
             <LogOut className="w-4 h-4 text-stone-500" />
             <span>Log Out</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Stage 3 Personalisation & Farm Overview Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Profile Preferences & Completion Card */}
+        <div className="bg-white rounded-2xl p-6 border border-stone-200/90 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 text-stone-900 font-bold text-sm">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                <Globe className="w-4 h-4" />
+              </div>
+              <div>
+                <span>Profile & Personalisation</span>
+                <span className="block text-[11px] font-normal text-stone-500">Language, experience & crop interests</span>
+              </div>
+            </div>
+            {(() => {
+              const comp = calculateProfileCompletion(userProfile);
+              return (
+                <span className="text-xs font-extrabold text-[#1b4332] bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                  {comp.percentage}% Complete
+                </span>
+              );
+            })()}
+          </div>
+
+          <div className="space-y-2 text-xs text-stone-600 bg-stone-50/70 p-3.5 rounded-xl border border-stone-100">
+            <div className="flex justify-between items-center">
+              <span className="text-stone-500">Preferred Language:</span>
+              <span className="font-semibold text-stone-800 uppercase">
+                {userProfile?.profile?.preferredLanguage || 'English (default)'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-stone-500">Farming Experience:</span>
+              <span className="font-semibold text-stone-800 capitalize">
+                {userProfile?.profile?.farmingExperience?.replace('_', ' ') || 'Not specified'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-stone-500">Preferred Crops:</span>
+              <span className="font-semibold text-stone-800">
+                {userProfile?.profile?.preferredCrops && userProfile.profile.preferredCrops.length > 0
+                  ? userProfile.profile.preferredCrops.join(', ')
+                  : 'None selected'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={onNavigateToProfile}
+            className="w-full py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>Edit Profile & Preferences</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Farm Management Card */}
+        <div className="bg-white rounded-2xl p-6 border border-stone-200/90 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 text-stone-900 font-bold text-sm">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                <Compass className="w-4 h-4" />
+              </div>
+              <div>
+                <span>My Farm Profiles</span>
+                <span className="block text-[11px] font-normal text-stone-500">Saved locations & derived agro-ecology</span>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-stone-600 leading-relaxed bg-stone-50/70 p-3.5 rounded-xl border border-stone-100">
+            Save individual farms with GPS coordinates, State, and LGA. SoilWise automatically derives verified agro-ecological classifications and allows 1-click assessment linking.
+          </p>
+
+          <button
+            onClick={onNavigateToFarms}
+            className="w-full py-2.5 bg-[#1b4332] hover:bg-[#143225] text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>Manage My Farms</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

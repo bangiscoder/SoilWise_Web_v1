@@ -16,11 +16,15 @@ import {
   ArrowRight,
   ArrowLeft,
   MapPinCheck,
-  RefreshCw
+  RefreshCw,
+  Compass,
 } from 'lucide-react';
 import { SoilData } from '../types/soilwise';
 import { NIGERIA_STATES_LGAS } from '../data/nigeriaStatesLga';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { getUserFarms } from '../services/farmService';
+import { FarmProfileDocument } from '../types/farm';
 import { 
   analyzeSoilPhoto, 
   validateSoilPhotoFile, 
@@ -45,13 +49,21 @@ interface FarmDataFormProps {
         fileName?: string;
       } | null;
       locationValidation?: LocationValidationResult | null;
+      farmId?: string;
+      farmName?: string;
     }
   ) => void;
   isSubmitting: boolean;
+  preselectedFarm?: FarmProfileDocument | null;
 }
 
-export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitting }) => {
+export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitting, preselectedFarm }) => {
   const { t } = useLanguage();
+  const { currentUser, userProfile } = useAuth();
+
+  // Saved user farms for optional farm linking (Section 13)
+  const [userFarms, setUserFarms] = useState<FarmProfileDocument[]>([]);
+  const [selectedFarm, setSelectedFarm] = useState<FarmProfileDocument | null>(preselectedFarm || null);
 
   // Active form section: 1 = Soil Analysis Data, 2 = Soil Photo, 3 = Farm Location
   const [currentSection, setCurrentSection] = useState<1 | 2 | 3>(1);
@@ -119,6 +131,55 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
     } finally {
       setIsValidatingLocation(false);
     }
+  };
+
+  // Section 13: Load user saved farms and auto-apply preselected / active farm
+  useEffect(() => {
+    if (currentUser) {
+      getUserFarms(currentUser.uid)
+        .then((farms) => {
+          setUserFarms(farms);
+          if (preselectedFarm) {
+            handleApplyFarm(preselectedFarm);
+          } else if (userProfile?.activeFarmId) {
+            const active = farms.find((f) => f.farmId === userProfile.activeFarmId);
+            if (active) {
+              handleApplyFarm(active);
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn('Could not load saved farms:', err);
+        });
+    }
+  }, [currentUser, preselectedFarm]);
+
+  const handleApplyFarm = (farm: FarmProfileDocument) => {
+    setSelectedFarm(farm);
+    setSelectedState(farm.location.state);
+    setSelectedLga(farm.location.lga);
+    setLatitude(String(farm.location.latitude));
+    setLongitude(String(farm.location.longitude));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.state;
+      delete next.lga;
+      delete next.latitude;
+      delete next.longitude;
+      delete next.locationConflict;
+      delete next.boundary;
+      return next;
+    });
+    triggerLocationValidation(
+      farm.location.state,
+      farm.location.lga,
+      String(farm.location.latitude),
+      String(farm.location.longitude)
+    );
+  };
+
+  const handleClearFarm = () => {
+    setSelectedFarm(null);
   };
 
   useEffect(() => {
@@ -505,6 +566,8 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
           fileName: soilPhotoAnalysis.fileName,
         } : null,
         locationValidation: currentValidation || null,
+        farmId: selectedFarm?.farmId,
+        farmName: selectedFarm?.name,
       }
     );
   };
@@ -622,6 +685,76 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
             {t('hero.caption')}
           </p>
         </div>
+
+        {/* Section 13: Optional Farm Linking for Authenticated Farmers */}
+        {currentUser && userFarms.length > 0 && (
+          <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 mb-6 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-emerald-950 block">
+                    Saved Farm Association (Optional)
+                  </span>
+                  <span className="text-[11px] text-stone-600 block">
+                    {selectedFarm ? (
+                      <>
+                        Linked to: <strong className="text-stone-900 font-semibold">{selectedFarm.name}</strong> ({selectedFarm.location.state}, {selectedFarm.location.lga})
+                      </>
+                    ) : (
+                      'Select a saved farm to automatically fill coordinates and agro-ecology, or analyse as new farm.'
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={selectedFarm?.farmId || ''}
+                  onChange={(e) => {
+                    const farmId = e.target.value;
+                    const found = userFarms.find((f) => f.farmId === farmId);
+                    if (found) {
+                      handleApplyFarm(found);
+                    } else {
+                      handleClearFarm();
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold bg-white border border-emerald-300 text-stone-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b4332] shadow-2xs"
+                >
+                  <option value="">Analyse as new farm</option>
+                  {userFarms.map((f) => (
+                    <option key={f.farmId} value={f.farmId}>
+                      {f.name} ({f.location.state}, {f.location.lga})
+                    </option>
+                  ))}
+                </select>
+
+                {selectedFarm ? (
+                  <button
+                    type="button"
+                    onClick={handleClearFarm}
+                    className="px-2.5 py-1.5 text-[11px] font-bold text-stone-600 hover:text-stone-900 bg-white border border-stone-200 hover:bg-stone-50 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Analyse as new farm
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (userFarms[0]) handleApplyFarm(userFarms[0]);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold text-white bg-[#1b4332] hover:bg-[#143225] rounded-xl transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Use saved farm
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 3-Section Stepper Indicator */}
         <div className="bg-white rounded-2xl p-3 sm:p-4 border border-stone-200/90 shadow-xs mb-8">

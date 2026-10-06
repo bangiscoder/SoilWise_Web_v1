@@ -6,6 +6,14 @@ export type UserRole = 'user' | 'admin' | 'agronomist';
 
 export type AccountStatus = 'active' | 'suspended';
 
+export interface UserPreferences {
+  preferredLanguage?: 'en' | 'ha' | 'yo' | 'ig' | string;
+  farmingExperience?: 'new' | 'some_experience' | 'experienced' | 'commercial' | string;
+  primaryFarmingInterest?: string;
+  farmingInterests?: string[];
+  preferredCrops?: string[];
+}
+
 export interface SoilWiseUserProfile {
   uid: string;
   email: string;
@@ -16,6 +24,18 @@ export interface SoilWiseUserProfile {
   accountStatus: AccountStatus;
   createdAt: string; // ISO String or serialized timestamp
   updatedAt: string;
+  profile?: UserPreferences;
+  activeFarmId?: string | null;
+}
+
+export interface UpdateProfileInput {
+  displayName?: string;
+  preferredLanguage?: string;
+  farmingExperience?: string;
+  primaryFarmingInterest?: string;
+  farmingInterests?: string[];
+  preferredCrops?: string[];
+  activeFarmId?: string | null;
 }
 
 export interface UserRegistrationInput {

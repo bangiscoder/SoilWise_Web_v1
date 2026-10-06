@@ -4,11 +4,13 @@ import { auth, isAdmin } from '../lib/firebase';
 import { 
   SoilWiseUserProfile, 
   UserRegistrationInput, 
-  UserLoginInput 
+  UserLoginInput,
+  UpdateProfileInput 
 } from '../types/auth';
 import {
   getUserProfile,
   createOrSyncUserProfile,
+  updateUserProfileData,
   registerWithEmail as apiRegisterWithEmail,
   loginWithEmail as apiLoginWithEmail,
   loginWithGoogle as apiLoginWithGoogle,
@@ -27,6 +29,7 @@ interface AuthContextType {
   sendPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateUserProfile: (input: UpdateProfileInput) => Promise<SoilWiseUserProfile>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -96,6 +99,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(null);
   };
 
+  const updateUserProfile = async (input: UpdateProfileInput): Promise<SoilWiseUserProfile> => {
+    if (!currentUser) throw new Error('User not authenticated.');
+    const updated = await updateUserProfileData(currentUser.uid, input);
+    setUserProfile(updated);
+    return updated;
+  };
+
   const isUserAdmin = Boolean(currentUser && isAdmin(currentUser));
 
   return (
@@ -111,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendPasswordReset,
         logout,
         refreshProfile,
+        updateUserProfile,
       }}
     >
       {children}

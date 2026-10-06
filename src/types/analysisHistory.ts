@@ -31,6 +31,8 @@ export interface SavedAnalysisSummary {
   score: number;
   potentialYield: number;
   status: 'completed' | 'partial';
+  farmId?: string;
+  farmName?: string;
 }
 
 export interface SavedFarmAnalysisDocument {
@@ -39,8 +41,12 @@ export interface SavedFarmAnalysisDocument {
   createdAt: string;
   updatedAt: string;
   status: 'completed' | 'partial';
+  farmId?: string;
+  farmName?: string;
 
   farm: {
+    farmId?: string;
+    farmName?: string;
     location: FarmLocation;
     ecology: string;
     state?: string;
@@ -125,5 +131,7 @@ export function reconstructFarmAnalysisFromSnapshot(
     soilDataProvenance: (doc.soil.provenance as any) || 'location_estimated',
     soilEvidence: doc.soil.evidence,
     cropRecommendationDecision: doc.recommendation.decision,
+    farmId: doc.farmId || doc.farm?.farmId,
+    farmName: doc.farmName || doc.farm?.farmName,
   };
 }
