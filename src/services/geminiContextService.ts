@@ -16,14 +16,14 @@
  * - Explicit distinction between measured, estimated, derived, and unavailable.
  */
 
-import { FarmAnalysisResult } from '../types/soilwise';
-import { SoilWiseUserProfile } from '../types/auth';
-import { FarmProfileDocument, FarmProfileSummary } from '../types/farm';
-import { 
+import type { FarmAnalysisResult } from '../types/soilwise';
+import type { SoilWiseUserProfile } from '../types/auth';
+import type { FarmProfileDocument, FarmProfileSummary } from '../types/farm';
+import type { 
   CropRecommendationDecision, 
   IarVarietyRecord 
 } from '../types/cropRecommendation';
-import { SavedFarmAnalysisDocument, SavedAnalysisSummary } from '../types/analysisHistory';
+import type { SavedFarmAnalysisDocument, SavedAnalysisSummary } from '../types/analysisHistory';
 import { IAR_CROP_VARIETIES } from '../data/iarCropVarieties';
 
 export interface SoilWiseGeminiContext {

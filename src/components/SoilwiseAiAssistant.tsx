@@ -164,22 +164,6 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
     (analysis?.farmId ? userFarms.find((f) => f.farmId === analysis.farmId) : null) || 
     (userFarms.length > 0 ? userFarms[0] : null);
 
-  // Quick-prompt suggestions (Section 2)
-  const quickPrompts = (() => {
-    const base = [
-      'What fertilizer ratio should I use?',
-      'When should I plant?',
-      'How can I improve soil pH?',
-    ];
-
-    if (analysis?.cropRecommendationDecision?.top_recommendation?.crop.name) {
-      const topCrop = analysis.cropRecommendationDecision.top_recommendation.crop.name;
-      return [`Why was ${topCrop} recommended?`, ...base];
-    }
-
-    return base;
-  })();
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -452,28 +436,8 @@ export const SoilwiseAiAssistant: React.FC<SoilwiseAiAssistantProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick-Prompt Suggestions (Section 2) */}
-      <div className="py-2 border-t border-stone-100 shrink-0">
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500 mb-1.5 px-0.5">
-          <Sparkles className="w-3 h-3 text-[#1b4332]" />
-          <span>Quick questions:</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {quickPrompts.map((q) => (
-            <button
-              key={q}
-              onClick={() => handleSendMessage(q)}
-              disabled={isTyping}
-              className="px-2.5 py-1 text-[11px] bg-stone-100 hover:bg-[#f0f5ee] hover:text-[#1b4332] text-stone-700 rounded-lg border border-stone-200/80 transition-colors text-left disabled:opacity-50 cursor-pointer"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Input Area (Fixed at bottom) */}
-      <div className="pt-2 border-t border-stone-200 shrink-0">
+      <div className="pt-3 border-t border-stone-200 shrink-0">
         <div className="flex items-center gap-2 bg-stone-50 border border-stone-300 rounded-2xl p-1.5 focus-within:ring-2 focus-within:ring-[#1b4332] focus-within:border-transparent transition-all">
           <input
             ref={inputRef}

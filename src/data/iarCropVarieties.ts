@@ -1,5 +1,5 @@
 import iarDatabaseRaw from './iar_crop_varieties_database.json';
-import { IarVarietyRecord, IarCropVarietiesDatabase } from '../types/cropRecommendation';
+import type { IarVarietyRecord, IarCropVarietiesDatabase } from '../types/cropRecommendation';
 
 /**
  * IAR Crop Variety Descriptors Compendium

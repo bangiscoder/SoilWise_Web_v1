@@ -9,7 +9,8 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
-import { SoilWiseGeminiContext, buildSoilWiseSystemInstruction, buildContextDebugSummary } from '../../src/services/geminiContextService.ts';
+import type { SoilWiseGeminiContext } from './geminiPromptService.ts';
+import { buildSoilWiseSystemInstruction, buildContextDebugSummary } from './geminiPromptService.ts';
 
 // Preferred primary model for rapid, structured Q&A
 const PRIMARY_MODEL = 'gemini-3.8-flash';
