@@ -19,13 +19,16 @@ import {
   MapPinCheck,
   Camera,
   CheckCircle2,
-  Archive
+  Archive,
+  GraduationCap,
+  ShoppingBag
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
 import { FarmOpenMeteoWeatherSection } from './FarmOpenMeteoWeatherSection';
 import { NimetClimateReport } from './NimetClimateReport';
 import { FutureRecommendationSection } from './FutureRecommendationSection';
+import { GeminiRecommendedCropsSection } from './GeminiRecommendedCropsSection';
 import { SoilwiseAiAssistant } from './SoilwiseAiAssistant';
 import { FloatingAiAssistantBar } from './FloatingAiAssistantBar';
 import { AgronomistConsultationModal } from './AgronomistConsultationModal';
@@ -46,6 +49,8 @@ interface FarmAnalysisViewProps {
   saveStatusMessage?: string | null;
   onRetrySave?: () => void;
   onNavigateToLogin?: () => void;
+  onNavigateToLearningHub?: () => void;
+  onNavigateToMarketplace?: (cropFilter?: string) => void;
 }
 
 export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
@@ -60,6 +65,8 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   saveStatusMessage,
   onRetrySave,
   onNavigateToLogin,
+  onNavigateToLearningHub,
+  onNavigateToMarketplace,
 }) => {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
@@ -1181,7 +1188,19 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
         {/* 6. CLIMATE REPORT — FUTURE INTEGRATION DEMO (Includes consolidated Climate Outlook & Agricultural Implication) */}
         <NimetClimateReport location={location} />
 
-        {/* 7. RECOMMENDATION (Major visual highlight) */}
+        {/* 7. GEMINI AI POWERED RECOMMENDED CROPS SECTION */}
+        <GeminiRecommendedCropsSection
+          analysis={analysis}
+          onNavigateToMarketplace={onNavigateToMarketplace}
+          onAskAiAboutCrop={(cropName, varietyName) => {
+            const phVal = soilData?.ph != null ? soilData.ph.toFixed(1) : '6.2';
+            handleOpenAssistant(
+              `Can you explain why ${cropName} (${varietyName}) is an optimal crop for my soil pH of ${phVal} and local rainfall? What specific planting and fertilizer practices will give me the highest yield?`
+            );
+          }}
+        />
+
+        {/* 7b. CANONICAL IAR VARIETY EVALUATION DETAILS */}
         <FutureRecommendationSection
           soilData={soilData}
           rainfallOutlook={rainfallOutlook}
@@ -1189,6 +1208,66 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           decision={analysis.cropRecommendationDecision}
           location={location}
         />
+
+        {/* 7b. SOILWISE LEARNING HUB ENTRY CALLOUT */}
+        {onNavigateToLearningHub && (
+          <section className="p-6 sm:p-7 bg-white rounded-3xl border border-stone-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-[#1b4332]" />
+                <h3 className="text-base sm:text-lg font-bold text-stone-900">
+                  SoilWise Learning Hub
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                Want to understand why these crops were recommended, how your soil pH controls fertilizer uptake, or how to manage dry spells? Explore personalized practical lessons in your Learning Journey.
+              </p>
+            </div>
+
+            <button
+              onClick={onNavigateToLearningHub}
+              className="px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs active:scale-[0.98] flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <GraduationCap className="w-4 h-4" />
+              <span>Explore Learning Hub</span>
+            </button>
+          </section>
+        )}
+
+        {/* 7c. FARM INPUTS & SEED MARKETPLACE CALLOUT */}
+        {onNavigateToMarketplace && (
+          <section className="p-6 sm:p-7 bg-[#fbfdfa] rounded-3xl border-2 border-emerald-800/15 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#1b4332] text-emerald-300 flex items-center justify-center">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                    Certified Farm Inputs
+                  </span>
+                  <h3 className="text-base sm:text-lg font-bold text-stone-900">
+                    Order Certified Crop Seeds for Your Farm
+                  </h3>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                Source NASC-certified, high-germination seed varieties (Maize, Sorghum, Cowpea, Rice, Soybean) matching your farm's soil profile and rainfall outlook. Specify exact kilograms or calculate by your farm acreage.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                const topCrop = analysis.cropRecommendationDecision?.recommendations?.[0]?.variety?.name || analysis.cropRecommendationDecision?.recommendations?.[0]?.crop?.name;
+                onNavigateToMarketplace(topCrop);
+              }}
+              className="px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Browse Seed Marketplace</span>
+            </button>
+          </section>
+        )}
 
         {/* 8. TALK TO A CERTIFIED AGRONOMIST DEMO */}
         <section className="p-6 sm:p-7 bg-[#f0f5ee] rounded-3xl border border-[#1b4332]/20 flex flex-col md:flex-row md:items-center justify-between gap-5">

@@ -105,6 +105,39 @@ service cloud.firestore {
         // Owner can delete their own analysis; Admin can delete any
         allow delete: if isOwner(uid) || isAdmin();
       }
+
+      // User-owned learning progress subcollection
+      match /learning/{docId} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    // SoilWise Learning Hub published curriculum lessons
+    // Public read-accessible to empower smallholder farmers with practical education
+    // Only verified administrator (bangiscoder@gmail.com) may create, update, or delete lessons
+    match /learning_lessons/{lessonId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // SoilWise Farm Inputs & Seed Marketplace
+    // Public read-accessible for smallholder farmers to explore available certified crop seeds & stock
+    // Only verified administrator (bangiscoder@gmail.com) can add seed varieties or modify stock/pricing
+    match /marketplace_seeds/{seedId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Farmer Seed Orders & Reservations
+    // Farmers can submit orders specifying crop seed and kilograms
+    // Farmers can view their own orders; admin can view and update order fulfillment status
+    match /marketplace_orders/{orderId} {
+      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow create: if request.resource.data.keys().hasAll(['orderNumber', 'seedId', 'quantityKg', 'farmerName', 'farmerPhone']) &&
+                       request.resource.data.quantityKg is number && request.resource.data.quantityKg > 0 &&
+                       request.resource.data.farmerName is string && request.resource.data.farmerName.size() <= 150 &&
+                       request.resource.data.farmerPhone is string && request.resource.data.farmerPhone.size() <= 50;
+      allow update, delete: if isAdmin();
     }
 
     // Default deny all other collections

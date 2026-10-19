@@ -299,6 +299,22 @@
     "/users/{uid}/farms/{farmId}": {
       "entity": "FarmProfile",
       "description": "User-owned farm profiles. Private to owner, read/create/update/delete by owner, read by admin."
+    },
+    "/users/{uid}/learning/{docId}": {
+      "entity": "UserLearningProgress",
+      "description": "User-owned learning journey progress, active lesson tracking, and completed modules."
+    },
+    "/learning_lessons/{lessonId}": {
+      "entity": "LearningLesson",
+      "description": "Curriculum lessons for SoilWise Learning Hub. Public read, admin create/update/delete."
+    },
+    "/marketplace_seeds/{seedId}": {
+      "entity": "CropSeed",
+      "description": "Certified crop seeds inventory library. Public read, admin create/update/delete."
+    },
+    "/marketplace_orders/{orderId}": {
+      "entity": "SeedOrder",
+      "description": "Farmer crop seed orders and kilogram reservations. Owner/admin read, public create, admin update/delete."
     }
   }
 }

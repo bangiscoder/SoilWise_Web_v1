@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sprout, RotateCcw, User, LogOut, LogIn, Archive, Compass } from 'lucide-react';
+import { Sprout, RotateCcw, User, LogOut, LogIn, Archive, Compass, GraduationCap, ShoppingBag } from 'lucide-react';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -45,6 +45,36 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
               {t('nav.dataArchitecture')}
             </button>
           )}
+
+          {/* Seed Marketplace Navigation Button */}
+          <button
+            onClick={() => onNavigate('marketplace')}
+            title="Browse certified crop seeds and order kilograms for your farm"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+              currentView === 'marketplace'
+                ? 'bg-[#1b4332] text-white border-[#1b4332] shadow-xs'
+                : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            <ShoppingBag className={`w-3.5 h-3.5 ${currentView === 'marketplace' ? 'text-emerald-300' : 'text-emerald-700'}`} />
+            <span className="hidden sm:inline">Seed Marketplace</span>
+            <span className="sm:hidden text-[11px]">Seeds</span>
+          </button>
+
+          {/* Learning Hub Navigation Button */}
+          <button
+            onClick={() => onNavigate('learning-hub')}
+            title="Explore agricultural lessons and practical guides in SoilWise Learning Hub"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+              currentView === 'learning-hub'
+                ? 'bg-[#1b4332] text-white border-[#1b4332] shadow-xs'
+                : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            <GraduationCap className={`w-3.5 h-3.5 ${currentView === 'learning-hub' ? 'text-emerald-300' : 'text-emerald-700'}`} />
+            <span className="hidden sm:inline">Learning Hub</span>
+            <span className="sm:hidden text-[11px]">Learn</span>
+          </button>
 
           {/* Language Switcher */}
           <LanguageSwitcher />

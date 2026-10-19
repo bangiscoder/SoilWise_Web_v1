@@ -19,6 +19,8 @@ import { UserAreaView } from './components/auth/UserAreaView';
 import { AnalysisHistoryView } from './components/history/AnalysisHistoryView';
 import { UserProfileView } from './components/profile/UserProfileView';
 import { FarmsManagementView } from './components/farms/FarmsManagementView';
+import { LearningHubView } from './components/learning/LearningHubView';
+import { MarketplaceView } from './components/marketplace/MarketplaceView';
 import { FarmProfileDocument } from './types/farm';
 import { SoilData, FarmAnalysisResult, AnalysisStep } from './types/soilwise';
 import { performFarmAnalysis } from './services/soilwiseService';
@@ -29,6 +31,8 @@ import { AlertCircle, Lock } from 'lucide-react';
 export type AppView = 
   | 'farm-data' 
   | 'analysis' 
+  | 'learning-hub'
+  | 'marketplace'
   | 'login' 
   | 'register' 
   | 'forgot-password' 
@@ -56,6 +60,7 @@ export default function App() {
   const [isHistoricalView, setIsHistoricalView] = useState<boolean>(false);
   const [historicalSavedDate, setHistoricalSavedDate] = useState<string | null>(null);
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null);
+  const [marketplaceCropFilter, setMarketplaceCropFilter] = useState<string | null>(null);
 
   // Monitor URL routes on mount and popstate
   useEffect(() => {
@@ -91,6 +96,10 @@ export default function App() {
         setCurrentView('my-farms');
       } else if (path.includes('/my-analyses') || path.includes('/analyses') || hash.includes('/my-analyses')) {
         setCurrentView('my-analyses');
+      } else if (path.includes('/learning-hub') || path.includes('/learning') || hash.includes('/learning-hub') || hash.includes('/learning')) {
+        setCurrentView('learning-hub');
+      } else if (path.includes('/marketplace') || path.includes('/seeds') || hash.includes('/marketplace') || hash.includes('/seeds')) {
+        setCurrentView('marketplace');
       }
     };
 
@@ -342,6 +351,42 @@ export default function App() {
             saveStatusMessage={saveStatusMessage}
             onRetrySave={handleRetrySave}
             onNavigateToLogin={() => navigateToView('login')}
+            onNavigateToLearningHub={() => navigateToView('learning-hub')}
+            onNavigateToMarketplace={(cropFilter) => {
+              setMarketplaceCropFilter(cropFilter || null);
+              navigateToView('marketplace');
+            }}
+          />
+        )}
+
+        {/* 2b. SoilWise Learning Hub ("My Learning Journey") */}
+        {currentView === 'learning-hub' && (
+          <LearningHubView
+            currentAnalysis={analysisResult}
+            onNavigateToAnalysis={() => {
+              if (analysisResult) {
+                navigateToView('analysis');
+              } else {
+                navigateToView('farm-data');
+              }
+            }}
+            onNavigateToFarms={() => navigateToView('my-farms')}
+          />
+        )}
+
+        {/* 2c. SoilWise Farm Inputs & Seed Marketplace */}
+        {currentView === 'marketplace' && (
+          <MarketplaceView
+            currentAnalysis={analysisResult}
+            onNavigateToAnalysis={() => {
+              if (analysisResult) {
+                navigateToView('analysis');
+              } else {
+                navigateToView('farm-data');
+              }
+            }}
+            onNavigateToAdmin={() => navigateToView('admin-dashboard')}
+            initialCropFilter={marketplaceCropFilter}
           />
         )}
 

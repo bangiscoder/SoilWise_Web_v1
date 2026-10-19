@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { validateNigerianLocation, loadBoundaryData } from './server/services/nigeriaBoundaryService.ts';
 import { fetchIsdaSoilData, tokenManager } from './src/services/isdaSoilService.ts';
 import { executeGeminiAgriculturalChat } from './server/services/geminiChatService.ts';
+import { generateGeminiCropRecommendations } from './server/services/geminiCropRecommendationService.ts';
 
 const containerPort = process.env.PORT;
 dotenv.config({ override: true });
@@ -296,6 +297,26 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
       success: false,
       reply: 'The SoilWise assistant is temporarily unavailable. Your farm analysis and recommendation are still available.',
       error: err?.message || 'Server error communicating with Gemini',
+    });
+  }
+});
+
+// Gemini AI Powered Crop Recommendations Endpoint based on soil-test data and climate parameters
+app.post('/api/ai/recommended-crops', async (req: Request, res: Response) => {
+  try {
+    const { location, soilData, soilTexture, climate } = req.body || {};
+    const result = await generateGeminiCropRecommendations({
+      location: location || {},
+      soilData: soilData || {},
+      soilTexture: soilTexture || {},
+      climate: climate || {},
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('[Gemini Crop Recommendations Route Error]:', err);
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to generate crop recommendations with Gemini',
     });
   }
 });
