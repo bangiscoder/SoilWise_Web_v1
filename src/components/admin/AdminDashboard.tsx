@@ -1111,15 +1111,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBack
                             <span className="text-[10px] text-stone-400 block capitalize">{order.deliveryMethod.replace('_', ' ')}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                              order.status === 'confirmed' || order.status === 'completed'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : order.status === 'ready_for_pickup'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {order.status.replace('_', ' ')}
-                            </span>
+                            <div className="space-y-1">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize inline-block ${
+                                order.status === 'confirmed' || order.status === 'completed'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : order.status === 'ready_for_pickup'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {order.status.replace('_', ' ')}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider block w-fit ${
+                                order.paymentStatus === 'paid'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : 'bg-stone-100 text-stone-600'
+                              }`}>
+                                {order.paymentStatus === 'paid' ? 'Paid (Paystack)' : 'Pay on Delivery'}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">

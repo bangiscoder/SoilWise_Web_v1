@@ -12,12 +12,19 @@ export interface UserPreferences {
   primaryFarmingInterest?: string;
   farmingInterests?: string[];
   preferredCrops?: string[];
+  phoneNumber?: string;
+  state?: string;
+  lga?: string;
+  bio?: string;
+  farmSizeHectares?: number;
+  primaryCrop?: string;
 }
 
 export interface SoilWiseUserProfile {
   uid: string;
   email: string;
   displayName: string | null;
+  phoneNumber?: string | null;
   photoURL: string | null;
   role: UserRole;
   authProviders: string[]; // e.g. ['password'], ['google.com']
@@ -26,10 +33,27 @@ export interface SoilWiseUserProfile {
   updatedAt: string;
   profile?: UserPreferences;
   activeFarmId?: string | null;
+  state?: string;
+  lga?: string;
+  bio?: string;
+  farmSizeHectares?: number;
+  primaryCrop?: string;
+  preferredLanguage?: string;
+  farmingExperience?: string;
+  primaryFarmingInterest?: string;
+  farmingInterests?: string[];
+  preferredCrops?: string[];
 }
 
 export interface UpdateProfileInput {
   displayName?: string;
+  phoneNumber?: string;
+  photoURL?: string | null;
+  state?: string;
+  lga?: string;
+  bio?: string;
+  farmSizeHectares?: number;
+  primaryCrop?: string;
   preferredLanguage?: string;
   farmingExperience?: string;
   primaryFarmingInterest?: string;

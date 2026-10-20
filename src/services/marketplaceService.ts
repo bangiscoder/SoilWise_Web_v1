@@ -16,6 +16,7 @@ import {
 import { db, isFirebaseConfigured, auth, AUTHORIZED_ADMIN_EMAIL } from '../lib/firebase';
 import { CropSeed, SeedOrder, SeedOrderStatus } from '../types/marketplace';
 import { INITIAL_SEEDS_CATALOGUE } from '../data/initialSeedsCatalogue';
+import { enqueueSyncItem } from './backgroundSyncService';
 
 const SEEDS_COLLECTION = 'marketplace_seeds';
 const ORDERS_COLLECTION = 'marketplace_orders';
@@ -242,11 +243,15 @@ export async function placeSeedOrder(
   const orderId = `order-${Date.now().toString(36)}-${randomSuffix}`;
   const nowIso = new Date().toISOString();
 
+  const isPaid = orderPayload.paymentStatus === 'paid';
+
   const newOrder: SeedOrder = {
     ...orderPayload,
     id: orderId,
     orderNumber,
-    status: 'pending',
+    status: isPaid ? 'confirmed' : 'pending',
+    paymentStatus: orderPayload.paymentStatus || 'unpaid',
+    paymentMethod: orderPayload.paymentMethod || 'paystack',
     createdAt: nowIso,
     updatedAt: nowIso,
   };
@@ -271,8 +276,10 @@ export async function placeSeedOrder(
     saveLocalCustomSeeds(localSeeds);
   }
 
-  // 3. Persist order and decrement stock in Firestore if available
-  if (isFirebaseConfigured && db) {
+  // 3. Persist order and decrement stock in Firestore if available and online
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+  if (isOnline && isFirebaseConfigured && db) {
     try {
       const orderRef = doc(db, ORDERS_COLLECTION, orderId);
       await setDoc(orderRef, {
@@ -294,8 +301,13 @@ export async function placeSeedOrder(
         });
       }
     } catch (err) {
-      console.warn('Failed to write seed order to Firestore:', err);
+      console.warn('Failed to write seed order to Firestore, queueing for background sync:', err);
+      enqueueSyncItem('seed_order', newOrder, orderPayload.userId);
     }
+  } else {
+    // Application is offline or Firebase is not connected -> Queue for background sync!
+    console.log('[Marketplace] Offline transaction detected. Queuing seed order for background sync.');
+    enqueueSyncItem('seed_order', newOrder, orderPayload.userId);
   }
 
   return newOrder;
@@ -351,6 +363,11 @@ export async function fetchUserSeedOrders(userId?: string | null): Promise<SeedO
         deliveryMethod: d.deliveryMethod || 'pickup_depot',
         deliveryNotes: d.deliveryNotes,
         status: (d.status as SeedOrderStatus) || 'pending',
+        paymentStatus: d.paymentStatus || (d.status === 'confirmed' ? 'paid' : 'unpaid'),
+        paymentMethod: d.paymentMethod || 'paystack',
+        paystackReference: d.paystackReference,
+        paidAt: d.paidAt,
+        amountPaidKobo: d.amountPaidKobo,
         userId: d.userId,
         createdAt: d.createdAt ? (typeof d.createdAt === 'string' ? d.createdAt : new Date(d.createdAt.seconds * 1000).toISOString()) : new Date().toISOString(),
         updatedAt: d.updatedAt ? (typeof d.updatedAt === 'string' ? d.updatedAt : new Date(d.updatedAt.seconds * 1000).toISOString()) : new Date().toISOString(),
@@ -421,6 +438,11 @@ export async function fetchAllSeedOrders(): Promise<SeedOrder[]> {
         deliveryMethod: d.deliveryMethod || 'pickup_depot',
         deliveryNotes: d.deliveryNotes,
         status: (d.status as SeedOrderStatus) || 'pending',
+        paymentStatus: d.paymentStatus || (d.status === 'confirmed' ? 'paid' : 'unpaid'),
+        paymentMethod: d.paymentMethod || 'paystack',
+        paystackReference: d.paystackReference,
+        paidAt: d.paidAt,
+        amountPaidKobo: d.amountPaidKobo,
         userId: d.userId,
         createdAt: d.createdAt ? (typeof d.createdAt === 'string' ? d.createdAt : new Date(d.createdAt.seconds * 1000).toISOString()) : new Date().toISOString(),
         updatedAt: d.updatedAt ? (typeof d.updatedAt === 'string' ? d.updatedAt : new Date(d.updatedAt.seconds * 1000).toISOString()) : new Date().toISOString(),

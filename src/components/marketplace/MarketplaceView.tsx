@@ -31,6 +31,7 @@ interface MarketplaceViewProps {
   currentAnalysis?: FarmAnalysisResult | null;
   onNavigateToAnalysis?: () => void;
   onNavigateToAdmin?: () => void;
+  onNavigateToPaymentSuccess?: (order: SeedOrder) => void;
   initialCropFilter?: string | null;
 }
 
@@ -38,6 +39,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   currentAnalysis,
   onNavigateToAnalysis,
   onNavigateToAdmin,
+  onNavigateToPaymentSuccess,
   initialCropFilter,
 }) => {
   const { currentUser, isAdmin } = useAuth();
@@ -141,8 +143,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       return s;
     }));
 
-    setSuccessToast(`Order ${order.orderNumber} for ${order.quantityKg} kg placed successfully!`);
-    setTimeout(() => setSuccessToast(null), 6000);
+    if (order.paymentStatus === 'paid' && onNavigateToPaymentSuccess) {
+      setIsOrderModalOpen(false);
+      onNavigateToPaymentSuccess(order);
+    } else {
+      setSuccessToast(`Order ${order.orderNumber} for ${order.quantityKg} kg placed successfully!`);
+      setTimeout(() => setSuccessToast(null), 6000);
+    }
   };
 
   const categories: { id: CropCategory | 'all'; label: string }[] = [
@@ -491,11 +498,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     className="p-5 bg-white rounded-2xl border border-stone-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-bold text-[#1b4332] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                           {order.orderNumber}
                         </span>
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
                           order.status === 'confirmed' || order.status === 'completed'
                             ? 'bg-emerald-100 text-emerald-800'
                             : order.status === 'ready_for_pickup'
@@ -503,6 +510,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                             : 'bg-amber-100 text-amber-800'
                         }`}>
                           {order.status.replace('_', ' ')}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                          order.paymentStatus === 'paid'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : 'bg-stone-100 text-stone-700'
+                        }`}>
+                          {order.paymentStatus === 'paid' ? 'Paid via Paystack' : 'Pay on Delivery'}
                         </span>
                       </div>
                       <h4 className="text-sm sm:text-base font-bold text-stone-900">

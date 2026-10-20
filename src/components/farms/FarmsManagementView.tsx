@@ -30,6 +30,7 @@ import {
 } from '../../services/farmService';
 import { setActiveFarmId } from '../../services/authService';
 import { FarmProfileDocument, CreateFarmInput } from '../../types/farm';
+import { LocationPermissionModal } from '../location/LocationPermissionModal';
 
 interface FarmsManagementViewProps {
   onStartAnalysisWithFarm?: (farm: FarmProfileDocument) => void;
@@ -67,6 +68,8 @@ export const FarmsManagementView: React.FC<FarmsManagementViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [gpsLoading, setGpsLoading] = useState<boolean>(false);
+  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState<boolean>(false);
+  const [isPermissionDenied, setIsPermissionDenied] = useState<boolean>(false);
 
   // Load farms
   const loadFarms = async () => {
@@ -106,7 +109,8 @@ export const FarmsManagementView: React.FC<FarmsManagementViewProps> = ({
   };
 
   // Device GPS
-  const handleGetDeviceLocation = () => {
+  const requestDeviceCoordinates = () => {
+    setIsPermissionModalOpen(false);
     if (!navigator.geolocation) {
       setFormError('Geolocation is not supported by your browser.');
       return;
@@ -118,13 +122,51 @@ export const FarmsManagementView: React.FC<FarmsManagementViewProps> = ({
         setLatitude(pos.coords.latitude.toFixed(5));
         setLongitude(pos.coords.longitude.toFixed(5));
         setGpsLoading(false);
+        setIsPermissionDenied(false);
       },
       (err) => {
         setGpsLoading(false);
-        setFormError(`Could not acquire GPS: ${err.message}`);
+        if (err.code === err.PERMISSION_DENIED) {
+          setIsPermissionDenied(true);
+          setIsPermissionModalOpen(true);
+        } else {
+          setFormError(`Could not acquire GPS: ${err.message}`);
+        }
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 15000, enableHighAccuracy: true, maximumAge: 0 }
     );
+  };
+
+  const handleGetDeviceLocation = async () => {
+    if (!navigator.geolocation) {
+      setFormError('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+        if (permissionStatus.state === 'granted') {
+          requestDeviceCoordinates();
+          return;
+        } else if (permissionStatus.state === 'denied') {
+          setIsPermissionDenied(true);
+          setIsPermissionModalOpen(true);
+          return;
+        } else {
+          setIsPermissionDenied(false);
+          setIsPermissionModalOpen(true);
+          return;
+        }
+      } catch {
+        setIsPermissionDenied(false);
+        setIsPermissionModalOpen(true);
+        return;
+      }
+    }
+
+    setIsPermissionDenied(false);
+    setIsPermissionModalOpen(true);
   };
 
   // Open Add Modal
@@ -702,6 +744,14 @@ export const FarmsManagementView: React.FC<FarmsManagementViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Location Permission Guidance Modal */}
+      <LocationPermissionModal
+        isOpen={isPermissionModalOpen}
+        isDenied={isPermissionDenied}
+        onClose={() => setIsPermissionModalOpen(false)}
+        onConfirmGrant={requestDeviceCoordinates}
+      />
     </div>
   );
 };

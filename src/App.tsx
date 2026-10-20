@@ -21,7 +21,10 @@ import { UserProfileView } from './components/profile/UserProfileView';
 import { FarmsManagementView } from './components/farms/FarmsManagementView';
 import { LearningHubView } from './components/learning/LearningHubView';
 import { MarketplaceView } from './components/marketplace/MarketplaceView';
+import { PaymentSuccessView } from './components/marketplace/PaymentSuccessView';
+import { OfflineBanner } from './components/pwa/OfflineBanner';
 import { FarmProfileDocument } from './types/farm';
+import { SeedOrder } from './types/marketplace';
 import { SoilData, FarmAnalysisResult, AnalysisStep } from './types/soilwise';
 import { performFarmAnalysis } from './services/soilwiseService';
 import { saveAnalysisSnapshot, getAnalysisSnapshot } from './services/analysisHistoryService';
@@ -33,6 +36,7 @@ export type AppView =
   | 'analysis' 
   | 'learning-hub'
   | 'marketplace'
+  | 'payment-success'
   | 'login' 
   | 'register' 
   | 'forgot-password' 
@@ -61,6 +65,8 @@ export default function App() {
   const [historicalSavedDate, setHistoricalSavedDate] = useState<string | null>(null);
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null);
   const [marketplaceCropFilter, setMarketplaceCropFilter] = useState<string | null>(null);
+  const [paymentSuccessOrder, setPaymentSuccessOrder] = useState<SeedOrder | null>(null);
+  const [paymentSuccessRef, setPaymentSuccessRef] = useState<string | null>(null);
 
   // Monitor URL routes on mount and popstate
   useEffect(() => {
@@ -72,6 +78,15 @@ export default function App() {
       
       const mode = searchParams.get('mode') || hashParams.get('mode');
       const oobCode = searchParams.get('oobCode') || hashParams.get('oobCode');
+      const payRef = searchParams.get('reference') || searchParams.get('trxref') || hashParams.get('reference') || hashParams.get('trxref');
+      const viewParam = searchParams.get('view') || hashParams.get('view');
+
+      // Paystack payment callback / fallback redirect detection
+      if (payRef || viewParam === 'payment-success' || path.includes('/payment-success') || hash.includes('/payment-success')) {
+        if (payRef) setPaymentSuccessRef(payRef);
+        setCurrentView('payment-success');
+        return;
+      }
 
       // Admin password reset / action links
       if (mode === 'resetPassword' || oobCode || path.includes('/reset-password') || hash.includes('/reset-password')) {
@@ -298,6 +313,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#fbfbf9] text-stone-900 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* PWA Offline Status Banner & Install Prompt */}
+      <OfflineBanner />
+
       {/* Top Bar Navigation (shown on main app views) */}
       {isNavVisible && (
         <Navbar
@@ -386,7 +404,27 @@ export default function App() {
               }
             }}
             onNavigateToAdmin={() => navigateToView('admin-dashboard')}
+            onNavigateToPaymentSuccess={(order) => {
+              setPaymentSuccessOrder(order);
+              setPaymentSuccessRef(order.paystackReference || order.orderNumber);
+              navigateToView('payment-success');
+            }}
             initialCropFilter={marketplaceCropFilter}
+          />
+        )}
+
+        {/* 2d. Dedicated Paystack Payment Confirmed / Fallback Page */}
+        {currentView === 'payment-success' && (
+          <PaymentSuccessView
+            order={paymentSuccessOrder}
+            reference={paymentSuccessRef}
+            onNavigateToMarketplace={() => navigateToView('marketplace')}
+            onNavigateToOrders={() => {
+              navigateToView('marketplace');
+            }}
+            onNavigateToAnalysis={(cropType) => {
+              navigateToView('farm-data');
+            }}
           />
         )}
 

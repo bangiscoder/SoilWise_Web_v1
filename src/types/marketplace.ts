@@ -52,6 +52,10 @@ export interface CropSeed {
   updatedAt: string;
 }
 
+export type PaymentStatus = 'unpaid' | 'paid' | 'failed' | 'pending_verification';
+
+export type PaymentMethod = 'paystack' | 'pay_on_delivery' | 'bank_transfer';
+
 export interface SeedOrder {
   id: string;
   orderNumber: string;
@@ -71,6 +75,12 @@ export interface SeedOrder {
   deliveryMethod: DeliveryMethod;
   deliveryNotes?: string;
   status: SeedOrderStatus;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  paystackReference?: string;
+  paystackTransactionId?: string;
+  paidAt?: string;
+  amountPaidKobo?: number;
   userId?: string | null;
   createdAt: string;
   updatedAt: string;

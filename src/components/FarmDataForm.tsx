@@ -32,6 +32,7 @@ import {
 } from '../services/soilPhotoAnalysisService';
 import { validateLocationApi } from '../services/soilDataValidationService';
 import { LocationValidationResult } from '../types/soilDataValidation';
+import { LocationPermissionModal } from './location/LocationPermissionModal';
 import heroBackground from '../assets/images/farm_analysis_hero_1790600561723.jpg';
 
 interface FarmDataFormProps {
@@ -98,6 +99,8 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoSuccess, setGeoSuccess] = useState<boolean>(false);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState<boolean>(false);
+  const [isPermissionDenied, setIsPermissionDenied] = useState<boolean>(false);
 
   // Geographic validation state
   const [locationValidation, setLocationValidation] = useState<LocationValidationResult | null>(null);
@@ -205,7 +208,8 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
     }
   }, [selectedState, selectedLga, latitude, longitude, gpsAccuracy]);
 
-  const handleGetLocation = () => {
+  const requestGpsCoordinates = () => {
+    setIsPermissionModalOpen(false);
     setGeoError(null);
     setGeoSuccess(false);
 
@@ -226,6 +230,7 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
         setGpsAccuracy(acc);
         setGeoSuccess(true);
         setGeoLoading(false);
+        setIsPermissionDenied(false);
         // Clear coordinate errors
         setErrors((prev) => {
           const next = { ...prev };
@@ -239,13 +244,56 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
       (error) => {
         setGeoLoading(false);
         if (error.code === error.PERMISSION_DENIED) {
+          setIsPermissionDenied(true);
+          setIsPermissionModalOpen(true);
           setGeoError(t('form.validation.geoPermission'));
         } else {
           setGeoError(t('form.validation.geoError'));
         }
       },
-      { timeout: 12000, enableHighAccuracy: true }
+      { timeout: 15000, enableHighAccuracy: true, maximumAge: 0 }
     );
+  };
+
+  const handleGetLocation = async () => {
+    setGeoError(null);
+    setGeoSuccess(false);
+
+    if (!('geolocation' in navigator)) {
+      setGeoError(t('form.validation.geoError'));
+      return;
+    }
+
+    // Check if user has already granted permission permanently
+    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+        if (permissionStatus.state === 'granted') {
+          // Already allowed always -> proceed directly
+          requestGpsCoordinates();
+          return;
+        } else if (permissionStatus.state === 'denied') {
+          // Permission blocked -> show guidance modal
+          setIsPermissionDenied(true);
+          setIsPermissionModalOpen(true);
+          return;
+        } else {
+          // Permission is 'prompt' (not allowed always) -> explicitly prompt user
+          setIsPermissionDenied(false);
+          setIsPermissionModalOpen(true);
+          return;
+        }
+      } catch {
+        // Fallback to opening permission modal
+        setIsPermissionDenied(false);
+        setIsPermissionModalOpen(true);
+        return;
+      }
+    }
+
+    // Default to prompt modal if permissions query not supported
+    setIsPermissionDenied(false);
+    setIsPermissionModalOpen(true);
   };
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1877,6 +1925,23 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
           )}
         </form>
       </section>
+
+      {/* GPS Location Permission Guidance Modal */}
+      <LocationPermissionModal
+        isOpen={isPermissionModalOpen}
+        isDenied={isPermissionDenied}
+        onClose={() => setIsPermissionModalOpen(false)}
+        onConfirmGrant={requestGpsCoordinates}
+        onManualEntry={() => {
+          setIsPermissionModalOpen(false);
+          // Focus or scroll to administrative location inputs
+          const stateEl = document.getElementById('stateInput');
+          if (stateEl) {
+            stateEl.focus();
+            stateEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }}
+      />
     </div>
   );
 };

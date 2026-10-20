@@ -35,6 +35,7 @@ import {
   UserLoginInput,
   UpdateProfileInput 
 } from '../types/auth';
+import { enqueueSyncItem } from './backgroundSyncService';
 
 /**
  * Translates Firebase internal authentication error codes into clear,
@@ -80,22 +81,49 @@ export function translateAuthError(error: any): string {
   }
 }
 
+const USER_PROFILE_CACHE_PREFIX = 'soilwise_cached_user_profile_';
+
+export function getCachedUserProfile(uid: string): SoilWiseUserProfile | null {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(`${USER_PROFILE_CACHE_PREFIX}${uid}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setCachedUserProfile(uid: string, profile: SoilWiseUserProfile): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(`${USER_PROFILE_CACHE_PREFIX}${uid}`, JSON.stringify(profile));
+  } catch (e) {
+    console.warn('Could not cache user profile locally:', e);
+  }
+}
+
 /**
- * Retrieves the user profile document from Firestore (`users/{uid}`)
+ * Retrieves the user profile document from Firestore (`users/{uid}`) with offline cache fallback
  */
 export async function getUserProfile(uid: string): Promise<SoilWiseUserProfile | null> {
-  if (!db || !isFirebaseConfigured) return null;
+  const cached = getCachedUserProfile(uid);
+
+  if (!db || !isFirebaseConfigured) {
+    return cached;
+  }
 
   try {
     const userDocRef = doc(db, 'users', uid);
     const snap = await getDoc(userDocRef);
     if (snap.exists()) {
-      return snap.data() as SoilWiseUserProfile;
+      const data = snap.data() as SoilWiseUserProfile;
+      setCachedUserProfile(uid, data);
+      return data;
     }
-    return null;
+    return cached;
   } catch (error) {
-    console.warn('Could not retrieve user profile from Firestore:', error);
-    return null;
+    console.warn('Could not retrieve user profile from Firestore, using cache:', error);
+    return cached;
   }
 }
 
@@ -292,6 +320,7 @@ export async function logoutUser(): Promise<void> {
 /**
  * Updates a user's display name and agricultural personalization preferences (Stage 3).
  * Enforces role isolation: regular users cannot elevate roles or modify security fields.
+ * Includes local storage caching and background sync queueing for offline reliability.
  */
 export async function updateUserProfileData(
   uid: string,
@@ -300,29 +329,73 @@ export async function updateUserProfileData(
   if (!uid) {
     throw new Error('User identifier is required.');
   }
-  if (!db || !isFirebaseConfigured) {
-    throw new Error('Database service is temporarily unavailable.');
-  }
-
-  const existingProfile = await getUserProfile(uid);
-  if (!existingProfile) {
-    throw new Error('User profile record not found.');
-  }
 
   const nowIso = new Date().toISOString();
 
-  // If displayName was updated, also update Firebase Auth user displayName if available
-  if (input.displayName && auth?.currentUser && auth.currentUser.uid === uid) {
+  // Try to retrieve profile from Firestore or local cache
+  let existingProfile = await getUserProfile(uid);
+  if (!existingProfile) {
+    // Graceful baseline creation if user document didn't exist yet
+    const currentFbUser = auth?.currentUser;
+    existingProfile = {
+      uid,
+      email: currentFbUser?.email || '',
+      displayName: currentFbUser?.displayName || null,
+      phoneNumber: currentFbUser?.phoneNumber || null,
+      photoURL: currentFbUser?.photoURL || null,
+      role: currentFbUser && isAdmin(currentFbUser) ? 'admin' : 'user',
+      authProviders: currentFbUser?.providerData.map(p => p.providerId) || ['password'],
+      accountStatus: 'active',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+  }
+
+  // If displayName or photoURL was updated, also update Firebase Auth user if available
+  if (auth?.currentUser && auth.currentUser.uid === uid) {
     try {
-      await updateProfile(auth.currentUser, { displayName: input.displayName.trim() });
+      const authUpdates: { displayName?: string; photoURL?: string } = {};
+      if (input.displayName !== undefined) authUpdates.displayName = input.displayName.trim();
+      if (input.photoURL !== undefined && input.photoURL !== null) authUpdates.photoURL = input.photoURL;
+      if (Object.keys(authUpdates).length > 0) {
+        await updateProfile(auth.currentUser, authUpdates);
+      }
     } catch (err) {
-      console.warn('Could not update Firebase Auth user displayName:', err);
+      console.warn('Could not update Firebase Auth user profile:', err);
     }
   }
 
   const nextDisplayName = input.displayName !== undefined
     ? (input.displayName.trim() || null)
     : existingProfile.displayName;
+
+  const nextPhoneNumber = input.phoneNumber !== undefined
+    ? (input.phoneNumber.trim() || null)
+    : (existingProfile.phoneNumber || null);
+
+  const nextPhotoURL = input.photoURL !== undefined
+    ? input.photoURL
+    : (existingProfile.photoURL || null);
+
+  const nextState = input.state !== undefined
+    ? (input.state.trim() || null)
+    : (existingProfile.state || null);
+
+  const nextLga = input.lga !== undefined
+    ? (input.lga.trim() || null)
+    : (existingProfile.lga || null);
+
+  const nextBio = input.bio !== undefined
+    ? (input.bio.trim() || null)
+    : (existingProfile.bio || existingProfile.profile?.bio || null);
+
+  const nextFarmSize = input.farmSizeHectares !== undefined
+    ? input.farmSizeHectares
+    : (existingProfile.farmSizeHectares ?? existingProfile.profile?.farmSizeHectares);
+
+  const nextPrimaryCrop = input.primaryCrop !== undefined
+    ? (input.primaryCrop.trim() || null)
+    : (existingProfile.primaryCrop ?? existingProfile.profile?.primaryCrop ?? null);
 
   // Build merged preferences cleanly
   const existingProfilePrefs = existingProfile.profile || {};
@@ -333,6 +406,12 @@ export async function updateUserProfileData(
     ...(input.primaryFarmingInterest !== undefined ? { primaryFarmingInterest: input.primaryFarmingInterest } : {}),
     ...(input.farmingInterests !== undefined ? { farmingInterests: input.farmingInterests } : {}),
     ...(input.preferredCrops !== undefined ? { preferredCrops: input.preferredCrops } : {}),
+    ...(input.phoneNumber !== undefined ? { phoneNumber: input.phoneNumber } : {}),
+    ...(input.state !== undefined ? { state: input.state } : {}),
+    ...(input.lga !== undefined ? { lga: input.lga } : {}),
+    ...(input.bio !== undefined ? { bio: input.bio } : {}),
+    ...(nextFarmSize !== undefined ? { farmSizeHectares: nextFarmSize } : {}),
+    ...(nextPrimaryCrop ? { primaryCrop: nextPrimaryCrop } : {}),
   };
 
   const nextActiveFarmId = input.activeFarmId !== undefined
@@ -342,19 +421,69 @@ export async function updateUserProfileData(
   const updatedProfile: SoilWiseUserProfile = {
     ...existingProfile,
     displayName: nextDisplayName,
+    phoneNumber: nextPhoneNumber,
+    photoURL: nextPhotoURL,
+    state: nextState || undefined,
+    lga: nextLga || undefined,
+    bio: nextBio || undefined,
+    farmSizeHectares: nextFarmSize,
+    primaryCrop: nextPrimaryCrop || undefined,
+    preferredLanguage: nextProfilePrefs.preferredLanguage,
+    farmingExperience: nextProfilePrefs.farmingExperience,
+    primaryFarmingInterest: nextProfilePrefs.primaryFarmingInterest,
+    farmingInterests: nextProfilePrefs.farmingInterests,
+    preferredCrops: nextProfilePrefs.preferredCrops,
     profile: nextProfilePrefs,
     activeFarmId: nextActiveFarmId ?? null,
     updatedAt: nowIso,
   };
 
-  // Update in Firestore
-  const userDocRef = doc(db, 'users', uid);
-  await setDoc(userDocRef, {
+  // 1. Immediately cache updated profile in localStorage
+  setCachedUserProfile(uid, updatedProfile);
+
+  // 2. Prepare Firestore document payload with complete required attributes
+  const firestorePayload: Record<string, any> = {
+    uid,
+    email: existingProfile.email || auth?.currentUser?.email || '',
+    role: existingProfile.role || 'user',
+    accountStatus: existingProfile.accountStatus || 'active',
     displayName: nextDisplayName,
+    phoneNumber: nextPhoneNumber,
+    photoURL: nextPhotoURL,
+    state: nextState,
+    lga: nextLga,
+    bio: nextBio,
+    farmSizeHectares: nextFarmSize ?? null,
+    primaryCrop: nextPrimaryCrop,
+    preferredLanguage: nextProfilePrefs.preferredLanguage || 'en',
+    farmingExperience: nextProfilePrefs.farmingExperience || null,
+    primaryFarmingInterest: nextProfilePrefs.primaryFarmingInterest || null,
+    farmingInterests: nextProfilePrefs.farmingInterests || [],
+    preferredCrops: nextProfilePrefs.preferredCrops || [],
     profile: nextProfilePrefs,
     activeFarmId: nextActiveFarmId ?? null,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+    updatedAt: nowIso,
+  };
+
+  // 3. Persist to Firestore if online, or queue to backgroundSyncService
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+  if (isOnline && db && isFirebaseConfigured) {
+    try {
+      const userDocRef = doc(db, 'users', uid);
+      await setDoc(userDocRef, {
+        ...firestorePayload,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Network error writing profile to Firestore. Queuing offline sync item:', err);
+      enqueueSyncItem('user_profile', firestorePayload, uid);
+    }
+  } else {
+    // Offline mode: queue for synchronization
+    console.log('[BackgroundSync] App is offline. Queued profile update for sync when connection is restored.');
+    enqueueSyncItem('user_profile', firestorePayload, uid);
+  }
 
   return updatedProfile;
 }

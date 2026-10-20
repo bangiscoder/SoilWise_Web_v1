@@ -4,6 +4,7 @@ import { Lesson, UserLearningProgress, LessonTopic } from '../types/learning';
 import { INITIAL_LESSONS, TOPIC_CATEGORIES } from '../data/learningCurriculum';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { extractYouTubeVideoId } from '../utils/youtubeUtils';
+import { enqueueSyncItem } from './backgroundSyncService';
 
 const LOCAL_STORAGE_KEY = 'soilwise_learning_progress_v1';
 
@@ -107,12 +108,20 @@ export async function fetchUserLearningProgress(userId?: string): Promise<UserLe
 export async function persistLearningProgress(progress: UserLearningProgress, userId?: string): Promise<void> {
   saveLocalLearningProgress(progress);
 
-  if (userId && db && isFirebaseConfigured) {
-    try {
-      const docRef = doc(db, 'users', userId, 'learning', 'progress');
-      await setDoc(docRef, progress, { merge: true });
-    } catch (err) {
-      console.warn('Failed to sync progress to Firestore:', err);
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+  if (userId) {
+    if (isOnline && db && isFirebaseConfigured) {
+      try {
+        const docRef = doc(db, 'users', userId, 'learning', 'progress');
+        await setDoc(docRef, progress, { merge: true });
+      } catch (err) {
+        console.warn('Failed to sync progress to Firestore, queueing for background sync:', err);
+        enqueueSyncItem('learning_progress', progress, userId);
+      }
+    } else {
+      console.log('[LearningHub] Offline progress recorded. Queuing for background sync.');
+      enqueueSyncItem('learning_progress', progress, userId);
     }
   }
 }

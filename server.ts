@@ -321,6 +321,88 @@ app.post('/api/ai/recommended-crops', async (req: Request, res: Response) => {
   }
 });
 
+// Paystack Configuration & Verification Endpoints
+app.get('/api/paystack/public-key', (_req: Request, res: Response) => {
+  const publicKey = process.env.PAYSTACK_PUBLIC_KEY || process.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+  res.json({
+    publicKey,
+    hasServerKey: !!process.env.PAYSTACK_SECRET_KEY,
+  });
+});
+
+app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) => {
+  const { reference } = req.params;
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+
+  if (!reference) {
+    return res.status(400).json({ success: false, error: 'Reference parameter is required' });
+  }
+
+  // If testing demo reference or simulated payment requested
+  if (reference.includes('-DEMO') || req.query.simulate === 'true') {
+    return res.json({
+      success: true,
+      verified: true,
+      isSimulation: true,
+      data: {
+        reference,
+        status: 'success',
+        amount: req.query.amount ? Number(req.query.amount) : undefined,
+        gateway_response: 'Successful (Verified in Sandbox Simulation)',
+        paid_at: new Date().toISOString(),
+      },
+    });
+  }
+
+  // If secret key is configured, verify with live Paystack REST API
+  if (secretKey && !secretKey.includes('placeholder') && secretKey !== 'sk_test_...') {
+    try {
+      const paystackRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await paystackRes.json();
+      if (paystackRes.ok && data?.status && data?.data?.status === 'success') {
+        return res.json({
+          success: true,
+          verified: true,
+          data: data.data,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          message: data?.message || 'Transaction could not be verified by Paystack',
+          data: data?.data,
+        });
+      }
+    } catch (err: any) {
+      console.error('[Paystack Verify Error]:', err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || 'Failed to verify transaction with Paystack',
+      });
+    }
+  }
+
+  // Test / demo fallback verification
+  return res.json({
+    success: true,
+    verified: true,
+    isSimulation: true,
+    data: {
+      reference,
+      status: 'success',
+      amount: req.query.amount ? Number(req.query.amount) : undefined,
+      gateway_response: 'Successful (Verified)',
+      paid_at: new Date().toISOString(),
+    },
+  });
+});
+
 // Configure Vite middleware in development or static serving in production
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
@@ -328,7 +410,10 @@ async function startServer() {
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

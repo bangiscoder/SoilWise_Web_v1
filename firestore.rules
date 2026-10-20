@@ -55,17 +55,21 @@ service cloud.firestore {
       // User can read their own profile; Admin can read all
       allow read: if isOwner(uid) || isAdmin();
 
-      // User can create their own profile on registration
-      // Role must be 'user' (cannot grant oneself admin)
-      allow create: if isOwner(uid) &&
+      // User can create their own profile on registration or initial sync
+      // Role defaults to 'user' for public users, or admin for designated admin email
+      allow create: if (isOwner(uid) &&
                        request.resource.data.uid == uid &&
-                       request.resource.data.role == 'user' &&
-                       (!('admin' in request.resource.data) || request.resource.data.admin == false);
+                       ((!('role' in request.resource.data)) || request.resource.data.role == 'user' || isAdmin()) &&
+                       ((!('admin' in request.resource.data)) || request.resource.data.admin == false || isAdmin())
+                      ) || isAdmin();
 
-      // User can update basic profile fields and preferences (displayName, photoURL, authProviders, updatedAt, profile, activeFarmId)
-      // Cannot elevate privileges (role, accountStatus, admin, subscription)
+      // User can update their own profile fields and preferences (displayName, photoURL, phoneNumber, state, lga, bio, farm details, profile, activeFarmId, etc.)
+      // Cannot elevate privileges (role, accountStatus, admin) or reassign uid
       allow update: if (isOwner(uid) &&
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'authProviders', 'updatedAt', 'profile', 'activeFarmId'])
+                        (!('uid' in request.resource.data) || request.resource.data.uid == uid) &&
+                        (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isAdmin()) &&
+                        (!('admin' in request.resource.data) || request.resource.data.admin == resource.data.admin || isAdmin()) &&
+                        (!('accountStatus' in request.resource.data) || request.resource.data.accountStatus == resource.data.accountStatus || isAdmin())
                        ) || isAdmin();
 
       // Only admin can delete user profiles

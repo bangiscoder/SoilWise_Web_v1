@@ -144,15 +144,67 @@
           "type": "string",
           "description": "Account status: active, suspended."
         },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User mobile phone number for notifications and verification."
+        },
+        "state": {
+          "type": "string",
+          "description": "Primary agricultural state (e.g. Kaduna, Kano, Niger)."
+        },
+        "lga": {
+          "type": "string",
+          "description": "Local Government Area (LGA) or town."
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short bio, agricultural background, or farm description."
+        },
+        "farmSizeHectares": {
+          "type": "number",
+          "description": "Total farm holding size in hectares."
+        },
+        "primaryCrop": {
+          "type": "string",
+          "description": "Primary commercial or subsistence crop cultivated."
+        },
+        "preferredLanguage": {
+          "type": "string",
+          "description": "Preferred interface and advisory language (en, ha, yo, ig)."
+        },
+        "farmingExperience": {
+          "type": "string",
+          "description": "Experience level (new, some_experience, experienced, commercial)."
+        },
+        "primaryFarmingInterest": {
+          "type": "string",
+          "description": "Primary agronomic focus area."
+        },
+        "farmingInterests": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Broad agricultural interest areas."
+        },
+        "preferredCrops": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Cultivar and crop preferences for personalized notifications."
+        },
         "profile": {
           "type": "object",
-          "description": "User preferences: preferredLanguage, farmingExperience, primaryFarmingInterest, farmingInterests, preferredCrops.",
+          "description": "Nested user preferences: preferredLanguage, farmingExperience, primaryFarmingInterest, farmingInterests, preferredCrops, phoneNumber, state, lga, bio, farmSizeHectares, primaryCrop.",
           "properties": {
             "preferredLanguage": { "type": "string" },
             "farmingExperience": { "type": "string" },
             "primaryFarmingInterest": { "type": "string" },
             "farmingInterests": { "type": "array", "items": { "type": "string" } },
-            "preferredCrops": { "type": "array", "items": { "type": "string" } }
+            "preferredCrops": { "type": "array", "items": { "type": "string" } },
+            "phoneNumber": { "type": "string" },
+            "state": { "type": "string" },
+            "lga": { "type": "string" },
+            "bio": { "type": "string" },
+            "farmSizeHectares": { "type": "number" },
+            "primaryCrop": { "type": "string" }
           }
         },
         "activeFarmId": {

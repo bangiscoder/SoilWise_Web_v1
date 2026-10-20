@@ -3,12 +3,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Suppress Vite dev-server WebSocket errors in cloud preview iframe (as instructed in environment constraints)
+      (function() {
+        var originalConsoleError = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var str = args.map(function(a) {
+            return (a && (a.message || a.stack)) || String(a || '');
+          }).join(' ');
+          if (str.indexOf('WebSocket') !== -1 || str.indexOf('closed without opened') !== -1) {
+            return;
+          }
+          originalConsoleError.apply(console, args);
+        };
+
+        window.addEventListener('error', function(e) {
+          var msg = (e && (e.message || (e.error && (e.error.message || e.error.stack)))) || '';
+          if (typeof msg === 'string' && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('closed without opened') !== -1)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = (e && e.reason && (e.reason.message || e.reason.stack || e.reason)) || '';
+          if (typeof reason === 'string' && (reason.indexOf('WebSocket') !== -1 || reason.indexOf('closed without opened') !== -1)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        });
+      })();
+    </script>
     <title>SoilWise AI Web — Agricultural Intelligence & Farm Analysis</title>
     <meta name="description" content="Decision-support agricultural intelligence platform combining farmer soil-test data, location, ISRIC SoilGrids, and Open-Meteo climate information for comprehensive farm analysis." />
     <meta property="og:title" content="SoilWise AI Web — Agricultural Intelligence & Farm Analysis" />
     <meta property="og:description" content="Decision-support agricultural intelligence platform combining farmer soil-test data, location, ISRIC SoilGrids, and Open-Meteo climate information for comprehensive farm analysis." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#1b4332" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SoilWise" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />

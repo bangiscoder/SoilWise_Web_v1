@@ -74,6 +74,12 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const { currentUser, userProfile, updateUserProfile } = useAuth();
 
   const [displayName, setDisplayName] = useState<string>('');
+  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [state, setState] = useState<string>('Kaduna');
+  const [lga, setLga] = useState<string>('');
+  const [bio, setBio] = useState<string>('');
+  const [farmSizeHectares, setFarmSizeHectares] = useState<string>('');
+  const [primaryCrop, setPrimaryCrop] = useState<string>('');
   const [preferredLanguage, setPreferredLanguage] = useState<string>('en');
   const [farmingExperience, setFarmingExperience] = useState<string>('');
   const [primaryInterest, setPrimaryInterest] = useState<string>('');
@@ -87,6 +93,17 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   useEffect(() => {
     if (userProfile) {
       setDisplayName(userProfile.displayName || currentUser?.displayName || '');
+      setPhoneNumber(userProfile.phoneNumber || userProfile.profile?.phoneNumber || '');
+      setState(userProfile.state || userProfile.profile?.state || 'Kaduna');
+      setLga(userProfile.lga || userProfile.profile?.lga || '');
+      setBio(userProfile.bio || userProfile.profile?.bio || '');
+      setFarmSizeHectares(
+        userProfile.farmSizeHectares !== undefined && userProfile.farmSizeHectares !== null
+          ? String(userProfile.farmSizeHectares)
+          : (userProfile.profile?.farmSizeHectares ? String(userProfile.profile.farmSizeHectares) : '')
+      );
+      setPrimaryCrop(userProfile.primaryCrop || userProfile.profile?.primaryCrop || '');
+
       const prefs = userProfile.profile;
       if (prefs) {
         setPreferredLanguage(prefs.preferredLanguage || 'en');
@@ -117,8 +134,16 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     setIsSaving(true);
     setFeedbackMessage(null);
 
+    const parsedHectares = farmSizeHectares.trim() ? parseFloat(farmSizeHectares.trim()) : undefined;
+
     const input: UpdateProfileInput = {
       displayName: displayName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      state: state.trim(),
+      lga: lga.trim(),
+      bio: bio.trim(),
+      farmSizeHectares: !isNaN(parsedHectares as number) ? parsedHectares : undefined,
+      primaryCrop: primaryCrop.trim(),
       preferredLanguage,
       farmingExperience,
       primaryFarmingInterest: primaryInterest || (selectedInterests.length > 0 ? selectedInterests[0] : ''),
@@ -128,9 +153,12 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 
     try {
       await updateUserProfile(input);
+      const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
       setFeedbackMessage({
         type: 'success',
-        text: 'Your profile and agricultural preferences have been successfully updated.',
+        text: isOnline
+          ? 'Your profile and agricultural preferences have been successfully updated in the database.'
+          : 'Profile saved locally! Background sync will update your cloud database once connectivity is restored.',
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
     } catch (err: any) {
@@ -295,6 +323,92 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 value={email}
                 disabled
                 className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-stone-500 text-xs sm:text-sm cursor-not-allowed select-all font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                Mobile Phone Number
+              </label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="e.g. 0803 123 4567"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/20 text-xs sm:text-sm outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                Primary Agricultural State
+              </label>
+              <select
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/20 text-xs sm:text-sm outline-none transition-all bg-white"
+              >
+                {[
+                  'Kaduna', 'Kano', 'Katsina', 'Niger', 'Kebbi', 'Sokoto', 'Zamfara', 
+                  'Jigawa', 'Borno', 'Yobe', 'Gombe', 'Bauchi', 'Adamawa', 'Taraba', 
+                  'Plateau', 'Benue', 'Nasarawa', 'Kogi', 'Kwara', 'Oyo', 'Ogun', 'Ondo', 'Osun', 'Ekiti', 'Edo', 'Abia', 'Enugu', 'Anambra', 'Ebonyi', 'Imo', 'Delta', 'Rivers', 'Cross River', 'Akwa Ibom', 'Bayelsa', 'FCT Abuja'
+                ].map(st => (
+                  <option key={st} value={st}>{st} State</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                Local Government Area (LGA) or Town
+              </label>
+              <input
+                type="text"
+                value={lga}
+                onChange={(e) => setLga(e.target.value)}
+                placeholder="e.g. Zaria, Giwa, Bichi, Makarfi"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/20 text-xs sm:text-sm outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                Estimated Farm Land Size (Hectares)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={farmSizeHectares}
+                onChange={(e) => setFarmSizeHectares(e.target.value)}
+                placeholder="e.g. 2.5"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/20 text-xs sm:text-sm outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                Primary Cultivated Crop
+              </label>
+              <input
+                type="text"
+                value={primaryCrop}
+                onChange={(e) => setPrimaryCrop(e.target.value)}
+                placeholder="e.g. Maize (SAMMAZ), Soybean, Sorghum"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/20 text-xs sm:text-sm outline-none transition-all"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                Agricultural Bio / Farm Description <span className="text-stone-400 font-normal">(Optional)</span>
+              </label>
+              <textarea
+                rows={3}
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Briefly describe your farming operations, soil management practices, or cooperative affiliation..."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:border-[#1b4332] focus:ring-2 focus:ring-[#1b4332]/20 text-xs sm:text-sm outline-none transition-all resize-none"
               />
             </div>
           </div>
