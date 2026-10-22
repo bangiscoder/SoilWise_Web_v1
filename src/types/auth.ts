@@ -50,6 +50,10 @@ export interface SoilWiseUserProfile {
   earlyBirdSpotSecured?: boolean;
   earlyBirdNumber?: number;
   totalCommitmentPaidNgn?: number;
+  hasFirstOrderDiscount35?: boolean;
+  refundableDepositNgn?: number;
+  hasCompletedCommitmentModal?: boolean;
+  feedbackSurveyCompleted?: boolean;
   lastDemand?: {
     orderId?: string;
     orderNumber?: string;
@@ -90,6 +94,10 @@ export interface UpdateProfileInput {
   earlyBirdSpotSecured?: boolean;
   earlyBirdNumber?: number;
   totalCommitmentPaidNgn?: number;
+  hasFirstOrderDiscount35?: boolean;
+  refundableDepositNgn?: number;
+  hasCompletedCommitmentModal?: boolean;
+  feedbackSurveyCompleted?: boolean;
   lastDemand?: SoilWiseUserProfile['lastDemand'];
 }
 

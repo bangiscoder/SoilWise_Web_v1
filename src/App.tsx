@@ -23,6 +23,9 @@ import { LearningHubView } from './components/learning/LearningHubView';
 import { MarketplaceView } from './components/marketplace/MarketplaceView';
 import { PaymentSuccessView } from './components/marketplace/PaymentSuccessView';
 import { VipCommitmentModal } from './components/marketplace/VipCommitmentModal';
+import { CommitmentRequestModal } from './components/auth/CommitmentRequestModal';
+import { SurveyPromptBanner } from './components/feedback/SurveyPromptBanner';
+import { SurveyModal } from './components/feedback/SurveyModal';
 import { OfflineBanner } from './components/pwa/OfflineBanner';
 import { FarmProfileDocument } from './types/farm';
 import { SeedOrder } from './types/marketplace';
@@ -50,7 +53,7 @@ export type AppView =
   | 'admin-soil-data-test';
 
 export default function App() {
-  const { currentUser, isAdmin: isAdminUser, isLoading: isAuthLoading } = useAuth();
+  const { currentUser, userProfile, isAdmin: isAdminUser, isLoading: isAuthLoading } = useAuth();
 
   // Start directly with Farm Analysis as the primary experience
   const [currentView, setCurrentView] = useState<AppView>('farm-data');
@@ -70,6 +73,44 @@ export default function App() {
   const [paymentSuccessRef, setPaymentSuccessRef] = useState<string | null>(null);
   const [isVipCommitmentModalOpen, setIsVipCommitmentModalOpen] = useState<boolean>(false);
   const [vipModalSource, setVipModalSource] = useState<'farm_analysis' | 'signup' | 'manual'>('farm_analysis');
+  const [isCommitmentRequestOpen, setIsCommitmentRequestOpen] = useState<boolean>(false);
+  const [isSurveyModalOpen, setIsSurveyModalOpen] = useState<boolean>(false);
+
+  // Proactively prompt users who haven't made a commitment yet with the Commitment Request Modal
+  useEffect(() => {
+    if (isAuthLoading) return;
+
+    // Check if user is already VIP, already completed the modal, or recorded in localStorage
+    const isVip = Boolean(userProfile?.isVipFarmer || userProfile?.earlyBirdSpotSecured);
+    const hasCompleted = Boolean(userProfile?.hasCompletedCommitmentModal);
+    let localCompleted = false;
+    let snoozedRecently = false;
+    try {
+      localCompleted = localStorage.getItem('soilwise_vip_commitment_completed') === 'true';
+      const snoozedAtStr = sessionStorage.getItem('soilwise_commitment_modal_snoozed_at');
+      if (snoozedAtStr) {
+        const snoozedAt = parseInt(snoozedAtStr, 10);
+        // Snooze duration: 10 minutes
+        if (!isNaN(snoozedAt) && Date.now() - snoozedAt < 10 * 60 * 1000) {
+          snoozedRecently = true;
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    // Never pop up if the user has already made their commitment, or dismissed recently
+    if (isVip || hasCompleted || localCompleted || snoozedRecently) {
+      return;
+    }
+
+    // Trigger after a friendly 4.5 seconds for users who did not make a commitment
+    const timer = setTimeout(() => {
+      setIsCommitmentRequestOpen(true);
+    }, 4500);
+
+    return () => clearTimeout(timer);
+  }, [currentUser, userProfile, isAuthLoading]);
 
   // Monitor URL routes on mount and popstate
   useEffect(() => {
@@ -331,6 +372,7 @@ export default function App() {
           currentView={currentView}
           onNavigate={(view) => navigateToView(view as AppView)}
           onOpenDocs={handleOpenDocs}
+          onOpenCommitmentModal={() => setIsCommitmentRequestOpen(true)}
           isAdmin={isAdminUser}
         />
       )}
@@ -455,9 +497,13 @@ export default function App() {
         {currentView === 'register' && (
           <RegisterPage
             onSuccess={() => {
-              setVipModalSource('signup');
-              setIsVipCommitmentModalOpen(true);
               navigateToView('account');
+              setTimeout(() => {
+                const isVip = localStorage.getItem('soilwise_vip_commitment_completed') === 'true';
+                if (!isVip) {
+                  setIsCommitmentRequestOpen(true);
+                }
+              }, 1200);
             }}
             onNavigateToLogin={() => navigateToView('login')}
             onBackToApp={navigateToHome}
@@ -658,6 +704,28 @@ export default function App() {
           setMarketplaceCropFilter(null);
           navigateToView('marketplace');
         }}
+      />
+
+      {/* Interactive Commitment Request Modal (Advocacy -> ₦1,000+ Refundable Commitment -> VIP Gold Upgrade) */}
+      <CommitmentRequestModal
+        isOpen={isCommitmentRequestOpen}
+        onClose={() => setIsCommitmentRequestOpen(false)}
+        onOpenSurvey={() => {
+          setIsCommitmentRequestOpen(false);
+          setIsSurveyModalOpen(true);
+        }}
+        onSuccessUpgrade={() => {
+          setIsCommitmentRequestOpen(false);
+        }}
+      />
+
+      {/* Frequently prompted survey banner for users who haven't completed the feedback survey */}
+      <SurveyPromptBanner onOpenSurvey={() => setIsSurveyModalOpen(true)} />
+
+      {/* Accessible Survey Modal displaying FarmerFeedbackSection anywhere in app */}
+      <SurveyModal
+        isOpen={isSurveyModalOpen}
+        onClose={() => setIsSurveyModalOpen(false)}
       />
     </div>
   );

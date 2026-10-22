@@ -1,8 +1,9 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import type { FirebaseApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import type { Auth } from 'firebase/auth';
 import { 
   getFirestore, 
-  Firestore, 
   collection, 
   addDoc, 
   serverTimestamp, 
@@ -13,6 +14,7 @@ import {
   onSnapshot,
   Timestamp
 } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
 
 // Authorized administrator email
 export const AUTHORIZED_ADMIN_EMAIL = 'bangiscoder@gmail.com';

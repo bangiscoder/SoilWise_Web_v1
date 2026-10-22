@@ -20,6 +20,8 @@ export interface PaystackOptions {
   amount: number; // in kobo (NGN * 100)
   currency?: string; // 'NGN'
   ref: string;
+  firstname?: string;
+  lastname?: string;
   metadata?: {
     custom_fields?: Array<{
       display_name: string;
@@ -254,6 +256,8 @@ export async function initiatePaystackCheckout(params: {
   quantityKg: number;
   farmerPhone: string;
   deliveryAddress: string;
+  farmerName?: string;
+  customFields?: Array<{ display_name: string; variable_name: string; value: string }>;
   onSuccess: (response: PaystackSuccessResponse) => void;
   onCancel: () => void;
   overridePublicKey?: string;
@@ -268,35 +272,61 @@ export async function initiatePaystackCheckout(params: {
   }
 
   try {
+    const trimmedName = (params.farmerName || '').trim();
+    const nameParts = trimmedName ? trimmedName.split(/\s+/) : [];
+    const firstname = nameParts[0] || undefined;
+    const lastname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+
+    const baseFields = [
+      {
+        display_name: 'Farmer Name',
+        variable_name: 'farmer_name',
+        value: trimmedName || 'SoilWise Farmer',
+      },
+      {
+        display_name: 'Farmer Email',
+        variable_name: 'farmer_email',
+        value: params.email,
+      },
+      {
+        display_name: 'Crop Seed Variety',
+        variable_name: 'seed_variety',
+        value: params.seedVariety,
+      },
+      {
+        display_name: 'Quantity (kg)',
+        variable_name: 'quantity_kg',
+        value: `${params.quantityKg} kg`,
+      },
+      {
+        display_name: 'Farmer Phone',
+        variable_name: 'farmer_phone',
+        value: params.farmerPhone,
+      },
+      {
+        display_name: 'Delivery Address',
+        variable_name: 'delivery_address',
+        value: params.deliveryAddress,
+      },
+    ];
+
+    const mergedFields = params.customFields 
+      ? [...baseFields, ...params.customFields] 
+      : baseFields;
+
     const handler = window.PaystackPop.setup({
       key: publicKey,
       email: params.email,
       amount: Math.round(params.amountNgn * 100), // in kobo
       currency: 'NGN',
       ref: params.reference,
+      firstname,
+      lastname,
       metadata: {
-        custom_fields: [
-          {
-            display_name: 'Crop Seed Variety',
-            variable_name: 'seed_variety',
-            value: params.seedVariety,
-          },
-          {
-            display_name: 'Quantity (kg)',
-            variable_name: 'quantity_kg',
-            value: `${params.quantityKg} kg`,
-          },
-          {
-            display_name: 'Farmer Phone',
-            variable_name: 'farmer_phone',
-            value: params.farmerPhone,
-          },
-          {
-            display_name: 'Delivery Address',
-            variable_name: 'delivery_address',
-            value: params.deliveryAddress,
-          },
-        ],
+        farmer_name: trimmedName,
+        customer_name: trimmedName,
+        email: params.email,
+        custom_fields: mergedFields,
       },
       callback: (response) => {
         params.onSuccess(response);

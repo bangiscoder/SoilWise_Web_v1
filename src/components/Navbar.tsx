@@ -34,10 +34,11 @@ interface NavbarProps {
   currentView: string;
   onNavigate: (view: any) => void;
   onOpenDocs: () => void;
+  onOpenCommitmentModal?: () => void;
   isAdmin?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenDocs, isAdmin }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenDocs, onOpenCommitmentModal, isAdmin }) => {
   const { t } = useLanguage();
   const { currentUser, userProfile, logout } = useAuth();
   const { isOnline, pendingCount } = useBackgroundSync();
@@ -199,6 +200,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
               <GraduationCap className={`w-3.5 h-3.5 ${currentView === 'learning-hub' ? 'text-emerald-300' : 'text-emerald-700'}`} />
               <span>Learning Hub</span>
             </button>
+
+            {/* VIP Commitment Offer Button for Users Who Have Not Committed */}
+            {!userProfile?.isVipFarmer && onOpenCommitmentModal && (
+              <button
+                onClick={onOpenCommitmentModal}
+                title="Commit ₦1,000 to unlock VIP Gold, 35% discount on your first seed order, and 100% free delivery"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 bg-gradient-to-r from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 text-amber-900 text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer animate-pulse"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                <span>Claim VIP (₦1,000)</span>
+              </button>
+            )}
 
             {/* Language Switcher */}
             <LanguageSwitcher />
@@ -428,6 +441,28 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
                     </div>
                     <ChevronRight className="w-4 h-4 opacity-50 shrink-0" />
                   </button>
+
+                  {/* VIP Commitment Offer in Mobile Menu for Uncommitted Users */}
+                  {!userProfile?.isVipFarmer && onOpenCommitmentModal && (
+                    <button
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        onOpenCommitmentModal();
+                      }}
+                      className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-500/15 via-amber-400/20 to-amber-500/10 border border-amber-400/50 text-left cursor-pointer transition-all active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-stone-950 flex items-center justify-center shrink-0 shadow-xs">
+                          <Crown className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="block text-xs font-black text-amber-950">Claim VIP Status (₦1,000)</span>
+                          <span className="block text-[10px] text-amber-900/80 font-medium">35% off 1st order + 100% free delivery</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-amber-700 shrink-0" />
+                    </button>
+                  )}
                 </div>
 
                 {/* SECTION 2: FARM INTELLIGENCE */}

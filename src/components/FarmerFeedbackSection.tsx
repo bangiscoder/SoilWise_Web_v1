@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { FarmLocation } from '../types/soilwise';
 import { submitFarmerFeedback, isFirebaseConfigured } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
 
 interface FarmerFeedbackSectionProps {
   location?: FarmLocation;
@@ -139,6 +140,23 @@ export const FarmerFeedbackSection: React.FC<FarmerFeedbackSectionProps> = ({ lo
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [stepError, setStepError] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<{ id: string; joinedWaitlist: boolean } | null>(null);
+
+  const { currentUser, userProfile, updateUserProfile } = useAuth();
+
+  // Prefill details if user is signed in
+  React.useEffect(() => {
+    if (userProfile) {
+      if (userProfile.displayName && !name) setName(userProfile.displayName);
+      if (userProfile.email && !email) setEmail(userProfile.email);
+      if (userProfile.phoneNumber && !phone) setPhone(userProfile.phoneNumber);
+      if (userProfile.state && !farmLocationText) {
+        setFarmLocationText(`${userProfile.state}${userProfile.lga ? `, ${userProfile.lga}` : ''}`);
+      }
+    } else if (currentUser) {
+      if (currentUser.displayName && !name) setName(currentUser.displayName);
+      if (currentUser.email && !email) setEmail(currentUser.email);
+    }
+  }, [userProfile, currentUser]);
 
   const isFarmer = userType === 'Farmer';
 
@@ -341,6 +359,21 @@ export const FarmerFeedbackSection: React.FC<FarmerFeedbackSectionProps> = ({ lo
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit feedback.');
+      }
+
+      // Record feedback survey completion permanently
+      try {
+        localStorage.setItem('soilwise_feedback_submitted', 'true');
+        window.dispatchEvent(new CustomEvent('soilwise_feedback_submitted'));
+      } catch {
+        // Ignore storage errors
+      }
+
+      // Update user profile in Firestore if signed in
+      if (currentUser && updateUserProfile) {
+        updateUserProfile({ feedbackSurveyCompleted: true }).catch((err) => {
+          console.warn('Could not record survey completion in profile:', err);
+        });
       }
 
       setSubmittedData({

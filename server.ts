@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { validateNigerianLocation, loadBoundaryData } from './server/services/nigeriaBoundaryService.ts';
 import { fetchIsdaSoilData, tokenManager } from './src/services/isdaSoilService.ts';
@@ -508,24 +509,36 @@ app.post('/api/paystack/webhook', async (req: Request, res: Response) => {
 
 // Configure Vite middleware in development or static serving in production
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const distPath = path.resolve(process.cwd(), 'dist');
+  const hasDist = fs.existsSync(path.join(distPath, 'index.html'));
+  const isProd = process.env.NODE_ENV === 'production' || hasDist;
 
-  if (!isProd) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { 
-        middlewareMode: true,
-        hmr: false,
-      },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(process.cwd(), 'dist');
+  if (isProd && hasDist) {
+    console.log(`[Production Server] Serving pre-built static client assets from ${distPath}`);
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  } else {
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { 
+          middlewareMode: true,
+          hmr: false,
+        },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (viteErr: any) {
+      console.warn('[Vite Middleware Init Warning]:', viteErr?.message);
+      if (hasDist) {
+        app.use(express.static(distPath));
+        app.get('*', (_req, res) => {
+          res.sendFile(path.join(distPath, 'index.html'));
+        });
+      }
+    }
   }
 
   app.listen(port, '0.0.0.0', () => {

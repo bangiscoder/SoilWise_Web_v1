@@ -9,7 +9,8 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import type { FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   doc, 
@@ -20,9 +21,9 @@ import {
   where, 
   getDocs, 
   serverTimestamp, 
-  setDoc,
-  Firestore
+  setDoc
 } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
 
 export interface PaystackVerifyResponse {
   success: boolean;

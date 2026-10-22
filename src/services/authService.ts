@@ -18,7 +18,7 @@ import {
   sendPasswordResetEmail,
   signOut,
   updateProfile,
-  User,
+  type User,
 } from 'firebase/auth';
 
 import {
@@ -458,6 +458,10 @@ export async function updateUserProfileData(
     totalCommitmentPaidNgn: input.totalCommitmentPaidNgn !== undefined 
       ? input.totalCommitmentPaidNgn 
       : ((existingProfile.totalCommitmentPaidNgn || 0) + (input.lastDemand?.commitmentAmountNgn || 0) || existingProfile.totalCommitmentPaidNgn),
+    hasFirstOrderDiscount35: input.hasFirstOrderDiscount35 !== undefined ? input.hasFirstOrderDiscount35 : existingProfile.hasFirstOrderDiscount35,
+    refundableDepositNgn: input.refundableDepositNgn !== undefined ? input.refundableDepositNgn : existingProfile.refundableDepositNgn,
+    hasCompletedCommitmentModal: input.hasCompletedCommitmentModal !== undefined ? input.hasCompletedCommitmentModal : existingProfile.hasCompletedCommitmentModal,
+    feedbackSurveyCompleted: input.feedbackSurveyCompleted !== undefined ? input.feedbackSurveyCompleted : existingProfile.feedbackSurveyCompleted,
     lastDemand: input.lastDemand !== undefined ? input.lastDemand : existingProfile.lastDemand,
     profile: nextProfilePrefs,
     activeFarmId: nextActiveFarmId ?? null,
@@ -490,6 +494,12 @@ export async function updateUserProfileData(
     vipLevel: nextVipLevel ?? null,
     vipSecuredAt: nextVipSecuredAt ?? null,
     freeDeliveryEligible: nextFreeDelivery ?? null,
+    earlyBirdSpotSecured: updatedProfile.earlyBirdSpotSecured ?? null,
+    hasFirstOrderDiscount35: updatedProfile.hasFirstOrderDiscount35 ?? null,
+    refundableDepositNgn: updatedProfile.refundableDepositNgn ?? null,
+    hasCompletedCommitmentModal: updatedProfile.hasCompletedCommitmentModal ?? null,
+    feedbackSurveyCompleted: updatedProfile.feedbackSurveyCompleted ?? null,
+    lastDemand: updatedProfile.lastDemand ?? null,
     profile: nextProfilePrefs,
     activeFarmId: nextActiveFarmId ?? null,
     updatedAt: nowIso,

@@ -12,7 +12,7 @@
           var str = args.map(function(a) {
             return (a && (a.message || a.stack)) || String(a || '');
           }).join(' ');
-          if (str.indexOf('WebSocket') !== -1 || str.indexOf('closed without opened') !== -1) {
+          if (str.indexOf('WebSocket') !== -1 || str.indexOf('closed without opened') !== -1 || str.indexOf('[vite]') !== -1) {
             return;
           }
           originalConsoleError.apply(console, args);
@@ -20,7 +20,7 @@
 
         window.addEventListener('error', function(e) {
           var msg = (e && (e.message || (e.error && (e.error.message || e.error.stack)))) || '';
-          if (typeof msg === 'string' && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('closed without opened') !== -1)) {
+          if (typeof msg === 'string' && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('closed without opened') !== -1 || msg.indexOf('[vite]') !== -1)) {
             e.preventDefault();
             e.stopImmediatePropagation();
             return true;
@@ -34,6 +34,45 @@
             e.stopImmediatePropagation();
           }
         });
+
+        // Intercept Vite client WebSocket connection in cloud sandbox iframe where HMR is disabled
+        if (typeof window.WebSocket !== 'undefined') {
+          var RealWebSocket = window.WebSocket;
+          window.WebSocket = function(url, protocols) {
+            var urlStr = String(url || '');
+            // Detect Vite HMR WebSocket connection attempts
+            if (urlStr.indexOf('vite') !== -1 || urlStr.indexOf('ais-dev') !== -1 || urlStr.indexOf('run.app') !== -1 || protocols === 'vite-hmr') {
+              var fakeWs = {
+                url: urlStr,
+                readyState: 3, // CLOSED
+                bufferedAmount: 0,
+                extensions: '',
+                protocol: '',
+                binaryType: 'blob',
+                CONNECTING: 0,
+                OPEN: 1,
+                CLOSING: 2,
+                CLOSED: 3,
+                send: function() {},
+                close: function() {},
+                addEventListener: function() {},
+                removeEventListener: function() {},
+                dispatchEvent: function() { return false; },
+                onopen: null,
+                onclose: null,
+                onerror: null,
+                onmessage: null
+              };
+              return fakeWs;
+            }
+            return new RealWebSocket(url, protocols);
+          };
+          window.WebSocket.prototype = RealWebSocket.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
       })();
     </script>
     <title>SoilWise AI Web — Agricultural Intelligence & Farm Analysis</title>
