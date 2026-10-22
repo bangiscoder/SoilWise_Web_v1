@@ -81,6 +81,12 @@ export interface SeedOrder {
   paystackTransactionId?: string;
   paidAt?: string;
   amountPaidKobo?: number;
+  isCommitmentOrder?: boolean;
+  commitmentDepositNgn?: number;
+  balanceDueNgn?: number;
+  isVipDelivery?: boolean;
+  freeDeliveryApplied?: boolean;
+  vipTier?: string;
   userId?: string | null;
   createdAt: string;
   updatedAt: string;

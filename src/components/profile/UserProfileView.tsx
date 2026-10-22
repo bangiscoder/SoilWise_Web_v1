@@ -18,6 +18,8 @@ import {
   Info,
   Archive,
   MapPin,
+  Crown,
+  Truck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { calculateProfileCompletion } from '../../services/farmService';
@@ -227,15 +229,27 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
           )}
 
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-extrabold text-stone-900 tracking-tight">
                 {displayName || 'SoilWise Farmer'}
               </h1>
+              {userProfile?.isVipFarmer && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-yellow-400 text-stone-900 border border-amber-500 shadow-2xs">
+                  <Crown className="w-3 h-3 text-stone-950" />
+                  <span>VIP Gold Farmer</span>
+                </span>
+              )}
+              {userProfile?.freeDeliveryEligible && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <Truck className="w-3 h-3 text-emerald-700" />
+                  <span>Free Farm Delivery</span>
+                </span>
+              )}
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
                   role === 'admin'
                     ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                    : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    : 'bg-stone-100 text-stone-700 border border-stone-200'
                 }`}
               >
                 {role === 'admin' ? 'Administrator' : 'Farmer Account'}
@@ -267,6 +281,57 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Active Seed Demand & Early-Bird Pre-Order Record Card */}
+      {userProfile?.lastDemand && (
+        <div className="bg-gradient-to-br from-amber-50 to-emerald-50/50 rounded-3xl p-6 border-2 border-amber-300 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black shadow-xs">
+                <Crown className="w-5 h-5 text-stone-950" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full border border-amber-300">
+                  First 50 Early-Bird Pre-Order Record
+                </span>
+                <h3 className="text-base sm:text-lg font-black text-stone-900">
+                  {userProfile.lastDemand.quantityKg} kg of {userProfile.lastDemand.seedName}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <Truck className="w-3.5 h-3.5 text-emerald-700" />
+                <span>100% Free Farm Delivery</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-white/90 rounded-2xl border border-amber-200/80 text-xs">
+            <div>
+              <span className="text-stone-400 text-[10px] uppercase font-bold block">Variety Demanded</span>
+              <span className="font-bold text-stone-900">{userProfile.lastDemand.seedName}</span>
+            </div>
+            <div>
+              <span className="text-stone-400 text-[10px] uppercase font-bold block">Quantity Demanded</span>
+              <span className="font-bold text-stone-900">{userProfile.lastDemand.quantityKg} kg</span>
+            </div>
+            <div>
+              <span className="text-stone-400 text-[10px] uppercase font-bold block">Commitment Paid</span>
+              <span className="font-black text-emerald-700">₦{userProfile.lastDemand.commitmentAmountNgn?.toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-stone-400 text-[10px] uppercase font-bold block">Official Price List</span>
+              <span className="font-bold text-amber-800">Awaiting Release</span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-stone-600 leading-relaxed">
+            Your seed demand has been recorded on your SoilWise profile. Official price lists from certified breeders and NASC are currently being finalized. Any remaining balance will simply be settled at farm gate upon delivery.
+          </p>
+        </div>
+      )}
 
       {/* Feedback Alert */}
       {feedbackMessage && (

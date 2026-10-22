@@ -6,6 +6,11 @@ import { validateNigerianLocation, loadBoundaryData } from './server/services/ni
 import { fetchIsdaSoilData, tokenManager } from './src/services/isdaSoilService.ts';
 import { executeGeminiAgriculturalChat } from './server/services/geminiChatService.ts';
 import { generateGeminiCropRecommendations } from './server/services/geminiCropRecommendationService.ts';
+import { 
+  verifyAndConfirmPaystackOrder, 
+  verifyPaystackReference, 
+  verifyAndProcessPaystackWebhook 
+} from './server/services/paystackServerService.ts';
 
 const containerPort = process.env.PORT;
 dotenv.config({ override: true });
@@ -38,7 +43,11 @@ function resolvePort(): number {
 }
 const port = resolvePort();
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 
 // Health check endpoint
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -322,7 +331,9 @@ app.post('/api/ai/recommended-crops', async (req: Request, res: Response) => {
 });
 
 // Paystack Configuration & Verification Endpoints
+// Paystack Configuration & Verification Endpoints
 app.get('/api/paystack/public-key', (_req: Request, res: Response) => {
+  // Check both PAYSTACK_PUBLIC_KEY and VITE_PAYSTACK_PUBLIC_KEY
   const publicKey = process.env.PAYSTACK_PUBLIC_KEY || process.env.VITE_PAYSTACK_PUBLIC_KEY || '';
   res.json({
     publicKey,
@@ -330,77 +341,169 @@ app.get('/api/paystack/public-key', (_req: Request, res: Response) => {
   });
 });
 
-app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) => {
-  const { reference } = req.params;
+/**
+ * Initializes a Paystack transaction on the server.
+ * Returns authorization_url, reference, and access_code.
+ */
+app.post('/api/paystack/initialize', async (req: Request, res: Response) => {
+  const { email, amount, reference, callback_url, metadata } = req.body;
   const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
-  if (!reference) {
-    return res.status(400).json({ success: false, error: 'Reference parameter is required' });
+  if (!email || !amount) {
+    return res.status(400).json({ success: false, error: 'Email and amount are required' });
   }
 
-  // If testing demo reference or simulated payment requested
-  if (reference.includes('-DEMO') || req.query.simulate === 'true') {
-    return res.json({
-      success: true,
-      verified: true,
-      isSimulation: true,
-      data: {
-        reference,
-        status: 'success',
-        amount: req.query.amount ? Number(req.query.amount) : undefined,
-        gateway_response: 'Successful (Verified in Sandbox Simulation)',
-        paid_at: new Date().toISOString(),
-      },
-    });
-  }
+  const transactionRef = reference || `SW-PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  // If secret key is configured, verify with live Paystack REST API
-  if (secretKey && !secretKey.includes('placeholder') && secretKey !== 'sk_test_...') {
+  // If live secret key is configured, initialize with official Paystack API
+  if (secretKey && !secretKey.includes('placeholder') && secretKey !== 'sk_test_...' && secretKey !== 'sk_test_DEFAULT') {
     try {
-      const paystackRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${secretKey}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          email,
+          amount, // in kobo
+          reference: transactionRef,
+          callback_url: callback_url || `${req.protocol}://${req.get('host')}/payment-success`,
+          metadata,
+        }),
       });
 
       const data = await paystackRes.json();
-      if (paystackRes.ok && data?.status && data?.data?.status === 'success') {
+      if (paystackRes.ok && data?.status && data?.data) {
         return res.json({
           success: true,
-          verified: true,
           data: data.data,
         });
       } else {
         return res.status(400).json({
           success: false,
-          verified: false,
-          message: data?.message || 'Transaction could not be verified by Paystack',
-          data: data?.data,
+          message: data?.message || 'Could not initialize Paystack transaction',
+          data,
         });
       }
     } catch (err: any) {
-      console.error('[Paystack Verify Error]:', err);
+      console.error('[Paystack Init Error]:', err);
       return res.status(500).json({
         success: false,
-        error: err.message || 'Failed to verify transaction with Paystack',
+        error: err.message || 'Failed to initialize transaction with Paystack',
       });
     }
   }
 
-  // Test / demo fallback verification
+  // Test / simulated initialization fallback for preview environment
   return res.json({
     success: true,
-    verified: true,
     isSimulation: true,
     data: {
-      reference,
-      status: 'success',
-      amount: req.query.amount ? Number(req.query.amount) : undefined,
-      gateway_response: 'Successful (Verified)',
-      paid_at: new Date().toISOString(),
+      authorization_url: `${callback_url || '/payment-success'}?reference=${transactionRef}&amount=${amount}`,
+      access_code: `mock_access_${Date.now()}`,
+      reference: transactionRef,
     },
   });
+});
+
+/**
+ * Server-Side Cloud Function: Verifies Paystack transaction reference against Paystack API
+ * and updates the Firestore document for the user's order and VIP commitment status.
+ */
+app.post('/api/paystack/verify-and-update', async (req: Request, res: Response) => {
+  try {
+    const { reference, orderId, userId, amountNgn, isCommitment } = req.body;
+
+    if (!reference) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reference parameter is required in request body',
+      });
+    }
+
+    const result = await verifyAndConfirmPaystackOrder({
+      reference,
+      orderId,
+      userId,
+      expectedAmountNgn: amountNgn ? Number(amountNgn) : undefined,
+      isCommitment: isCommitment !== false,
+    });
+
+    if (!result.verified) {
+      return res.status(400).json(result);
+    }
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[Paystack Verify & Update Endpoint Error]:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Internal server error while verifying Paystack transaction',
+    });
+  }
+});
+
+/**
+ * GET Verification endpoint: Verifies reference and optionally updates Firestore document
+ * if orderId or userId query parameters are passed.
+ */
+app.get('/api/paystack/verify/:reference', async (req: Request, res: Response) => {
+  const { reference } = req.params;
+  const orderId = req.query.orderId as string | undefined;
+  const userId = req.query.userId as string | undefined;
+  const amount = req.query.amount ? Number(req.query.amount) / 100 : undefined;
+  const isCommitment = req.query.isCommitment !== 'false';
+
+  if (!reference) {
+    return res.status(400).json({ success: false, error: 'Reference parameter is required' });
+  }
+
+  try {
+    // If orderId or userId provided, run full verification & Firestore update
+    if (orderId || userId) {
+      const fullResult = await verifyAndConfirmPaystackOrder({
+        reference,
+        orderId,
+        userId,
+        expectedAmountNgn: amount,
+        isCommitment,
+      });
+      return res.json(fullResult);
+    }
+
+    // Standard verification against Paystack API
+    const verifyResult = await verifyPaystackReference(reference, amount);
+    return res.json(verifyResult);
+  } catch (err: any) {
+    console.error('[Paystack Verify Route Error]:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to verify transaction with Paystack',
+    });
+  }
+});
+
+/**
+ * Paystack Webhook Handler: Listens for server-to-server notifications from Paystack
+ * (e.g. charge.success) and updates the order and user document in Firestore.
+ */
+app.post('/api/paystack/webhook', async (req: Request, res: Response) => {
+  try {
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const signature = req.headers['x-paystack-signature'] as string | undefined;
+
+    const webhookResult = await verifyAndProcessPaystackWebhook(rawBody, signature);
+
+    if (webhookResult.handled) {
+      return res.status(200).json({ status: 'success', handled: true });
+    } else {
+      return res.status(400).json({ status: 'ignored', error: webhookResult.error });
+    }
+  } catch (err: any) {
+    console.error('[Paystack Webhook Handler Error]:', err);
+    return res.status(500).json({ status: 'error', error: err.message });
+  }
 });
 
 // Configure Vite middleware in development or static serving in production

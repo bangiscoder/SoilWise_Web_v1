@@ -418,6 +418,22 @@ export async function updateUserProfileData(
     ? input.activeFarmId
     : existingProfile.activeFarmId;
 
+  const nextIsVipFarmer = input.isVipFarmer !== undefined
+    ? input.isVipFarmer
+    : existingProfile.isVipFarmer;
+
+  const nextVipLevel = input.vipLevel !== undefined
+    ? input.vipLevel
+    : existingProfile.vipLevel;
+
+  const nextVipSecuredAt = input.vipSecuredAt !== undefined
+    ? input.vipSecuredAt
+    : existingProfile.vipSecuredAt;
+
+  const nextFreeDelivery = input.freeDeliveryEligible !== undefined
+    ? input.freeDeliveryEligible
+    : existingProfile.freeDeliveryEligible;
+
   const updatedProfile: SoilWiseUserProfile = {
     ...existingProfile,
     displayName: nextDisplayName,
@@ -433,6 +449,16 @@ export async function updateUserProfileData(
     primaryFarmingInterest: nextProfilePrefs.primaryFarmingInterest,
     farmingInterests: nextProfilePrefs.farmingInterests,
     preferredCrops: nextProfilePrefs.preferredCrops,
+    isVipFarmer: nextIsVipFarmer,
+    vipLevel: nextVipLevel,
+    vipSecuredAt: nextVipSecuredAt,
+    freeDeliveryEligible: nextFreeDelivery,
+    earlyBirdSpotSecured: input.earlyBirdSpotSecured !== undefined ? input.earlyBirdSpotSecured : existingProfile.earlyBirdSpotSecured,
+    earlyBirdNumber: input.earlyBirdNumber !== undefined ? input.earlyBirdNumber : existingProfile.earlyBirdNumber,
+    totalCommitmentPaidNgn: input.totalCommitmentPaidNgn !== undefined 
+      ? input.totalCommitmentPaidNgn 
+      : ((existingProfile.totalCommitmentPaidNgn || 0) + (input.lastDemand?.commitmentAmountNgn || 0) || existingProfile.totalCommitmentPaidNgn),
+    lastDemand: input.lastDemand !== undefined ? input.lastDemand : existingProfile.lastDemand,
     profile: nextProfilePrefs,
     activeFarmId: nextActiveFarmId ?? null,
     updatedAt: nowIso,
@@ -460,6 +486,10 @@ export async function updateUserProfileData(
     primaryFarmingInterest: nextProfilePrefs.primaryFarmingInterest || null,
     farmingInterests: nextProfilePrefs.farmingInterests || [],
     preferredCrops: nextProfilePrefs.preferredCrops || [],
+    isVipFarmer: nextIsVipFarmer ?? null,
+    vipLevel: nextVipLevel ?? null,
+    vipSecuredAt: nextVipSecuredAt ?? null,
+    freeDeliveryEligible: nextFreeDelivery ?? null,
     profile: nextProfilePrefs,
     activeFarmId: nextActiveFarmId ?? null,
     updatedAt: nowIso,

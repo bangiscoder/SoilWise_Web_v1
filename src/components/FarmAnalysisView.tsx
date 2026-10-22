@@ -21,7 +21,9 @@ import {
   CheckCircle2,
   Archive,
   GraduationCap,
-  ShoppingBag
+  ShoppingBag,
+  Crown,
+  Truck
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
@@ -51,6 +53,7 @@ interface FarmAnalysisViewProps {
   onNavigateToLogin?: () => void;
   onNavigateToLearningHub?: () => void;
   onNavigateToMarketplace?: (cropFilter?: string) => void;
+  onOpenVipCommitment?: () => void;
 }
 
 export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
@@ -67,6 +70,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   onNavigateToLogin,
   onNavigateToLearningHub,
   onNavigateToMarketplace,
+  onOpenVipCommitment,
 }) => {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
@@ -1234,7 +1238,39 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </section>
         )}
 
-        {/* 7c. FARM INPUTS & SEED MARKETPLACE CALLOUT */}
+        {/* 7c. VIP FREE DELIVERY COMMITMENT CALLOUT */}
+        {onOpenVipCommitment && (
+          <section className="p-6 sm:p-7 bg-gradient-to-r from-emerald-950 via-[#1b4332] to-[#143225] text-white rounded-3xl border-2 border-amber-400/40 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+            <div className="space-y-2 max-w-xl relative z-10">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black uppercase tracking-wider">
+                  <Crown className="w-3.5 h-3.5 text-stone-950" />
+                  <span>First 50 Early-Bird Farmers Offer</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 text-[10px] font-bold border border-emerald-500/30">
+                  <Truck className="w-3 h-3 text-amber-300" />
+                  <span>100% Free Delivery Guaranteed</span>
+                </span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                Place Demand &amp; Commit ₦1,000+ for VIP Level &amp; Free Delivery
+              </h3>
+              <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+                Your seed demand will be officially placed. In the meantime, commit <strong>₦1,000 or above</strong> (or pay in full) to secure your VIP Gold status and free farm delivery as part of our special offer for the first 50 farmers before the official certified price list is released.
+              </p>
+            </div>
+
+            <button
+              onClick={onOpenVipCommitment}
+              className="px-6 py-3.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:brightness-105 text-stone-950 text-xs sm:text-sm font-black rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <Crown className="w-4 h-4 text-stone-950" />
+              <span>Commit ₦1,000+ &amp; Secure Spot</span>
+            </button>
+          </section>
+        )}
+
+        {/* 7d. FARM INPUTS & SEED MARKETPLACE CALLOUT */}
         {onNavigateToMarketplace && (
           <section className="p-6 sm:p-7 bg-[#fbfdfa] rounded-3xl border-2 border-emerald-800/15 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div className="space-y-1.5 max-w-xl">

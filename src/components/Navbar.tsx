@@ -20,7 +20,8 @@ import {
   ChevronRight,
   Info,
   MapPin,
-  FileText
+  FileText,
+  Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -110,11 +111,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
             </div>
 
             <div className="flex flex-col min-w-0 max-w-[180px]">
-              <span className="text-xs font-extrabold text-stone-900 truncate leading-snug group-hover:text-[#1b4332] transition-colors">
-                {displayName}
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-xs font-extrabold text-stone-900 truncate leading-snug group-hover:text-[#1b4332] transition-colors">
+                  {displayName}
+                </span>
+                {userProfile?.isVipFarmer && (
+                  <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded-full border border-amber-300">
+                    <Crown className="w-2.5 h-2.5 text-amber-600 fill-amber-500" />
+                    <span>VIP</span>
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] text-stone-500 font-medium truncate">
-                {currentUser ? (isOnline ? 'Active Farmer' : 'Offline Mode') : 'Tap to sign in'}
+                {currentUser ? (userProfile?.isVipFarmer ? 'VIP Gold • Free Delivery' : isOnline ? 'Active Farmer' : 'Offline Mode') : 'Tap to sign in'}
               </span>
             </div>
           </button>
@@ -229,6 +238,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
                 <span className="max-w-[90px] truncate">
                   {displayName}
                 </span>
+                {userProfile?.isVipFarmer && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-900 bg-linear-to-r from-amber-200 to-yellow-300 px-1.5 py-0.5 rounded-full border border-amber-400">
+                    <Crown className="w-2.5 h-2.5 text-amber-700 fill-amber-500" />
+                    <span>VIP Gold</span>
+                  </span>
+                )}
               </button>
             ) : (
               <button
@@ -318,17 +333,32 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenD
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-extrabold text-stone-900 truncate group-hover:text-[#1b4332] transition-colors">
-                      {displayName}
-                    </h3>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h3 className="text-sm font-extrabold text-stone-900 truncate group-hover:text-[#1b4332] transition-colors">
+                        {displayName}
+                      </h3>
+                      {userProfile?.isVipFarmer && (
+                        <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-black text-amber-900 bg-amber-200 px-2 py-0.5 rounded-full border border-amber-400">
+                          <Crown className="w-2.5 h-2.5 text-amber-700 fill-amber-500" />
+                          <span>VIP Gold</span>
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-stone-500 truncate font-medium">
                       {currentUser?.email || (currentUser ? 'Authenticated Farmer' : 'Offline Guest Account')}
                     </p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                      <span className="text-[10px] font-bold text-stone-600 uppercase tracking-wider">
-                        {isOnline ? 'Connected' : 'Offline Mode'}
-                      </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                        <span className="text-[10px] font-bold text-stone-600 uppercase tracking-wider">
+                          {isOnline ? 'Connected' : 'Offline Mode'}
+                        </span>
+                      </div>
+                      {userProfile?.freeDeliveryEligible && (
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
+                          Free Delivery
+                        </span>
+                      )}
                     </div>
                   </div>
 

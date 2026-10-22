@@ -141,7 +141,8 @@ service cloud.firestore {
                        request.resource.data.quantityKg is number && request.resource.data.quantityKg > 0 &&
                        request.resource.data.farmerName is string && request.resource.data.farmerName.size() <= 150 &&
                        request.resource.data.farmerPhone is string && request.resource.data.farmerPhone.size() <= 50;
-      allow update, delete: if isAdmin();
+      allow update: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Default deny all other collections

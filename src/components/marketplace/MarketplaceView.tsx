@@ -19,7 +19,9 @@ import {
   Layers,
   Wheat,
   SlidersHorizontal,
-  Check
+  Check,
+  Crown,
+  Truck
 } from 'lucide-react';
 import { CropSeed, CropCategory, SeedOrder } from '../../types/marketplace';
 import { fetchAllMarketplaceSeeds, fetchUserSeedOrders } from '../../services/marketplaceService';
@@ -497,11 +499,23 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     key={order.id}
                     className="p-5 bg-white rounded-2xl border border-stone-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-bold text-[#1b4332] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                           {order.orderNumber}
                         </span>
+                        {order.isCommitmentOrder && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black bg-gradient-to-r from-amber-500 to-yellow-500 text-stone-900 px-2 py-0.5 rounded-full shadow-2xs">
+                            <Crown className="w-3 h-3 text-stone-950" />
+                            <span>VIP Gold Order</span>
+                          </span>
+                        )}
+                        {order.freeDeliveryApplied && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <Truck className="w-3 h-3 text-emerald-700" />
+                            <span>Free Farm Delivery</span>
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
                           order.status === 'confirmed' || order.status === 'completed'
                             ? 'bg-emerald-100 text-emerald-800'
@@ -522,16 +536,37 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                       <h4 className="text-sm sm:text-base font-bold text-stone-900">
                         {order.quantityKg} kg of {order.seedName}
                       </h4>
-                      <p className="text-xs text-stone-500 flex items-center gap-3">
+                      <p className="text-xs text-stone-500 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span>Recipient: {order.farmerName} ({order.farmerPhone})</span>
                         <span>•</span>
                         <span>Location: {order.lga}, {order.state}</span>
                       </p>
+
+                      {order.isCommitmentOrder && (
+                        <div className="mt-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-amber-900 font-semibold">
+                              Commitment Deposit Paid:
+                            </span>
+                            <span className="font-bold text-emerald-700">
+                              ₦{(order.commitmentDepositNgn || 1000).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-amber-900 font-semibold">
+                              Balance Due on Delivery:
+                            </span>
+                            <span className="font-extrabold text-[#1b4332]">
+                              ₦{(order.balanceDueNgn !== undefined ? order.balanceDueNgn : Math.max(0, order.totalPrice - (order.commitmentDepositNgn || 1000))).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-stone-100 flex sm:flex-col justify-between items-center sm:items-end">
                       <div>
-                        <span className="text-[10px] text-stone-400 uppercase tracking-wider block">Total Amount</span>
+                        <span className="text-[10px] text-stone-400 uppercase tracking-wider block">Total Order Value</span>
                         <span className="text-base sm:text-lg font-black text-[#1b4332] font-mono">
                           ₦{order.totalPrice.toLocaleString()}
                         </span>

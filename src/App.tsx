@@ -22,6 +22,7 @@ import { FarmsManagementView } from './components/farms/FarmsManagementView';
 import { LearningHubView } from './components/learning/LearningHubView';
 import { MarketplaceView } from './components/marketplace/MarketplaceView';
 import { PaymentSuccessView } from './components/marketplace/PaymentSuccessView';
+import { VipCommitmentModal } from './components/marketplace/VipCommitmentModal';
 import { OfflineBanner } from './components/pwa/OfflineBanner';
 import { FarmProfileDocument } from './types/farm';
 import { SeedOrder } from './types/marketplace';
@@ -67,6 +68,8 @@ export default function App() {
   const [marketplaceCropFilter, setMarketplaceCropFilter] = useState<string | null>(null);
   const [paymentSuccessOrder, setPaymentSuccessOrder] = useState<SeedOrder | null>(null);
   const [paymentSuccessRef, setPaymentSuccessRef] = useState<string | null>(null);
+  const [isVipCommitmentModalOpen, setIsVipCommitmentModalOpen] = useState<boolean>(false);
+  const [vipModalSource, setVipModalSource] = useState<'farm_analysis' | 'signup' | 'manual'>('farm_analysis');
 
   // Monitor URL routes on mount and popstate
   useEffect(() => {
@@ -205,6 +208,12 @@ export default function App() {
         setAnalysisStep('idle');
         setCurrentView('analysis');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Prompt user after analysing farm to make purchase and lock in VIP free delivery
+        setTimeout(() => {
+          setVipModalSource('farm_analysis');
+          setIsVipCommitmentModalOpen(true);
+        }, 1200);
       }, 350);
     } catch (err: any) {
       console.error('Analysis execution error:', err);
@@ -374,6 +383,10 @@ export default function App() {
               setMarketplaceCropFilter(cropFilter || null);
               navigateToView('marketplace');
             }}
+            onOpenVipCommitment={() => {
+              setVipModalSource('farm_analysis');
+              setIsVipCommitmentModalOpen(true);
+            }}
           />
         )}
 
@@ -441,7 +454,11 @@ export default function App() {
         {/* 4. Public Registration Page */}
         {currentView === 'register' && (
           <RegisterPage
-            onSuccess={() => navigateToView('account')}
+            onSuccess={() => {
+              setVipModalSource('signup');
+              setIsVipCommitmentModalOpen(true);
+              navigateToView('account');
+            }}
             onNavigateToLogin={() => navigateToView('login')}
             onBackToApp={navigateToHome}
           />
@@ -625,6 +642,23 @@ export default function App() {
           currentAnalysis={analysisResult}
         />
       )}
+
+      {/* VIP Commitment Deposit & Seed Order Modal */}
+      <VipCommitmentModal
+        isOpen={isVipCommitmentModalOpen}
+        onClose={() => setIsVipCommitmentModalOpen(false)}
+        source={vipModalSource}
+        analysisResult={analysisResult}
+        onSuccessOrder={(order) => {
+          setPaymentSuccessOrder(order);
+          setPaymentSuccessRef(order.paystackReference || order.orderNumber);
+        }}
+        onNavigateToMarketplace={() => navigateToView('marketplace')}
+        onNavigateToOrders={() => {
+          setMarketplaceCropFilter(null);
+          navigateToView('marketplace');
+        }}
+      />
     </div>
   );
 }

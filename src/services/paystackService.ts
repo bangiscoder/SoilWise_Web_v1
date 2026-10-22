@@ -118,14 +118,22 @@ export async function getPaystackPublicKey(): Promise<string> {
 
 /**
  * Verifies a transaction reference with the SoilWise backend.
+ * Optionally passes orderId and userId so server-side cloud function updates Firestore.
  */
 export async function verifyPaystackTransaction(
   reference: string,
-  amountNgn?: number
+  amountNgn?: number,
+  options?: { orderId?: string; userId?: string; isCommitment?: boolean }
 ): Promise<VerificationResult> {
   try {
-    const query = amountNgn ? `?amount=${Math.round(amountNgn * 100)}` : '';
-    const res = await fetch(`/api/paystack/verify/${encodeURIComponent(reference)}${query}`);
+    const params = new URLSearchParams();
+    if (amountNgn) params.append('amount', Math.round(amountNgn * 100).toString());
+    if (options?.orderId) params.append('orderId', options.orderId);
+    if (options?.userId) params.append('userId', options.userId);
+    if (options?.isCommitment !== undefined) params.append('isCommitment', String(options.isCommitment));
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`/api/paystack/verify/${encodeURIComponent(reference)}${queryString}`);
     const data = await res.json();
     return data;
   } catch (err: any) {
@@ -134,6 +142,103 @@ export async function verifyPaystackTransaction(
       success: false,
       verified: false,
       message: err.message || 'Could not verify transaction with server',
+    };
+  }
+}
+
+/**
+ * Server-Side Cloud Function Caller: Explicitly triggers server verification against Paystack
+ * and updates the Firestore document for the user's order and VIP commitment status.
+ */
+export async function verifyAndUpdateOrderOnServer(params: {
+  reference: string;
+  orderId?: string;
+  userId?: string;
+  amountNgn?: number;
+  isCommitment?: boolean;
+}): Promise<{
+  success: boolean;
+  verified: boolean;
+  isSimulation?: boolean;
+  message: string;
+  firestoreResult?: {
+    orderFound: boolean;
+    orderUpdated: boolean;
+    orderId?: string;
+    userVipUpdated: boolean;
+    userId?: string;
+  };
+}> {
+  try {
+    const res = await fetch('/api/paystack/verify-and-update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error('[Paystack Verify & Update Client Error]:', err);
+    return {
+      success: false,
+      verified: false,
+      message: err.message || 'Failed to call Paystack verification cloud function',
+    };
+  }
+}
+
+/**
+ * Initializes a Paystack transaction via the server API (returns authorization_url).
+ */
+export async function initializeServerTransaction(params: {
+  email: string;
+  amountNgn: number;
+  reference?: string;
+  callbackUrl?: string;
+  metadata?: Record<string, any>;
+}): Promise<{
+  success: boolean;
+  authorizationUrl?: string;
+  accessCode?: string;
+  reference?: string;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/paystack/initialize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: params.email,
+        amount: Math.round(params.amountNgn * 100), // in kobo
+        reference: params.reference,
+        callback_url: params.callbackUrl,
+        metadata: params.metadata,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data?.success && data?.data) {
+      return {
+        success: true,
+        authorizationUrl: data.data.authorization_url,
+        accessCode: data.data.access_code,
+        reference: data.data.reference,
+      };
+    }
+    return {
+      success: false,
+      error: data?.message || data?.error || 'Failed to initialize payment',
+    };
+  } catch (err: any) {
+    console.error('[Paystack Init Client Error]:', err);
+    return {
+      success: false,
+      error: err.message || 'Payment initialization request failed',
     };
   }
 }

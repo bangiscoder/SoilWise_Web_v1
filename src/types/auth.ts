@@ -43,6 +43,29 @@ export interface SoilWiseUserProfile {
   primaryFarmingInterest?: string;
   farmingInterests?: string[];
   preferredCrops?: string[];
+  isVipFarmer?: boolean;
+  vipLevel?: string;
+  vipSecuredAt?: string;
+  freeDeliveryEligible?: boolean;
+  earlyBirdSpotSecured?: boolean;
+  earlyBirdNumber?: number;
+  totalCommitmentPaidNgn?: number;
+  lastDemand?: {
+    orderId?: string;
+    orderNumber?: string;
+    seedId: string;
+    seedName: string;
+    cropType: string;
+    quantityKg: number;
+    commitmentAmountNgn: number;
+    farmerName: string;
+    farmerPhone: string;
+    state: string;
+    lga: string;
+    deliveryAddress: string;
+    submittedAt: string;
+    status: string;
+  };
 }
 
 export interface UpdateProfileInput {
@@ -60,6 +83,14 @@ export interface UpdateProfileInput {
   farmingInterests?: string[];
   preferredCrops?: string[];
   activeFarmId?: string | null;
+  isVipFarmer?: boolean;
+  vipLevel?: string;
+  vipSecuredAt?: string;
+  freeDeliveryEligible?: boolean;
+  earlyBirdSpotSecured?: boolean;
+  earlyBirdNumber?: number;
+  totalCommitmentPaidNgn?: number;
+  lastDemand?: SoilWiseUserProfile['lastDemand'];
 }
 
 export interface UserRegistrationInput {
