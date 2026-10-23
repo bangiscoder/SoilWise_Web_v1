@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   MapPin, 
   FlaskConical, 
@@ -23,7 +23,10 @@ import {
   GraduationCap,
   ShoppingBag,
   Crown,
-  Truck
+  Truck,
+  MessageSquareHeart,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
@@ -39,7 +42,42 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import resultHeroBg from '../assets/images/result_hero_bg_1790608469988.jpg';
 
-interface FarmAnalysisViewProps {
+export type FarmAnalysisTab =
+  | 'ai-recommendations'
+  | 'soil-profile'
+  | 'weather'
+  | 'location'
+  | 'advisory'
+  | 'feedback';
+
+export const VALID_ANALYSIS_TABS: readonly FarmAnalysisTab[] = [
+  'ai-recommendations',
+  'soil-profile',
+  'weather',
+  'location',
+  'advisory',
+  'feedback',
+] as const;
+
+export const getStoredAnalysisTab = (analysisId?: string): FarmAnalysisTab | null => {
+  try {
+    if (analysisId) {
+      const perAnalysis = sessionStorage.getItem(`soilwise_analysis_tab_${analysisId}`);
+      if (perAnalysis && VALID_ANALYSIS_TABS.includes(perAnalysis as FarmAnalysisTab)) {
+        return perAnalysis as FarmAnalysisTab;
+      }
+    }
+    const globalLast = sessionStorage.getItem('soilwise_active_analysis_tab');
+    if (globalLast && VALID_ANALYSIS_TABS.includes(globalLast as FarmAnalysisTab)) {
+      return globalLast as FarmAnalysisTab;
+    }
+  } catch {
+    // sessionStorage might be restricted in some iframe contexts
+  }
+  return null;
+};
+
+export interface FarmAnalysisViewProps {
   analysis: FarmAnalysisResult;
   onEdit: () => void;
   onNewAnalysis: () => void;
@@ -54,6 +92,8 @@ interface FarmAnalysisViewProps {
   onNavigateToLearningHub?: () => void;
   onNavigateToMarketplace?: (cropFilter?: string) => void;
   onOpenVipCommitment?: () => void;
+  selectedTab?: FarmAnalysisTab;
+  onTabChange?: (tab: FarmAnalysisTab) => void;
 }
 
 export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
@@ -71,6 +111,8 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
   onNavigateToLearningHub,
   onNavigateToMarketplace,
   onOpenVipCommitment,
+  selectedTab,
+  onTabChange,
 }) => {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
@@ -89,9 +131,54 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
     photoAnalysisResult
   } = analysis;
 
-  const isUserMeasured = soilDataProvenance === 'user_measured' || (hasSoilTest !== false && soilDataProvenance !== 'location_estimated');
-
   const [activeDepthTab, setActiveDepthTab] = useState<'0-20' | '20-50' | 'landscape'>('0-20');
+  
+  // Persist selected tab across navigations within the session
+  const [activeTab, setActiveTab] = useState<FarmAnalysisTab>(() => {
+    if (selectedTab && VALID_ANALYSIS_TABS.includes(selectedTab)) {
+      return selectedTab;
+    }
+    return getStoredAnalysisTab(analysis.id) || 'ai-recommendations';
+  });
+
+  const tabContainerRef = useRef<HTMLDivElement>(null);
+  const isUserMeasured = hasSoilTest ?? (soilDataProvenance === 'user_measured');
+
+  // Synchronize when controlled prop selectedTab updates
+  useEffect(() => {
+    if (selectedTab && VALID_ANALYSIS_TABS.includes(selectedTab) && selectedTab !== activeTab) {
+      setActiveTab(selectedTab);
+    }
+  }, [selectedTab]);
+
+  // Synchronize if user views another historical analysis in session
+  useEffect(() => {
+    const stored = getStoredAnalysisTab(analysis.id);
+    if (stored && stored !== activeTab) {
+      setActiveTab(stored);
+      onTabChange?.(stored);
+    }
+  }, [analysis.id]);
+
+  const handleTabChange = (newTab: FarmAnalysisTab) => {
+    setActiveTab(newTab);
+    try {
+      if (analysis.id) {
+        sessionStorage.setItem(`soilwise_analysis_tab_${analysis.id}`, newTab);
+      }
+      sessionStorage.setItem('soilwise_active_analysis_tab', newTab);
+    } catch {
+      // Ignore storage errors in restricted sandboxes
+    }
+    onTabChange?.(newTab);
+
+    if (tabContainerRef.current) {
+      const yOffset = -70;
+      const y = tabContainerRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    }
+  };
+
   const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false);
   const [isAssistantModalOpen, setIsAssistantModalOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string>('');
@@ -180,6 +267,46 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
   const stateToDisplay = selectedState || location.state || location.address?.state || null;
   const lgaToDisplay = selectedLga || location.lga || location.address?.county || null;
+
+  const renderTabFooter = (
+    prev?: { id: FarmAnalysisTab; label: string },
+    next?: { id: FarmAnalysisTab; label: string }
+  ) => (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-stone-200/90 text-xs">
+      {prev ? (
+        <button
+          type="button"
+          onClick={() => handleTabChange(prev.id)}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 border border-stone-200/90 font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+        >
+          <ChevronLeft className="w-4 h-4 text-stone-500" />
+          <span>Previous: {prev.label}</span>
+        </button>
+      ) : (
+        <div className="hidden sm:block" />
+      )}
+
+      {next ? (
+        <button
+          type="button"
+          onClick={() => handleTabChange(next.id)}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1b4332] hover:bg-[#143225] text-white font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+        >
+          <span>Next: {next.label}</span>
+          <ChevronRight className="w-4 h-4 text-emerald-300" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => handleTabChange('ai-recommendations')}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1b4332] hover:bg-[#143225] text-white font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+        >
+          <span>Back to AI Recommendations</span>
+          <RotateCcw className="w-4 h-4 text-emerald-300" />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="w-full pb-28 sm:pb-32 space-y-10 sm:space-y-14">
@@ -307,48 +434,150 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </div>
         </div>
 
-        {/* 2. FARM LOCATION */}
-        <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-5">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
-              <MapPin className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
-                {t('results.locationTitle')}
-              </h2>
-              <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
-                {t('hero.caption')}
+
+        {/* Sticky Top Tab Navigation Bar ("Taps") */}
+        <div
+          ref={tabContainerRef}
+          className="sticky top-14 sm:top-16 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-stone-50/95 backdrop-blur-md border-y border-stone-200/80 shadow-xs print:hidden"
+        >
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1">
+            {[
+              { id: "ai-recommendations", label: "AI Crops", icon: Sparkles, badge: "Recommended" },
+              { id: "soil-profile", label: "Soil Profile", icon: FlaskConical },
+              { id: "weather", label: "Weather & Climate", icon: CloudRain },
+              { id: "location", label: "Farm Location", icon: MapPin },
+              { id: "advisory", label: "Agronomist & Hub", icon: UserCheck },
+              { id: "feedback", label: "Farmer Feedback", icon: MessageSquareHeart },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleTabChange(tab.id as any)}
+                  className={"shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer " + (
+                    isActive
+                      ? "bg-[#1b4332] text-white shadow-sm ring-2 ring-[#1b4332]/40"
+                      : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200/90 shadow-2xs hover:text-stone-950"
+                  )}
+                >
+                  <Icon className={"w-4 h-4 shrink-0 " + (isActive ? "text-emerald-300" : "text-stone-500")} />
+                  <span className="whitespace-nowrap">{tab.label}</span>
+                  {tab.badge && (
+                    <span
+                      className={"text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full " + (
+                        isActive ? "bg-amber-400 text-stone-950" : "bg-emerald-100 text-emerald-800"
+                      )}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* TAB 1: AI RECOMMENDATIONS (FIRST TAP) */}
+        <div className={activeTab === 'ai-recommendations' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
+        {/* 7. GEMINI AI POWERED RECOMMENDED CROPS SECTION */}
+        <GeminiRecommendedCropsSection
+          analysis={analysis}
+          onNavigateToMarketplace={onNavigateToMarketplace}
+          onAskAiAboutCrop={(cropName, varietyName) => {
+            const phVal = soilData?.ph != null ? soilData.ph.toFixed(1) : '6.2';
+            handleOpenAssistant(
+              `Can you explain why ${cropName} (${varietyName}) is an optimal crop for my soil pH of ${phVal} and local rainfall? What specific planting and fertilizer practices will give me the highest yield?`
+            );
+          }}
+        />
+
+
+        {/* 7b. CANONICAL IAR VARIETY EVALUATION DETAILS */}
+        <FutureRecommendationSection
+          soilData={soilData}
+          rainfallOutlook={rainfallOutlook}
+          soilTexture={soilTexture}
+          decision={analysis.cropRecommendationDecision}
+          location={location}
+        />
+
+
+        {/* 7c. VIP FREE DELIVERY COMMITMENT CALLOUT */}
+        {onOpenVipCommitment && (
+          <section className="p-6 sm:p-7 bg-gradient-to-r from-emerald-950 via-[#1b4332] to-[#143225] text-white rounded-3xl border-2 border-amber-400/40 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+            <div className="space-y-2 max-w-xl relative z-10">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black uppercase tracking-wider">
+                  <Crown className="w-3.5 h-3.5 text-stone-950" />
+                  <span>First 50 Early-Bird Farmers Offer</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 text-[10px] font-bold border border-emerald-500/30">
+                  <Truck className="w-3 h-3 text-amber-300" />
+                  <span>100% Free Delivery Guaranteed</span>
+                </span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                Place Demand &amp; Commit ₦1,000+ for VIP Level &amp; Free Delivery
+              </h3>
+              <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+                Your seed demand will be officially placed. In the meantime, commit <strong>₦1,000 or above</strong> (or pay in full) to secure your VIP Gold status and free farm delivery as part of our special offer for the first 50 farmers before the official certified price list is released.
               </p>
             </div>
-          </div>
 
-          {/* Integrated Location Statement Card */}
-          <div className="p-5 bg-[#fafaf7] rounded-2xl border border-stone-200/90 text-stone-800 text-sm sm:text-base leading-relaxed">
-            <p>
-              {t('results.locationSummary', {
-                latitude: `${latFormatted}°`,
-                longitude: `${lonFormatted}°`,
-                address: fullAddress,
-                elevation: elevationFormatted,
-              })}
-            </p>
-          </div>
+            <button
+              onClick={onOpenVipCommitment}
+              className="px-6 py-3.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:brightness-105 text-stone-950 text-xs sm:text-sm font-black rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <Crown className="w-4 h-4 text-stone-950" />
+              <span>Commit ₦1,000+ &amp; Secure Spot</span>
+            </button>
+          </section>
+        )}
 
-          {/* Map Preview */}
-          <div className="pt-2">
-            <span className="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2.5">
-              {t('results.mapView')}
-            </span>
-            <FarmMapPreview
-              latitude={location.latitude}
-              longitude={location.longitude}
-              label={location.address?.road || location.address?.village || 'Farm Coordinates'}
-              elevationMeters={location.elevationMeters}
-            />
-          </div>
-        </section>
 
+        {/* 7d. FARM INPUTS & SEED MARKETPLACE CALLOUT */}
+        {onNavigateToMarketplace && (
+          <section className="p-6 sm:p-7 bg-[#fbfdfa] rounded-3xl border-2 border-emerald-800/15 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#1b4332] text-emerald-300 flex items-center justify-center">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                    Certified Farm Inputs
+                  </span>
+                  <h3 className="text-base sm:text-lg font-bold text-stone-900">
+                    Order Certified Crop Seeds for Your Farm
+                  </h3>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                Source NASC-certified, high-germination seed varieties (Maize, Sorghum, Cowpea, Rice, Soybean) matching your farm's soil profile and rainfall outlook. Specify exact kilograms or calculate by your farm acreage.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                const topCrop = analysis.cropRecommendationDecision?.recommendations?.[0]?.variety?.name || analysis.cropRecommendationDecision?.recommendations?.[0]?.crop?.name;
+                onNavigateToMarketplace(topCrop);
+              }}
+              className="px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Browse Seed Marketplace</span>
+            </button>
+          </section>
+        )}
+
+
+          {renderTabFooter(undefined, { id: 'soil-profile', label: 'Soil Profile' })}
+        </div>
+
+        {/* TAB 2: SOIL PROFILE (SECOND TAP) */}
+        <div className={activeTab === 'soil-profile' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
         {/* 3. SOIL DATA (Merged "Your Soil Data" and "Soil Texture") */}
         <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
           <div className="flex items-start gap-3">
@@ -970,6 +1199,12 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </div>
         </section>
 
+
+          {renderTabFooter({ id: 'ai-recommendations', label: 'AI Crops' }, { id: 'weather', label: 'Weather & Climate' })}
+        </div>
+
+        {/* TAB 3: WEATHER & CLIMATE (THIRD TAP) */}
+        <div className={activeTab === 'weather' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
         {/* 4. RAINFALL OUTLOOK */}
         <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
           <div className="flex items-center justify-between">
@@ -1186,125 +1421,68 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </div>
         </section>
 
+
         {/* 5. OPEN-METEO 7-DAY AG-WEATHER FORECAST & HISTORICAL RAINFALL PATTERNS */}
         <FarmOpenMeteoWeatherSection location={location} />
+
 
         {/* 6. CLIMATE REPORT — FUTURE INTEGRATION DEMO (Includes consolidated Climate Outlook & Agricultural Implication) */}
         <NimetClimateReport location={location} />
 
-        {/* 7. GEMINI AI POWERED RECOMMENDED CROPS SECTION */}
-        <GeminiRecommendedCropsSection
-          analysis={analysis}
-          onNavigateToMarketplace={onNavigateToMarketplace}
-          onAskAiAboutCrop={(cropName, varietyName) => {
-            const phVal = soilData?.ph != null ? soilData.ph.toFixed(1) : '6.2';
-            handleOpenAssistant(
-              `Can you explain why ${cropName} (${varietyName}) is an optimal crop for my soil pH of ${phVal} and local rainfall? What specific planting and fertilizer practices will give me the highest yield?`
-            );
-          }}
-        />
 
-        {/* 7b. CANONICAL IAR VARIETY EVALUATION DETAILS */}
-        <FutureRecommendationSection
-          soilData={soilData}
-          rainfallOutlook={rainfallOutlook}
-          soilTexture={soilTexture}
-          decision={analysis.cropRecommendationDecision}
-          location={location}
-        />
+          {renderTabFooter({ id: 'soil-profile', label: 'Soil Profile' }, { id: 'location', label: 'Farm Location' })}
+        </div>
 
-        {/* 7b. SOILWISE LEARNING HUB ENTRY CALLOUT */}
-        {onNavigateToLearningHub && (
-          <section className="p-6 sm:p-7 bg-white rounded-3xl border border-stone-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-1.5 max-w-xl">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-[#1b4332]" />
-                <h3 className="text-base sm:text-lg font-bold text-stone-900">
-                  SoilWise Learning Hub
-                </h3>
-              </div>
-              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-                Want to understand why these crops were recommended, how your soil pH controls fertilizer uptake, or how to manage dry spells? Explore personalized practical lessons in your Learning Journey.
+        {/* TAB 4: FARM LOCATION (FOURTH TAP) */}
+        <div className={activeTab === 'location' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
+        {/* 2. FARM LOCATION */}
+        <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-5">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
+                {t('results.locationTitle')}
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
+                {t('hero.caption')}
               </p>
             </div>
+          </div>
 
-            <button
-              onClick={onNavigateToLearningHub}
-              className="px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs active:scale-[0.98] flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span>Explore Learning Hub</span>
-            </button>
-          </section>
-        )}
+          {/* Integrated Location Statement Card */}
+          <div className="p-5 bg-[#fafaf7] rounded-2xl border border-stone-200/90 text-stone-800 text-sm sm:text-base leading-relaxed">
+            <p>
+              {t('results.locationSummary', {
+                latitude: `${latFormatted}°`,
+                longitude: `${lonFormatted}°`,
+                address: fullAddress,
+                elevation: elevationFormatted,
+              })}
+            </p>
+          </div>
 
-        {/* 7c. VIP FREE DELIVERY COMMITMENT CALLOUT */}
-        {onOpenVipCommitment && (
-          <section className="p-6 sm:p-7 bg-gradient-to-r from-emerald-950 via-[#1b4332] to-[#143225] text-white rounded-3xl border-2 border-amber-400/40 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-            <div className="space-y-2 max-w-xl relative z-10">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black uppercase tracking-wider">
-                  <Crown className="w-3.5 h-3.5 text-stone-950" />
-                  <span>First 50 Early-Bird Farmers Offer</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 text-[10px] font-bold border border-emerald-500/30">
-                  <Truck className="w-3 h-3 text-amber-300" />
-                  <span>100% Free Delivery Guaranteed</span>
-                </span>
-              </div>
-              <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
-                Place Demand &amp; Commit ₦1,000+ for VIP Level &amp; Free Delivery
-              </h3>
-              <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
-                Your seed demand will be officially placed. In the meantime, commit <strong>₦1,000 or above</strong> (or pay in full) to secure your VIP Gold status and free farm delivery as part of our special offer for the first 50 farmers before the official certified price list is released.
-              </p>
-            </div>
+          {/* Map Preview */}
+          <div className="pt-2">
+            <span className="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2.5">
+              {t('results.mapView')}
+            </span>
+            <FarmMapPreview
+              latitude={location.latitude}
+              longitude={location.longitude}
+              label={location.address?.road || location.address?.village || 'Farm Coordinates'}
+              elevationMeters={location.elevationMeters}
+            />
+          </div>
+        </section>
 
-            <button
-              onClick={onOpenVipCommitment}
-              className="px-6 py-3.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:brightness-105 text-stone-950 text-xs sm:text-sm font-black rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-            >
-              <Crown className="w-4 h-4 text-stone-950" />
-              <span>Commit ₦1,000+ &amp; Secure Spot</span>
-            </button>
-          </section>
-        )}
 
-        {/* 7d. FARM INPUTS & SEED MARKETPLACE CALLOUT */}
-        {onNavigateToMarketplace && (
-          <section className="p-6 sm:p-7 bg-[#fbfdfa] rounded-3xl border-2 border-emerald-800/15 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-1.5 max-w-xl">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#1b4332] text-emerald-300 flex items-center justify-center">
-                  <ShoppingBag className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                    Certified Farm Inputs
-                  </span>
-                  <h3 className="text-base sm:text-lg font-bold text-stone-900">
-                    Order Certified Crop Seeds for Your Farm
-                  </h3>
-                </div>
-              </div>
-              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-                Source NASC-certified, high-germination seed varieties (Maize, Sorghum, Cowpea, Rice, Soybean) matching your farm's soil profile and rainfall outlook. Specify exact kilograms or calculate by your farm acreage.
-              </p>
-            </div>
+          {renderTabFooter({ id: 'weather', label: 'Weather & Climate' }, { id: 'advisory', label: 'Agronomist & Hub' })}
+        </div>
 
-            <button
-              onClick={() => {
-                const topCrop = analysis.cropRecommendationDecision?.recommendations?.[0]?.variety?.name || analysis.cropRecommendationDecision?.recommendations?.[0]?.crop?.name;
-                onNavigateToMarketplace(topCrop);
-              }}
-              className="px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span>Browse Seed Marketplace</span>
-            </button>
-          </section>
-        )}
-
+        {/* TAB 5: AGRONOMIST & HUB (FIFTH TAP) */}
+        <div className={activeTab === 'advisory' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
         {/* 8. TALK TO A CERTIFIED AGRONOMIST DEMO */}
         <section className="p-6 sm:p-7 bg-[#f0f5ee] rounded-3xl border border-[#1b4332]/20 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-1.5 max-w-xl">
@@ -1331,8 +1509,43 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </button>
         </section>
 
-        {/* 9. HELP US BUILD SOILWISE AI (Interactive Multi-Step Feedback Questionnaire) */}
-        <FarmerFeedbackSection location={location} />
+
+        {/* 7b. SOILWISE LEARNING HUB ENTRY CALLOUT */}
+        {onNavigateToLearningHub && (
+          <section className="p-6 sm:p-7 bg-white rounded-3xl border border-stone-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-[#1b4332]" />
+                <h3 className="text-base sm:text-lg font-bold text-stone-900">
+                  SoilWise Learning Hub
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                Want to understand why these crops were recommended, how your soil pH controls fertilizer uptake, or how to manage dry spells? Explore personalized practical lessons in your Learning Journey.
+              </p>
+            </div>
+
+            <button
+              onClick={onNavigateToLearningHub}
+              className="px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs active:scale-[0.98] flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <GraduationCap className="w-4 h-4" />
+              <span>Explore Learning Hub</span>
+            </button>
+          </section>
+        )}
+
+
+          {renderTabFooter({ id: 'location', label: 'Farm Location' }, { id: 'feedback', label: 'Farmer Feedback' })}
+        </div>
+
+        {/* TAB 6: FARMER FEEDBACK (SIXTH TAP) */}
+        <div className={activeTab === 'feedback' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
+          {/* HELP US BUILD SOILWISE AI (Interactive Multi-Step Feedback Questionnaire) */}
+          <FarmerFeedbackSection location={location} />
+
+          {renderTabFooter({ id: 'advisory', label: 'Agronomist & Hub' }, undefined)}
+        </div>
       </div>
 
       {/* MODALS */}

@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { FarmDataForm } from './components/FarmDataForm';
-import { FarmAnalysisView } from './components/FarmAnalysisView';
+import { FarmAnalysisView, FarmAnalysisTab, getStoredAnalysisTab } from './components/FarmAnalysisView';
 import { AnalysisProgressModal } from './components/AnalysisProgressModal';
 import { ApiDocsModal } from './components/ApiDocsModal';
 import { AdminLogin } from './components/admin/AdminLogin';
@@ -75,6 +75,11 @@ export default function App() {
   const [vipModalSource, setVipModalSource] = useState<'farm_analysis' | 'signup' | 'manual'>('farm_analysis');
   const [isCommitmentRequestOpen, setIsCommitmentRequestOpen] = useState<boolean>(false);
   const [isSurveyModalOpen, setIsSurveyModalOpen] = useState<boolean>(false);
+  
+  // Persisted selected tab for FarmAnalysisView across session navigations
+  const [persistedAnalysisTab, setPersistedAnalysisTab] = useState<FarmAnalysisTab>(() => {
+    return getStoredAnalysisTab() || 'ai-recommendations';
+  });
 
   // Proactively prompt users who haven't made a commitment yet with the Commitment Request Modal
   useEffect(() => {
@@ -279,6 +284,12 @@ export default function App() {
     setIsHistoricalView(false);
     setHistoricalSavedDate(null);
     setSaveStatusMessage(null);
+    setPersistedAnalysisTab('ai-recommendations');
+    try {
+      sessionStorage.setItem('soilwise_active_analysis_tab', 'ai-recommendations');
+    } catch {
+      // ignore
+    }
     setCurrentView('farm-data');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -293,6 +304,9 @@ export default function App() {
         setIsHistoricalView(true);
         setHistoricalSavedDate(snapshot.createdAt);
         setSaveStatusMessage(null);
+        // Restore tab for this historical analysis if previously visited in this session, otherwise preserve current tab or default
+        const restoredTab = getStoredAnalysisTab(snapshot.fullAnalysis.id) || persistedAnalysisTab;
+        setPersistedAnalysisTab(restoredTab);
         setCurrentView('analysis');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
@@ -428,6 +442,15 @@ export default function App() {
             onOpenVipCommitment={() => {
               setVipModalSource('farm_analysis');
               setIsVipCommitmentModalOpen(true);
+            }}
+            selectedTab={persistedAnalysisTab}
+            onTabChange={(tab) => {
+              setPersistedAnalysisTab(tab);
+              try {
+                sessionStorage.setItem('soilwise_active_analysis_tab', tab);
+              } catch {
+                // ignore
+              }
             }}
           />
         )}

@@ -331,7 +331,80 @@ app.post('/api/ai/recommended-crops', async (req: Request, res: Response) => {
   }
 });
 
-// Paystack Configuration & Verification Endpoints
+// Open-Meteo Weather Proxy Endpoints (Robust against client adblockers, CORS & mobile network timeouts)
+app.get('/api/weather/forecast', async (req: Request, res: Response) => {
+  try {
+    const lat = parseFloat(req.query.latitude as string);
+    const lon = parseFloat(req.query.longitude as string);
+    if (isNaN(lat) || isNaN(lon)) {
+      return res.status(400).json({ error: 'Valid latitude and longitude query parameters are required' });
+    }
+
+    const endpoint = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,et0_fao_evapotranspiration&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&timezone=auto&forecast_days=7`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      try {
+        controller.abort(new DOMException('Open-Meteo proxy timeout', 'TimeoutError'));
+      } catch {
+        controller.abort();
+      }
+    }, 12000);
+
+    const response = await fetch(endpoint, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Open-Meteo returned status ${response.status}` });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (err: any) {
+    console.warn('[Weather Proxy Forecast Warning]:', err?.message || err);
+    res.status(502).json({ error: err?.message || 'Failed to fetch forecast from Open-Meteo' });
+  }
+});
+
+app.get('/api/weather/historical', async (req: Request, res: Response) => {
+  try {
+    const lat = parseFloat(req.query.latitude as string);
+    const lon = parseFloat(req.query.longitude as string);
+    const startYear = parseInt(req.query.start_year as string, 10) || 2023;
+    const endYear = parseInt(req.query.end_year as string, 10) || 2025;
+
+    if (isNaN(lat) || isNaN(lon)) {
+      return res.status(400).json({ error: 'Valid latitude and longitude query parameters are required' });
+    }
+
+    const startDate = `${startYear}-01-01`;
+    const endDate = `${endYear}-12-31`;
+    const endpoint = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${startDate}&end_date=${endDate}&daily=precipitation_sum,temperature_2m_max,temperature_2m_min&timezone=auto`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      try {
+        controller.abort(new DOMException('Open-Meteo archive proxy timeout', 'TimeoutError'));
+      } catch {
+        controller.abort();
+      }
+    }, 15000);
+
+    const response = await fetch(endpoint, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Open-Meteo archive returned status ${response.status}` });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (err: any) {
+    console.warn('[Weather Proxy Historical Warning]:', err?.message || err);
+    res.status(502).json({ error: err?.message || 'Failed to fetch historical data from Open-Meteo' });
+  }
+});
+
 // Paystack Configuration & Verification Endpoints
 app.get('/api/paystack/public-key', (_req: Request, res: Response) => {
   // Check both PAYSTACK_PUBLIC_KEY and VITE_PAYSTACK_PUBLIC_KEY

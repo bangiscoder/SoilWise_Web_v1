@@ -80,7 +80,7 @@ export const FarmOpenMeteoWeatherSection: React.FC<FarmOpenMeteoWeatherSectionPr
         setError(fResult.errorMessage || 'Unable to connect to Open-Meteo services.');
       }
     } catch (err: any) {
-      console.error('Failed to load Open-Meteo weather data:', err);
+      console.warn('Weather data loading note:', err?.message || err);
       setError(err?.message || 'Unexpected network error occurred.');
     } finally {
       setLoading(false);
