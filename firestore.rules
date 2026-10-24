@@ -145,6 +145,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Offline / Pre-Signup VIP Payer Credits
+    // Admin can create and manage pending credits for people who paid before registering
+    // Authenticated users can check if a pending credit exists for their email
+    match /soilwise_pending_vip_credits/{creditId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
     // Default deny all other collections
     match /{document=**} {
       allow read, write: if false;

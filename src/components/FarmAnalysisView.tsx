@@ -38,6 +38,7 @@ import { SoilwiseAiAssistant } from './SoilwiseAiAssistant';
 import { FloatingAiAssistantBar } from './FloatingAiAssistantBar';
 import { AgronomistConsultationModal } from './AgronomistConsultationModal';
 import { FarmerFeedbackSection } from './FarmerFeedbackSection';
+import { RealTimeWeatherAlerts } from './weather/RealTimeWeatherAlerts';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import resultHeroBg from '../assets/images/result_hero_bg_1790608469988.jpg';
@@ -434,6 +435,11 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
           </div>
         </div>
 
+        {/* Real-Time Extreme Climate & Weather Alerts (Location-Based Notification) */}
+        <RealTimeWeatherAlerts
+          location={location}
+          onNavigateToWeatherTab={() => handleTabChange('weather')}
+        />
 
         {/* Sticky Top Tab Navigation Bar ("Taps") */}
         <div

@@ -18,7 +18,9 @@ import {
   Loader2,
   Calendar,
   Layers,
-  Sprout
+  Sprout,
+  UserPlus,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
@@ -41,6 +43,8 @@ interface VipCommitmentModalProps {
   onSuccessOrder?: (order: SeedOrder) => void;
   onNavigateToMarketplace?: () => void;
   onNavigateToOrders?: () => void;
+  onNavigateToRegister?: () => void;
+  onNavigateToLogin?: () => void;
 }
 
 const DEPOSIT_PRESETS = [1000, 2500, 5000, 10000];
@@ -53,6 +57,8 @@ export const VipCommitmentModal: React.FC<VipCommitmentModalProps> = ({
   onSuccessOrder,
   onNavigateToMarketplace,
   onNavigateToOrders,
+  onNavigateToRegister,
+  onNavigateToLogin,
 }) => {
   const { currentUser, userProfile, updateUserProfile } = useAuth();
 
@@ -142,6 +148,11 @@ export const VipCommitmentModal: React.FC<VipCommitmentModalProps> = ({
   const handleInitiateCommitment = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (!currentUser) {
+      setErrorMessage('You must create a free farmer account or sign in first before paying the VIP commitment.');
+      return;
+    }
 
     if (!farmerName.trim()) {
       setErrorMessage('Please enter your full name for order dispatch.');
@@ -480,6 +491,45 @@ export const VipCommitmentModal: React.FC<VipCommitmentModalProps> = ({
               </div>
             </div>
 
+            {/* Mandatory Signup First Alert for Guests */}
+            {!currentUser && (
+              <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-2xl space-y-2.5 shadow-sm">
+                <div className="flex items-start gap-2.5 text-xs text-amber-900 font-semibold">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-black text-amber-950 text-sm">Account Required: Please Sign Up First</p>
+                    <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
+                      To tie your refundable ₦{effectiveDeposit.toLocaleString()} deposit, guaranteed seed quota, and VIP delivery badge to your farmer profile, you must have an active SoilWise account before paying.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onNavigateToRegister?.();
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-[#1b4332] text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-[#143225] cursor-pointer shadow-xs"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>Create Account</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onNavigateToLogin?.();
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-white border border-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-stone-50 cursor-pointer shadow-xs"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Sign In</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Step 1: Select Seed Variety */}
             <div className="space-y-2">
               <label className="block text-xs font-bold text-stone-800 uppercase tracking-wider">
@@ -779,23 +829,37 @@ export const VipCommitmentModal: React.FC<VipCommitmentModalProps> = ({
                   Skip for Now
                 </button>
 
-                <button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="flex-1 sm:flex-none px-6 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Connecting to Paystack...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Crown className="w-4 h-4 text-amber-300" />
-                      <span>Pay ₦{effectiveDeposit.toLocaleString()} &amp; Secure Free Delivery</span>
-                    </>
-                  )}
-                </button>
+                {!currentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onNavigateToRegister?.();
+                    }}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4 text-emerald-300" />
+                    <span>Sign Up First to Pay Commitment</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isProcessing}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Connecting to Paystack...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Crown className="w-4 h-4 text-amber-300" />
+                        <span>Pay ₦{effectiveDeposit.toLocaleString()} &amp; Secure Free Delivery</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </form>

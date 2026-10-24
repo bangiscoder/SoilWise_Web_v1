@@ -17,7 +17,10 @@ import {
   RotateCcw,
   Heart,
   MessageSquareHeart,
-  FileText
+  FileText,
+  Lock,
+  UserPlus,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +37,8 @@ interface CommitmentRequestModalProps {
   onClose: () => void;
   onOpenSurvey?: () => void;
   onSuccessUpgrade?: () => void;
+  onNavigateToRegister?: () => void;
+  onNavigateToLogin?: () => void;
 }
 
 export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
@@ -41,6 +46,8 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
   onClose,
   onOpenSurvey,
   onSuccessUpgrade,
+  onNavigateToRegister,
+  onNavigateToLogin,
 }) => {
   const { currentUser, userProfile, updateUserProfile } = useAuth();
 
@@ -105,6 +112,11 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
   const handleInitiateCommitment = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (!currentUser) {
+      setErrorMessage('You must create a free farmer account or sign in first before paying the VIP commitment.');
+      return;
+    }
 
     const parsedAmount = parseInt(customAmountStr, 10);
     if (isNaN(parsedAmount) || parsedAmount < 1000) {
@@ -440,6 +452,50 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
                 </p>
               </div>
 
+              {/* Account Requirement Warning (if user is not signed in) */}
+              {!currentUser && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border-2 border-amber-400 text-stone-900 space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 text-stone-950 flex items-center justify-center font-black shrink-0 mt-0.5 shadow-2xs">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-xs text-stone-950">
+                        Farmer Account Required to Claim VIP
+                      </h4>
+                      <p className="text-[11px] text-stone-700 leading-snug">
+                        Please sign up or sign in first before paying. This guarantees your ₦{amountNgn.toLocaleString()} refundable fund, 35% discount, and free farm delivery are linked to your profile.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onNavigateToRegister?.();
+                      }}
+                      className="py-2 px-3 rounded-xl bg-[#1b4332] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer hover:bg-[#143225]"
+                    >
+                      <UserPlus className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>Create Account</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onNavigateToLogin?.();
+                      }}
+                      className="py-2 px-3 rounded-xl bg-white border border-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-stone-50 cursor-pointer"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Sign In</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Amount Selection & Input */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -549,23 +605,37 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
                   Maybe Later
                 </button>
 
-                <button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="w-full sm:flex-1 px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Connecting to Paystack...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Crown className="w-4 h-4 text-amber-300" />
-                      <span>Pay ₦{amountNgn.toLocaleString()} &amp; Unlock VIP</span>
-                    </>
-                  )}
-                </button>
+                {!currentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onNavigateToRegister?.();
+                    }}
+                    className="w-full sm:flex-1 px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-black rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4 text-emerald-300" />
+                    <span>Sign Up First to Claim VIP (₦{amountNgn.toLocaleString()})</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isProcessing}
+                    className="w-full sm:flex-1 px-5 py-3 bg-[#1b4332] hover:bg-[#143225] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Connecting to Paystack...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Crown className="w-4 h-4 text-amber-300" />
+                        <span>Pay ₦{amountNgn.toLocaleString()} &amp; Unlock VIP</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </form>
           )}

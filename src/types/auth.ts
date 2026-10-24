@@ -70,6 +70,25 @@ export interface SoilWiseUserProfile {
     submittedAt: string;
     status: string;
   };
+  vipUpgradeNote?: string;
+  adminUpgradedBy?: string;
+  prePaidCreditApplied?: boolean;
+  prePaidCreditRef?: string | null;
+}
+
+export interface PendingVipCredit {
+  id?: string;
+  email: string;
+  phone?: string;
+  name?: string;
+  amountNgn: number;
+  reference?: string;
+  note?: string;
+  status: 'pending' | 'claimed';
+  createdAt: string;
+  claimedByUid?: string;
+  claimedAt?: string;
+  createdByAdmin?: boolean;
 }
 
 export interface UpdateProfileInput {

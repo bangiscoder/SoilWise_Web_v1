@@ -25,6 +25,11 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
   serverTimestamp,
 } from 'firebase/firestore';
 
@@ -150,13 +155,47 @@ export async function createOrSyncUserProfile(
     existingProfile = await getUserProfile(uid);
   }
 
+  // Check if an offline or pre-signup VIP commitment was credited for this email
+  let pendingCreditData: any = null;
+  if (db && isFirebaseConfigured && email) {
+    try {
+      const creditsRef = collection(db, 'soilwise_pending_vip_credits');
+      const q = query(creditsRef, where('email', '==', email.toLowerCase().trim()), where('status', '==', 'pending'));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const firstDoc = snap.docs[0];
+        pendingCreditData = { id: firstDoc.id, ...firstDoc.data() };
+        // Mark as claimed
+        await updateDoc(doc(db, 'soilwise_pending_vip_credits', firstDoc.id), {
+          status: 'claimed',
+          claimedByUid: uid,
+          claimedAt: nowIso,
+        });
+      }
+    } catch (err) {
+      console.warn('Could not query pending VIP credits:', err);
+    }
+  }
+
   if (existingProfile) {
-    // If profile already exists, do not overwrite custom display name with Google profile
+    // If profile already exists, preserve fields and apply any newly discovered credit
     const updatedProviders = Array.from(new Set([...existingProfile.authProviders, ...providers]));
+    const shouldApplyVip = pendingCreditData && !existingProfile.isVipFarmer;
     const updatedProfile: SoilWiseUserProfile = {
       ...existingProfile,
       authProviders: updatedProviders,
       updatedAt: nowIso,
+      ...(shouldApplyVip ? {
+        isVipFarmer: true,
+        vipLevel: 'gold',
+        refundableDepositNgn: pendingCreditData.amountNgn || 1000,
+        totalCommitmentPaidNgn: pendingCreditData.amountNgn || 1000,
+        freeDeliveryEligible: true,
+        earlyBirdSpotSecured: true,
+        vipSecuredAt: nowIso,
+        prePaidCreditApplied: true,
+        prePaidCreditRef: pendingCreditData.reference || null,
+      } : {}),
     };
 
     if (db && isFirebaseConfigured) {
@@ -165,6 +204,17 @@ export async function createOrSyncUserProfile(
         await setDoc(userDocRef, {
           authProviders: updatedProviders,
           updatedAt: serverTimestamp(),
+          ...(shouldApplyVip ? {
+            isVipFarmer: true,
+            vipLevel: 'gold',
+            refundableDepositNgn: pendingCreditData.amountNgn || 1000,
+            totalCommitmentPaidNgn: pendingCreditData.amountNgn || 1000,
+            freeDeliveryEligible: true,
+            earlyBirdSpotSecured: true,
+            vipSecuredAt: nowIso,
+            prePaidCreditApplied: true,
+            prePaidCreditRef: pendingCreditData.reference || null,
+          } : {}),
         }, { merge: true });
       } catch (err) {
         console.warn('Could not update profile in Firestore:', err);
@@ -174,7 +224,7 @@ export async function createOrSyncUserProfile(
     return updatedProfile;
   }
 
-  // Create brand new profile
+  // Create brand new profile with auto-applied pre-paid credit if found
   const newProfile: SoilWiseUserProfile = {
     uid,
     email,
@@ -185,6 +235,17 @@ export async function createOrSyncUserProfile(
     accountStatus: 'active',
     createdAt: nowIso,
     updatedAt: nowIso,
+    ...(pendingCreditData ? {
+      isVipFarmer: true,
+      vipLevel: 'gold',
+      refundableDepositNgn: pendingCreditData.amountNgn || 1000,
+      totalCommitmentPaidNgn: pendingCreditData.amountNgn || 1000,
+      freeDeliveryEligible: true,
+      earlyBirdSpotSecured: true,
+      vipSecuredAt: nowIso,
+      prePaidCreditApplied: true,
+      prePaidCreditRef: pendingCreditData.reference || null,
+    } : {}),
   };
 
   if (db && isFirebaseConfigured) {

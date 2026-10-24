@@ -69,6 +69,7 @@ import {
   updateSeedOrderStatus 
 } from '../../services/marketplaceService';
 import { AdminAddSeedModal } from './AdminSeedInventoryModal';
+import { AdminUserAnalysisView } from './AdminUserAnalysisView';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -105,7 +106,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBack
   };
 
   // Main Admin Section Tabs
-  const [activeAdminTab, setActiveAdminTab] = useState<'curriculum' | 'seeds-inventory' | 'feedback' | 'diagnostics'>('curriculum');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'curriculum' | 'seeds-inventory' | 'feedback' | 'diagnostics'>('users');
 
   // Curriculum & Lesson Management State
   const [curriculumLessons, setCurriculumLessons] = useState<Lesson[]>(INITIAL_LESSONS);
@@ -495,6 +496,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBack
       {/* Admin Section Tabs */}
       <div className="flex items-center gap-2 border-b border-stone-200 pb-3 overflow-x-auto scrollbar-none">
         <button
+          onClick={() => setActiveAdminTab('users')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeAdminTab === 'users'
+              ? 'bg-[#1b4332] text-white shadow-xs'
+              : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>User Analysis &amp; VIP Farmers</span>
+        </button>
+
+        <button
           onClick={() => setActiveAdminTab('curriculum')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeAdminTab === 'curriculum'
@@ -557,6 +570,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onBack
             ✕
           </button>
         </div>
+      )}
+
+      {/* 0. USER & VIP FARMER ANALYSIS SUITE */}
+      {activeAdminTab === 'users' && (
+        <AdminUserAnalysisView />
       )}
 
       {/* 1. CURRICULUM & LESSON MANAGEMENT SUITE */}

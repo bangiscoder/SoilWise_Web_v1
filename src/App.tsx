@@ -376,11 +376,11 @@ export default function App() {
     currentView !== 'admin-soil-data-test';
 
   return (
-    <div className="min-h-screen bg-[#fbfbf9] text-stone-900 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-[#fbfbf9] text-stone-900 flex flex-col md:flex-row font-['Plus_Jakarta_Sans',sans-serif]">
       {/* PWA Offline Status Banner & Install Prompt */}
       <OfflineBanner />
 
-      {/* Top Bar Navigation (shown on main app views) */}
+      {/* Navigation (Left Sidebar on Desktop, Top Bar + Left Drawer on Mobile) */}
       {isNavVisible && (
         <Navbar
           currentView={currentView}
@@ -391,9 +391,10 @@ export default function App() {
         />
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1">
-        {/* Global Error Banner */}
+      {/* Main Content Area: Takes the rest of the space without reloading browser */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen overflow-x-hidden">
+        <main className="flex-1">
+          {/* Global Error Banner */}
         {appError && (
           <div className="max-w-3xl mx-auto mt-4 px-4">
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-xs sm:text-sm text-red-800">
@@ -699,6 +700,7 @@ export default function App() {
           </div>
         </footer>
       )}
+      </div>
 
       {/* Analysis Progress Dialog */}
       {isSubmitting && <AnalysisProgressModal currentStep={analysisStep} />}
@@ -727,6 +729,14 @@ export default function App() {
           setMarketplaceCropFilter(null);
           navigateToView('marketplace');
         }}
+        onNavigateToRegister={() => {
+          setIsVipCommitmentModalOpen(false);
+          navigateToView('register');
+        }}
+        onNavigateToLogin={() => {
+          setIsVipCommitmentModalOpen(false);
+          navigateToView('login');
+        }}
       />
 
       {/* Interactive Commitment Request Modal (Advocacy -> ₦1,000+ Refundable Commitment -> VIP Gold Upgrade) */}
@@ -739,6 +749,14 @@ export default function App() {
         }}
         onSuccessUpgrade={() => {
           setIsCommitmentRequestOpen(false);
+        }}
+        onNavigateToRegister={() => {
+          setIsCommitmentRequestOpen(false);
+          navigateToView('register');
+        }}
+        onNavigateToLogin={() => {
+          setIsCommitmentRequestOpen(false);
+          navigateToView('login');
         }}
       />
 
