@@ -18,6 +18,7 @@ import {
   MapPinCheck,
   RefreshCw,
   Compass,
+  Crown,
 } from 'lucide-react';
 import { SoilData } from '../types/soilwise';
 import { NIGERIA_STATES_LGAS } from '../data/nigeriaStatesLga';
@@ -56,9 +57,19 @@ interface FarmDataFormProps {
   ) => void;
   isSubmitting: boolean;
   preselectedFarm?: FarmProfileDocument | null;
+  onOpenCommitmentModal?: () => void;
+  onNavigateToRegister?: () => void;
+  onNavigateToLogin?: () => void;
 }
 
-export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitting, preselectedFarm }) => {
+export const FarmDataForm: React.FC<FarmDataFormProps> = ({ 
+  onSubmit, 
+  isSubmitting, 
+  preselectedFarm,
+  onOpenCommitmentModal,
+  onNavigateToRegister,
+  onNavigateToLogin,
+}) => {
   const { t } = useLanguage();
   const { currentUser, userProfile } = useAuth();
 
@@ -720,9 +731,51 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({ onSubmit, isSubmitti
       </section>
 
       {/* 3. MAIN FARM ANALYSIS FORM */}
-      <section id="farmAnalysisForm" className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+      <section id="farmAnalysisForm" className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14 space-y-6">
+        {/* Direct VIP Upgrade Banner (No Farm Analysis Required) */}
+        {!userProfile?.isVipFarmer && (
+          <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 rounded-3xl p-4 sm:p-5 text-stone-950 shadow-md border border-amber-500/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-stone-950 text-amber-400 flex items-center justify-center font-black shrink-0 shadow-xs">
+                <Crown className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-stone-950 text-amber-300 px-2.5 py-0.5 rounded-full">
+                    Direct VIP Upgrade
+                  </span>
+                  <span className="text-xs font-bold text-stone-900">
+                    No Farm Analysis Required
+                  </span>
+                </div>
+                <p className="text-xs text-stone-900 font-medium leading-relaxed">
+                  Commit <strong>₦1,000 (100% refundable)</strong> to unlock <strong>35% off certified seed varieties</strong> and <strong>100% free nationwide farm delivery</strong>.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!currentUser) {
+                  try {
+                    sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                  } catch {}
+                  onNavigateToRegister?.();
+                } else if (onOpenCommitmentModal) {
+                  onOpenCommitmentModal();
+                }
+              }}
+              className="w-full sm:w-auto px-5 py-2.5 bg-stone-950 hover:bg-stone-900 text-amber-300 text-xs sm:text-sm font-black rounded-xl transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 shrink-0"
+            >
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>{currentUser ? 'Upgrade Account (₦1,000)' : 'Sign Up to Upgrade (₦1,000)'}</span>
+            </button>
+          </div>
+        )}
+
         {/* Header of input area */}
-        <div className="text-center sm:text-left space-y-1 mb-6">
+        <div className="text-center sm:text-left space-y-1">
           <span className="text-xs font-semibold uppercase tracking-wider text-[#1b4332]">
             {t('nav.farmAnalysis')}
           </span>

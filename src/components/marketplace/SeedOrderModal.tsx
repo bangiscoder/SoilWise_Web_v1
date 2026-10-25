@@ -22,7 +22,10 @@ import {
   Printer,
   ExternalLink,
   RefreshCw,
-  FileText
+  FileText,
+  ArrowRight,
+  ShieldAlert,
+  Coins
 } from 'lucide-react';
 import { CropSeed, SeedOrder, DeliveryMethod, PaymentMethod, PaymentStatus } from '../../types/marketplace';
 import { placeSeedOrder } from '../../services/marketplaceService';
@@ -34,6 +37,8 @@ interface SeedOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderSuccess: (order: SeedOrder) => void;
+  onNavigateToLogin?: () => void;
+  onNavigateToRegister?: () => void;
 }
 
 export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
@@ -41,14 +46,20 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
   isOpen,
   onClose,
   onOrderSuccess,
+  onNavigateToLogin,
+  onNavigateToRegister,
 }) => {
   const { currentUser } = useAuth();
 
-  // Kilograms & calculator state
+  // Kilograms & calculator state (any kilogram quantity allowed)
   const [quantityKg, setQuantityKg] = useState<number>(seed?.minOrderKg || 5);
   const [showCalculator, setShowCalculator] = useState<boolean>(false);
   const [farmArea, setFarmArea] = useState<string>('1.0');
   const [areaUnit, setAreaUnit] = useState<'hectares' | 'acres'>('hectares');
+
+  // Flexible Deposit state (Minimum ₦1,000)
+  const [depositAmount, setDepositAmount] = useState<number>(1000);
+  const [customDepositInput, setCustomDepositInput] = useState<string>('1000');
 
   // Farmer details state
   const [farmerName, setFarmerName] = useState<string>(currentUser?.displayName || '');
@@ -76,6 +87,8 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
   useEffect(() => {
     if (seed) {
       setQuantityKg(seed.minOrderKg || 5);
+      setDepositAmount(1000);
+      setCustomDepositInput('1000');
       setSubmittedOrder(null);
       setErrorMessage(null);
       setIsProcessingPayment(false);
@@ -84,43 +97,65 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
     getPaystackPublicKey().then((k) => setPaystackKey(k));
   }, [seed?.id]);
 
+  useEffect(() => {
+    if (currentUser) {
+      if (!farmerName && currentUser.displayName) setFarmerName(currentUser.displayName);
+      if (!farmerEmail && currentUser.email) setFarmerEmail(currentUser.email);
+    }
+  }, [currentUser]);
+
   if (!isOpen || !seed) return null;
 
-  const pricePerKg = seed.pricePerKg || 1500;
-  const totalPrice = quantityKg * pricePerKg;
-  const isOutOfStock = seed.stockKg <= 0 || !seed.inStock;
-  const exceedsStock = quantityKg > seed.stockKg;
+  const estimatedPricePerKg = seed.pricePerKg || 1500;
+  const estimatedTotalPrice = quantityKg * estimatedPricePerKg;
 
   // Farm Area calculation helper
   const areaValue = parseFloat(farmArea) || 0;
   const convertedHectares = areaUnit === 'acres' ? areaValue * 0.404686 : areaValue;
   const calculatedRecommendedKg = Math.max(
-    seed.minOrderKg,
-    Math.round(convertedHectares * seed.recommendedRateKgPerHa)
+    1,
+    Math.round(convertedHectares * (seed.recommendedRateKgPerHa || 20))
   );
 
   const applyCalculatedKg = () => {
     if (calculatedRecommendedKg > 0) {
-      const clamped = Math.min(seed.stockKg > 0 ? seed.stockKg : 1000, Math.max(seed.minOrderKg, calculatedRecommendedKg));
-      setQuantityKg(clamped);
+      setQuantityKg(calculatedRecommendedKg);
       setShowCalculator(false);
     }
   };
 
   const handleKgChange = (newVal: number) => {
-    const validVal = isNaN(newVal) ? seed.minOrderKg : newVal;
-    const clamped = Math.max(seed.minOrderKg, validVal);
-    setQuantityKg(clamped);
+    const validVal = isNaN(newVal) ? 1 : Math.max(1, newVal);
+    setQuantityKg(validVal);
+    if (errorMessage) setErrorMessage(null);
+  };
+
+  const handleDepositChange = (amount: number) => {
+    setDepositAmount(amount);
+    setCustomDepositInput(amount.toString());
+    if (errorMessage) setErrorMessage(null);
+  };
+
+  const handleCustomDepositInput = (val: string) => {
+    setCustomDepositInput(val);
+    const num = parseInt(val, 10);
+    if (!isNaN(num)) {
+      setDepositAmount(num);
+    }
     if (errorMessage) setErrorMessage(null);
   };
 
   const validateForm = (): boolean => {
-    if (quantityKg < seed.minOrderKg) {
-      setErrorMessage(`Minimum order quantity for this seed is ${seed.minOrderKg} kg.`);
+    if (!currentUser) {
+      setErrorMessage('You must be signed in to your SoilWise account to place an IAR seed pre-order.');
       return false;
     }
-    if (quantityKg > seed.stockKg) {
-      setErrorMessage(`Only ${seed.stockKg} kg currently available in stock. Please adjust your quantity.`);
+    if (quantityKg < 1) {
+      setErrorMessage('Please enter at least 1 kilogram of seed.');
+      return false;
+    }
+    if (depositAmount < 1000) {
+      setErrorMessage('Minimum pre-order deposit is ₦1,000. Please adjust your deposit amount.');
       return false;
     }
     if (!farmerName.trim()) {
@@ -128,7 +163,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
       return false;
     }
     if (!farmerPhone.trim()) {
-      setErrorMessage('Please enter your mobile phone number for order verification & delivery.');
+      setErrorMessage('Please enter your mobile phone number for order verification & dispatch notifications.');
       return false;
     }
     if (!lga.trim()) {
@@ -138,7 +173,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
     return true;
   };
 
-  // Execute Order Creation after payment or on POD selection
+  // Execute Order Creation after payment or POD selection
   const executeOrderCreation = async (paymentDetails: {
     paymentStatus: PaymentStatus;
     paymentMethod: PaymentMethod;
@@ -154,8 +189,8 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
         seedName: seed.varietyName,
         cropType: seed.cropType,
         quantityKg,
-        pricePerKg,
-        totalPrice,
+        pricePerKg: estimatedPricePerKg,
+        totalPrice: estimatedTotalPrice,
         currency: 'NGN',
         farmerName: farmerName.trim(),
         farmerPhone: farmerPhone.trim(),
@@ -166,6 +201,13 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
         deliveryMethod,
         deliveryNotes: deliveryNotes.trim() || undefined,
         userId: currentUser?.uid || null,
+        status: 'preorder_awaiting_price',
+        isPreOrder: true,
+        isAwaitingOfficialPrice: true,
+        depositAmountNgn: depositAmount,
+        excessRefundGuaranteed: true,
+        refundPolicyNotice: 'When official partnership seed prices are released by IAR, your deposit will be aggregated against the actual price of your ordered kilograms. If there is an excess balance, SoilWise AI will definitely refund the balance.',
+        iarPartnershipStatus: 'Awaiting Official Price Release',
         paymentStatus: paymentDetails.paymentStatus,
         paymentMethod: paymentDetails.paymentMethod,
         paystackReference: paymentDetails.paystackReference,
@@ -177,8 +219,8 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
       setPaymentStep('completed');
       onOrderSuccess(order);
     } catch (err: any) {
-      console.error('Failed to place seed order:', err);
-      setErrorMessage(err.message || 'Failed to place seed order. Please try again.');
+      console.error('Failed to place pre-order:', err);
+      setErrorMessage(err.message || 'Failed to place seed pre-order. Please try again.');
     } finally {
       setIsSubmitting(false);
       setIsProcessingPayment(false);
@@ -192,7 +234,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
 
     if (!validateForm()) return;
 
-    // Option A: Pay on Delivery
+    // Option A: Pay on Delivery / Depot collection deposit
     if (paymentMethod === 'pay_on_delivery') {
       await executeOrderCreation({
         paymentStatus: 'unpaid',
@@ -201,55 +243,54 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
       return;
     }
 
-    // Option B: Paystack Payment Gateway
+    // Option B: Paystack Payment Gateway charging the chosen DEPOSIT amount
     setIsProcessingPayment(true);
     setPaymentStep('popup_open');
 
-    const orderRef = `SW-PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderRef = `SW-PRE-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const sanitizedEmail = farmerEmail.trim() || `${farmerPhone.replace(/\D/g, '') || 'farmer'}@soilwise.ng`;
 
-    // Check if user requested simulated test payment or if test key is sandbox
+    // Check if user requested simulated test payment
     if (useSimulatedTestPay) {
       setPaymentStep('verifying');
       setTimeout(async () => {
-        const verifyRes = await verifyPaystackTransaction(orderRef, totalPrice);
+        const verifyRes = await verifyPaystackTransaction(orderRef, depositAmount);
         await executeOrderCreation({
           paymentStatus: 'paid',
           paymentMethod: 'paystack',
           paystackReference: orderRef,
-          amountPaidKobo: Math.round(totalPrice * 100),
+          amountPaidKobo: Math.round(depositAmount * 100),
         });
       }, 1200);
       return;
     }
 
-    // Attempt live Paystack popup
+    // Attempt live Paystack popup with the user's chosen deposit amount
     const popupOpened = await initiatePaystackCheckout({
       email: sanitizedEmail,
-      amountNgn: totalPrice,
+      amountNgn: depositAmount,
       reference: orderRef,
-      seedVariety: seed.varietyName,
+      seedVariety: `${seed.varietyName} (Pre-Order Deposit)`,
       quantityKg,
       farmerPhone: farmerPhone.trim(),
       deliveryAddress: `${farmLocation.trim() || lga}, ${state}`,
       onSuccess: async (response) => {
         setPaymentStep('verifying');
         try {
-          const verifyRes = await verifyPaystackTransaction(response.reference || orderRef, totalPrice);
+          const verifyRes = await verifyPaystackTransaction(response.reference || orderRef, depositAmount);
           if (verifyRes.verified && verifyRes.data?.status === 'success') {
             await executeOrderCreation({
               paymentStatus: 'paid',
               paymentMethod: 'paystack',
               paystackReference: response.reference || orderRef,
-              amountPaidKobo: Math.round(totalPrice * 100),
+              amountPaidKobo: Math.round(depositAmount * 100),
             });
           } else {
-            // STRICT CONFIRMATION: Do not confirm if not verified by Paystack
             setIsProcessingPayment(false);
             setPaymentStep('idle');
             setErrorMessage(
               verifyRes.message || 
-              'Payment could not be confirmed by Paystack. Your card was not charged or payment was declined.'
+              'Deposit could not be confirmed by Paystack. Your card was not charged or payment was declined.'
             );
           }
         } catch (err: any) {
@@ -279,7 +320,11 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
     window.print();
   };
 
-  const quickPresets = [2, 5, 10, 20, 50, 100].filter(kg => kg >= seed.minOrderKg && kg <= (seed.stockKg || 1000));
+  // Flexible kilogram presets
+  const kgPresets = [5, 10, 25, 50, 100, 250, 500, 1000];
+
+  // Deposit presets (min ₦1,000)
+  const depositPresets = [1000, 2500, 5000, 10000, 25000, 50000];
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 md:p-6 animate-in fade-in duration-200">
@@ -290,16 +335,21 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
         aria-labelledby="order-seed-modal-title"
       >
         {/* Header Bar */}
-        <div className="px-5 sm:px-7 py-4 sm:py-5 border-b border-stone-100 flex items-center justify-between bg-stone-50/80">
+        <div className="px-5 sm:px-7 py-4 sm:py-5 border-b border-stone-100 flex items-center justify-between bg-emerald-950 text-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center justify-center shrink-0">
-              <Sprout className="w-5 h-5 text-emerald-700" />
+            <div className="w-9 h-9 rounded-xl bg-emerald-800/80 text-emerald-200 border border-emerald-700 flex items-center justify-center shrink-0">
+              <Sprout className="w-5 h-5 text-emerald-300" />
             </div>
             <div>
-              <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider block">
-                Certified Seed Purchase &bull; Paystack Checkout
-              </span>
-              <h2 id="order-seed-modal-title" className="text-base sm:text-lg font-extrabold text-stone-900 truncate max-w-md">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400 text-stone-950">
+                  IAR Partnership Pre-Order
+                </span>
+                <span className="text-[11px] text-emerald-200 hidden sm:inline">
+                  Samaru / ABU Zaria
+                </span>
+              </div>
+              <h2 id="order-seed-modal-title" className="text-base sm:text-lg font-extrabold text-white truncate max-w-md mt-0.5">
                 {seed.varietyName}
               </h2>
             </div>
@@ -308,7 +358,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
           <button
             onClick={onClose}
             aria-label="Close modal"
-            className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-emerald-200 hover:text-white hover:bg-emerald-900 rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -317,31 +367,38 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
         {/* Modal Body */}
         <div className="overflow-y-auto px-5 sm:px-7 py-5 sm:py-6 space-y-6">
           {submittedOrder ? (
-            /* Order Success View with Payment Receipt */
+            /* Pre-Order Success View with Receipt */
             <div className="py-4 space-y-6 text-center">
-              <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-800 border-2 border-emerald-200 flex items-center justify-center mx-auto shadow-inner animate-in zoom-in-95">
+              <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-800 border-2 border-emerald-300 flex items-center justify-center mx-auto shadow-inner animate-in zoom-in-95">
                 <CheckCircle2 className="w-9 h-9 text-emerald-700" />
               </div>
 
               <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                  {submittedOrder.paymentStatus === 'paid' ? (
-                    <>
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>Payment Verified via Paystack</span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Order Confirmed &bull; Pay on Collection</span>
-                    </>
-                  )}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-950 text-xs font-bold">
+                  <Clock className="w-3.5 h-3.5 text-amber-800" />
+                  <span>Pre-Order Registered &bull; Awaiting Official IAR Price</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-stone-900">
-                  {submittedOrder.paymentStatus === 'paid' ? 'Seed Purchase Successful!' : 'Order Placed Successfully!'}
+                  Certified Seed Pre-Order Successful!
                 </h3>
                 <p className="text-xs sm:text-sm text-stone-600 max-w-md mx-auto">
-                  Your seed reservation has been processed and logged in the SoilWise system.
+                  Your seed allocation has been logged in the priority queue for official IAR breeder release.
+                </p>
+              </div>
+
+              {/* Definitive Refund & Price Aggregation Assurance Box */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-300 text-left space-y-2 max-w-lg mx-auto">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0" />
+                  <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
+                    SoilWise AI 100% Guaranteed Balance Refund Policy
+                  </h4>
+                </div>
+                <p className="text-xs text-emerald-900 leading-relaxed">
+                  As we finalize official partnership with the <strong>Institute for Agricultural Research (IAR), Samaru</strong>, your deposit of <strong>₦{(submittedOrder.depositAmountNgn || depositAmount).toLocaleString()}</strong> is securely logged against your <strong>{submittedOrder.quantityKg} kg</strong> order.
+                </p>
+                <p className="text-xs font-semibold text-emerald-950 bg-white/80 p-2.5 rounded-xl border border-emerald-200">
+                  When official prices are released, your money will be aggregated. <strong>If there is an excess balance, SoilWise AI will definitely refund the balance</strong> to you. Any balance due will be settled at farm delivery.
                 </p>
               </div>
 
@@ -349,15 +406,13 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
               <div className="bg-[#fbfbf9] p-5 sm:p-6 rounded-2xl border border-stone-200/90 text-left space-y-4 max-w-lg mx-auto shadow-xs">
                 <div className="flex items-center justify-between border-b border-stone-200/70 pb-3">
                   <div>
-                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Tracking Order No.</span>
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Pre-Order Tracking No.</span>
                     <span className="text-sm sm:text-base font-extrabold font-mono text-stone-900">
                       {submittedOrder.orderNumber}
                     </span>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                    submittedOrder.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {submittedOrder.paymentStatus === 'paid' ? 'PAID' : 'PAY ON DELIVERY'}
+                  <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                    PRE-ORDER
                   </span>
                 </div>
 
@@ -367,13 +422,13 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                     <span className="font-bold text-stone-900">{submittedOrder.seedName}</span>
                   </div>
                   <div>
-                    <span className="text-stone-400 text-[10px] block font-semibold uppercase">Quantity</span>
-                    <span className="font-bold text-stone-900 font-mono">{submittedOrder.quantityKg} kg</span>
+                    <span className="text-stone-400 text-[10px] block font-semibold uppercase">Reserved Kilograms</span>
+                    <span className="font-extrabold text-stone-900 font-mono text-sm">{submittedOrder.quantityKg} kg</span>
                   </div>
                   <div>
-                    <span className="text-stone-400 text-[10px] block font-semibold uppercase">Total Amount</span>
+                    <span className="text-stone-400 text-[10px] block font-semibold uppercase">Deposit Paid</span>
                     <span className="font-black text-[#1b4332] font-mono text-sm">
-                      ₦{submittedOrder.totalPrice.toLocaleString()}
+                      ₦{(submittedOrder.depositAmountNgn || depositAmount).toLocaleString()}
                     </span>
                   </div>
                   <div>
@@ -395,10 +450,10 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                     <p className="font-bold text-stone-800">
                       {submittedOrder.deliveryMethod === 'pickup_depot' 
                         ? `Agro-Dealer Depot Collection in ${submittedOrder.lga}, ${submittedOrder.state}`
-                        : `Direct Delivery to: ${submittedOrder.farmLocationOrAddress}`}
+                        : `Direct Farm Delivery to: ${submittedOrder.farmLocationOrAddress}`}
                     </p>
                     <p className="text-[11px] text-stone-500 mt-0.5">
-                      You will receive an SMS confirmation on {submittedOrder.farmerPhone} with pickup dispatch details.
+                      You will receive an SMS and email notification on {submittedOrder.farmerPhone} immediately once IAR releases official partnership prices and dispatch begins.
                     </p>
                   </div>
                 </div>
@@ -412,7 +467,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                   className="w-full sm:w-auto px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>Print Receipt</span>
+                  <span>Print Pre-Order Receipt</span>
                 </button>
 
                 <button
@@ -425,8 +480,73 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
               </div>
             </div>
           ) : (
-            /* Order & Payment Form */
+            /* Pre-Order Form */
             <form onSubmit={handleProceedToPayment} className="space-y-6">
+              {/* Institutional Notice & Refund Guarantee Banner */}
+              <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50 to-emerald-50/70 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-700 shrink-0" />
+                  <h3 className="text-xs sm:text-sm font-black text-stone-900 uppercase tracking-tight">
+                    IAR Partnership Pre-Order Period &bull; Samaru, Zaria
+                  </h3>
+                </div>
+                <p className="text-xs text-stone-700 leading-relaxed">
+                  As we await official partnership formalization and seasonal price releases with the <strong>Institute for Agricultural Research (IAR)</strong>, all orders are placed as priority <strong>Pre-Orders</strong>.
+                </p>
+                <div className="bg-white/90 p-3 rounded-xl border border-amber-200/80 text-xs space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-stone-900 block font-bold">
+                        Guaranteed Balance Refund &amp; Aggregation Assurance:
+                      </strong>
+                      <span className="text-stone-600 leading-relaxed block text-[11px] mt-0.5">
+                        Order <strong>any kilogram quantity</strong> of certified seed you desire and make <strong>any deposit of your choice (minimum ₦1,000)</strong>. When the official price is released by IAR, your money will be aggregated against your order. <strong>If there is an excess balance, SoilWise AI will definitely refund the balance</strong>.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Authentication Requirement Check */}
+              {!currentUser && (
+                <div className="p-4 bg-red-50 border-2 border-red-300 rounded-2xl space-y-2.5 animate-in shake">
+                  <div className="flex items-center gap-2 text-red-900 font-bold text-xs">
+                    <ShieldAlert className="w-4 h-4 text-red-700 shrink-0" />
+                    <span>Account Required to Place an IAR Seed Pre-Order</span>
+                  </div>
+                  <p className="text-xs text-red-800 leading-relaxed">
+                    Only farmers with an authenticated SoilWise account can place pre-orders so your allocation is tracked and eligible for refund processing.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    {onNavigateToRegister && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onNavigateToRegister();
+                        }}
+                        className="px-3.5 py-1.5 bg-[#1b4332] text-white text-xs font-bold rounded-lg hover:bg-[#143225] transition-all cursor-pointer"
+                      >
+                        Create Free Account
+                      </button>
+                    )}
+                    {onNavigateToLogin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onNavigateToLogin();
+                        }}
+                        className="px-3.5 py-1.5 bg-white text-stone-800 border border-stone-300 text-xs font-bold rounded-lg hover:bg-stone-50 transition-all cursor-pointer"
+                      >
+                        Sign In
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Seed Summary Strip */}
               <div className="bg-[#fbfbf9] p-4 rounded-2xl border border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
@@ -439,42 +559,24 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-stone-500">
-                    Source: <strong className="text-stone-700">{seed.breederOrg}</strong>
+                    Breeder / Institutional Origin: <strong className="text-stone-700">{seed.breederOrg}</strong>
                   </p>
                 </div>
 
                 <div className="text-right sm:border-l sm:border-stone-200 sm:pl-4">
-                  <span className="text-[10px] text-stone-400 uppercase font-semibold block">Price Per Kg</span>
-                  <span className="text-base sm:text-lg font-black text-[#1b4332] font-mono">
-                    ₦{pricePerKg.toLocaleString()} <span className="text-xs text-stone-500 font-normal">/ kg</span>
+                  <span className="text-[10px] text-stone-400 uppercase font-semibold block">Official Status</span>
+                  <span className="text-xs sm:text-sm font-extrabold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 inline-block">
+                    Awaiting Official IAR Price
                   </span>
                 </div>
               </div>
 
-              {/* Stock Warning Banner */}
-              {isOutOfStock ? (
-                <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-xs text-red-800">
-                  <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
-                  <div>
-                    <strong className="block font-bold">Currently Out of Stock</strong>
-                    <span>No seed units available at this moment. Please check back soon or browse other certified varieties.</span>
-                  </div>
-                </div>
-              ) : seed.stockKg <= 50 ? (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-xs text-amber-800">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-                  <span>
-                    <strong>Low Stock Alert:</strong> Only <strong>{seed.stockKg} kg</strong> remaining in inventory.
-                  </span>
-                </div>
-              ) : null}
-
-              {/* SECTION 1: KILOGRAM SELECTION & RATE CALCULATOR */}
+              {/* SECTION 1: KILOGRAM SELECTION (ANY KILOGRAM OF SEED) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label htmlFor="seedQuantityKgInput" className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
                     <Scale className="w-4 h-4 text-[#1b4332]" />
-                    <span>Select Seed Quantity (Kilograms) *</span>
+                    <span>1. How Many Kilograms (kg) Do You Want to Pre-Order? *</span>
                   </label>
 
                   <button
@@ -508,7 +610,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                           type="number"
                           step="0.1"
                           min="0.1"
-                          max="500"
+                          max="1000"
                           value={farmArea}
                           onChange={(e) => setFarmArea(e.target.value)}
                           placeholder="Enter area"
@@ -542,7 +644,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleKgChange(quantityKg - (quantityKg > 10 ? 5 : 1))}
-                      disabled={quantityKg <= seed.minOrderKg}
+                      disabled={quantityKg <= 1}
                       className="px-4 py-2.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 disabled:opacity-40 transition-colors cursor-pointer text-base font-bold"
                     >
                       &minus;
@@ -550,57 +652,116 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                     <input
                       id="seedQuantityKgInput"
                       type="number"
-                      min={seed.minOrderKg}
-                      max={seed.stockKg || 1000}
+                      min={1}
                       value={quantityKg}
                       onChange={(e) => handleKgChange(parseInt(e.target.value, 10))}
-                      className="w-20 text-center py-2 bg-transparent text-sm sm:text-base font-black text-stone-900 font-mono focus:outline-none"
+                      className="w-24 text-center py-2 bg-transparent text-sm sm:text-base font-black text-stone-900 font-mono focus:outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => handleKgChange(quantityKg + (quantityKg >= 10 ? 5 : 1))}
-                      disabled={quantityKg >= seed.stockKg}
-                      className="px-4 py-2.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 disabled:opacity-40 transition-colors cursor-pointer text-base font-bold"
+                      className="px-4 py-2.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer text-base font-bold"
                     >
                       &#43;
                     </button>
                   </div>
 
                   <span className="text-xs text-stone-500 font-medium">
-                    kg &bull; Minimum: <strong>{seed.minOrderKg} kg</strong> (Stock: {seed.stockKg} kg)
+                    Kilograms (Order <strong>any amount</strong> required for your farm)
                   </span>
                 </div>
 
                 {/* Quick Presets */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[11px] text-stone-400 font-medium mr-1">Presets:</span>
-                  {quickPresets.map(preset => (
+                  <span className="text-[11px] text-stone-400 font-medium mr-1">Quick Presets:</span>
+                  {kgPresets.map(preset => (
                     <button
                       key={preset}
                       type="button"
-                      onClick={() => setQuantityKg(preset)}
+                      onClick={() => handleKgChange(preset)}
                       className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
                         quantityKg === preset
                           ? 'bg-[#1b4332] text-white shadow-2xs'
                           : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
                       }`}
                     >
-                      {preset} kg
+                      {preset >= 1000 ? `${preset / 1000} tonne` : `${preset} kg`}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* SECTION 2: FARMER CONTACT & LOCATION */}
+              {/* SECTION 2: DEPOSIT AMOUNT SELECTION (MINIMUM ₦1,000) */}
+              <div className="space-y-3 pt-3 border-t border-stone-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
+                    <Coins className="w-4 h-4 text-[#1b4332]" />
+                    <span>2. Choose Your Pre-Order Deposit (Minimum ₦1,000) *</span>
+                  </label>
+                  <span className="text-[11px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
+                    Paystack charges only this deposit
+                  </span>
+                </div>
+
+                <p className="text-xs text-stone-600 leading-snug">
+                  You can make <strong>any deposit of your choice (min. ₦1,000)</strong>. Once IAR officially releases seasonal pricing, your deposit will be aggregated and any excess balance will be definitely refunded.
+                </p>
+
+                {/* Deposit Presets */}
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {depositPresets.map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleDepositChange(preset)}
+                      className={`py-2 px-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                        depositAmount === preset
+                          ? 'bg-[#1b4332] text-white border-[#1b4332] font-black shadow-xs'
+                          : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-800 font-semibold text-xs'
+                      }`}
+                    >
+                      <span className="text-[11px] block">₦{preset.toLocaleString()}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Deposit Input */}
+                <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-stone-700">
+                    Or Enter Any Custom Deposit Amount:
+                  </span>
+                  <div className="relative w-full sm:w-48">
+                    <span className="absolute left-3 top-2 text-stone-500 font-bold text-sm">₦</span>
+                    <input
+                      type="number"
+                      min={1000}
+                      step={500}
+                      value={customDepositInput}
+                      onChange={(e) => handleCustomDepositInput(e.target.value)}
+                      placeholder="1000"
+                      className="w-full pl-8 pr-3 py-1.5 bg-white border border-stone-300 rounded-xl text-sm font-black text-stone-900 font-mono focus:outline-none focus:border-[#1b4332]"
+                    />
+                  </div>
+                </div>
+
+                {depositAmount < 1000 && (
+                  <p className="text-xs text-red-600 font-semibold flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>Minimum deposit allowed is ₦1,000.</span>
+                  </p>
+                )}
+              </div>
+
+              {/* SECTION 3: FARMER CONTACT & LOCATION */}
               <div className="space-y-3.5 pt-3 border-t border-stone-100">
                 <span className="text-xs font-bold uppercase tracking-wider text-stone-700 block">
-                  Farmer Contact & Delivery Information
+                  3. Farmer Contact &amp; Dispatch Information
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Farmer or Farm Name *
+                      Farmer or Farm Business Name *
                     </label>
                     <div className="relative">
                       <User className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-2.5" />
@@ -617,7 +778,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Phone Number (SMS Notifications) *
+                      Phone Number (For IAR Price Alert SMS) *
                     </label>
                     <div className="relative">
                       <Phone className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-2.5" />
@@ -670,7 +831,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Email Address (For Paystack Receipt)
+                    Email Address (For Paystack Pre-Order Receipt)
                   </label>
                   <input
                     type="email"
@@ -715,7 +876,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                       <Truck className={`w-4 h-4 shrink-0 mt-0.5 ${deliveryMethod === 'farm_delivery' ? 'text-emerald-800' : 'text-stone-400'}`} />
                       <div>
                         <span className="font-bold text-stone-900 block">Direct Farm Gate Delivery</span>
-                        <span className="text-[11px] text-stone-500">Delivered directly to farm site for orders</span>
+                        <span className="text-[11px] text-stone-500">Delivered directly to farm site on seasonal dispatch</span>
                       </div>
                     </button>
                   </div>
@@ -735,12 +896,12 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                 </div>
               </div>
 
-              {/* SECTION 3: PAYMENT METHOD (PAYSTACK INTEGRATION) */}
+              {/* SECTION 4: PAYMENT METHOD (PAYSTACK INTEGRATION) */}
               <div className="space-y-3.5 pt-3 border-t border-stone-100">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
                     <CreditCard className="w-4 h-4 text-[#1b4332]" />
-                    <span>Choose Payment Method *</span>
+                    <span>4. Choose Deposit Payment Method *</span>
                   </span>
                   <div className="flex items-center gap-1 text-[11px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     <Lock className="w-3 h-3 text-emerald-700" />
@@ -764,18 +925,18 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-stone-900">Pay with Paystack</span>
+                        <span className="font-extrabold text-stone-900">Pay Deposit with Paystack</span>
                         <span className="text-[10px] font-bold bg-[#0BA4DB]/10 text-[#0BA4DB] px-1.5 py-0.5 rounded">
                           Instant
                         </span>
                       </div>
                       <p className="text-[11px] text-stone-600 mt-0.5 leading-snug">
-                        Debit Card, Bank Transfer, USSD, or Bank Account. Instant stock reservation.
+                        Debit Card, Bank Transfer, USSD, or Bank Account. Instant pre-order confirmation.
                       </p>
                     </div>
                   </button>
 
-                  {/* Pay on Delivery Option */}
+                  {/* Pay on Delivery / Depot Option */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('pay_on_delivery')}
@@ -789,9 +950,9 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                       <Truck className="w-3.5 h-3.5 text-amber-700" />
                     </div>
                     <div className="flex-1">
-                      <span className="font-extrabold text-stone-900 block">Pay on Depot Collection</span>
+                      <span className="font-extrabold text-stone-900 block">Deposit on Depot Verification</span>
                       <p className="text-[11px] text-stone-600 mt-0.5 leading-snug">
-                        Reserve seeds and pay cash/transfer when inspecting at local cooperative depot.
+                        Log pre-order now and deposit cash/transfer upon seasonal depot inspection.
                       </p>
                     </div>
                   </button>
@@ -826,11 +987,16 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
               {/* Submit / Pay Action Bar */}
               <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-stone-100">
                 <div className="text-left w-full sm:w-auto">
-                  <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider block">
-                    Total Checkout ({quantityKg} kg)
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider block">
+                      Deposit Due Today ({quantityKg} kg booked)
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                      Refund Guaranteed
+                    </span>
+                  </div>
                   <span className="text-xl sm:text-2xl font-black text-[#1b4332] font-mono">
-                    ₦{totalPrice.toLocaleString()}
+                    ₦{depositAmount.toLocaleString()}
                   </span>
                 </div>
 
@@ -846,7 +1012,7 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || isProcessingPayment || isOutOfStock || exceedsStock}
+                    disabled={isSubmitting || isProcessingPayment || depositAmount < 1000 || !currentUser}
                     className="w-2/3 sm:w-auto px-6 py-2.5 bg-[#1b4332] hover:bg-[#143225] disabled:bg-stone-300 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                   >
                     {isProcessingPayment || isSubmitting ? (
@@ -856,15 +1022,17 @@ export const SeedOrderModal: React.FC<SeedOrderModalProps> = ({
                           {paymentStep === 'verifying' ? 'Verifying with Paystack...' : 'Opening Paystack...'}
                         </span>
                       </>
+                    ) : !currentUser ? (
+                      <span>Sign In to Pre-Order</span>
                     ) : paymentMethod === 'paystack' ? (
                       <>
                         <Lock className="w-4 h-4 text-emerald-300" />
-                        <span>Pay ₦{totalPrice.toLocaleString()} with Paystack</span>
+                        <span>Pay ₦{depositAmount.toLocaleString()} Deposit</span>
                       </>
                     ) : (
                       <>
                         <ShoppingBag className="w-4 h-4" />
-                        <span>Place Order (₦{totalPrice.toLocaleString()})</span>
+                        <span>Reserve Pre-Order ({quantityKg} kg)</span>
                       </>
                     )}
                   </button>

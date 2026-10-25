@@ -7,7 +7,8 @@ import {
   ArrowRight, 
   AlertCircle, 
   Loader2, 
-  ArrowLeft 
+  ArrowLeft,
+  Crown
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { translateAuthError } from '../../services/authService';
@@ -32,6 +33,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const isVipPending = typeof window !== 'undefined' && sessionStorage.getItem('soilwise_pending_action') === 'open_commitment';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +112,19 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
             Join SoilWise AI to access and manage your personal farm analyses
           </p>
         </div>
+
+        {/* Pending VIP Commitment Notice */}
+        {isVipPending && (
+          <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-2.5 text-xs text-amber-950">
+            <Crown className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold">Account Required to Complete VIP Upgrade</p>
+              <p className="text-[11px] text-amber-900 leading-relaxed">
+                Create your free farmer account below to link your ₦1,000 refundable commitment, 35% seed discount, and free farm delivery voucher directly to your profile.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Error Notice */}
         {errorMessage && (

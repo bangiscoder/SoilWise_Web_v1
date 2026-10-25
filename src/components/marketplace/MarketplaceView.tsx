@@ -35,6 +35,9 @@ interface MarketplaceViewProps {
   onNavigateToAdmin?: () => void;
   onNavigateToPaymentSuccess?: (order: SeedOrder) => void;
   initialCropFilter?: string | null;
+  onOpenCommitmentModal?: () => void;
+  onNavigateToRegister?: () => void;
+  onNavigateToLogin?: () => void;
 }
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
@@ -43,8 +46,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   onNavigateToAdmin,
   onNavigateToPaymentSuccess,
   initialCropFilter,
+  onOpenCommitmentModal,
+  onNavigateToRegister,
+  onNavigateToLogin,
 }) => {
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, userProfile, isAdmin } = useAuth();
 
   const [seeds, setSeeds] = useState<CropSeed[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -243,6 +249,32 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             </div>
           </div>
 
+          {/* IAR Partnership Pre-Order Period Announcement Banner */}
+          <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-emerald-500/20 border-2 border-amber-400/40 backdrop-blur-md rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-black shrink-0 mt-0.5">
+                <Clock className="w-5 h-5 text-stone-950" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400 text-stone-950">
+                    IAR Partnership Pre-Orders Active
+                  </span>
+                  <span className="text-amber-200 font-bold text-xs hidden sm:inline">
+                    Institute for Agricultural Research, Samaru / ABU Zaria
+                  </span>
+                </div>
+                <p className="text-emerald-50 leading-relaxed text-xs">
+                  Awaiting official partnership seasonal breeder price release. Every order is placed as a priority <strong>Pre-Order</strong>. Specify <strong>any kilogram quantity</strong> you need and make <strong>any deposit of your choice (minimum ₦1,000)</strong>.
+                </p>
+                <p className="text-amber-200 font-semibold text-[11px] flex items-center gap-1.5 pt-0.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                  <span>When official prices are released, your money will be aggregated. If there is an excess balance, SoilWise AI will definitely refund the balance.</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Contextual Soil Analysis Crop Recommendation Alert */}
           {currentAnalysis && currentAnalysis.cropRecommendationDecision?.recommendations && currentAnalysis.cropRecommendationDecision.recommendations.length > 0 && (
             <div className="bg-white/10 border border-white/20 backdrop-blur-md rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
@@ -269,6 +301,48 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
+        {/* Direct VIP Upgrade Banner */}
+        {!userProfile?.isVipFarmer && (
+          <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 rounded-3xl p-5 sm:p-6 text-stone-950 shadow-md border border-amber-500/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-stone-950 text-amber-400 flex items-center justify-center font-black shrink-0 shadow-xs">
+                <Crown className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-stone-950 text-amber-300 px-2.5 py-0.5 rounded-full">
+                    VIP Farmer Perk
+                  </span>
+                  <span className="text-xs font-bold text-stone-900">
+                    Get 35% Off Any Seed Order + 100% Free Farm Delivery
+                  </span>
+                </div>
+                <p className="text-xs text-stone-900 font-medium leading-relaxed">
+                  Make a <strong>₦1,000 refundable commitment</strong> directly today to lock in your VIP discount and nationwide free delivery voucher.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!currentUser) {
+                  try {
+                    sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                  } catch {}
+                  onNavigateToRegister?.();
+                } else if (onOpenCommitmentModal) {
+                  onOpenCommitmentModal();
+                }
+              }}
+              className="w-full sm:w-auto px-5 py-2.5 bg-stone-950 hover:bg-stone-900 text-amber-300 text-xs sm:text-sm font-black rounded-xl transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 shrink-0"
+            >
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>{currentUser ? 'Upgrade Account (₦1,000)' : 'Sign Up to Upgrade (₦1,000)'}</span>
+            </button>
+          </div>
+        )}
+
         {activeTab === 'browse' ? (
           <>
             {/* Search & Filters Bar */}
@@ -431,23 +505,24 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Card Footer: Pricing and Kilograms Order Action */}
+                      {/* Card Footer: Pre-Order Pricing and Flexible Deposit Action */}
                       <div className="px-5 py-4 bg-stone-50/80 border-t border-stone-100 flex items-center justify-between gap-3">
                         <div>
-                          <span className="text-[10px] text-stone-400 uppercase tracking-wider block">Price per kg</span>
-                          <span className="text-lg font-black text-[#1b4332] font-mono">
-                            ₦{seed.pricePerKg.toLocaleString()}
+                          <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block">
+                            IAR Pre-Order Deposit
                           </span>
-                          <span className="text-[10px] text-stone-500 block">Rate: ~{seed.recommendedRateKgPerHa} kg/ha</span>
+                          <span className="text-base sm:text-lg font-black text-[#1b4332] font-mono">
+                            From ₦1,000
+                          </span>
+                          <span className="text-[10px] text-stone-500 block">Est. ref: ~₦{seed.pricePerKg.toLocaleString()}/kg</span>
                         </div>
 
                         <button
                           onClick={() => handleOpenOrderModal(seed)}
-                          disabled={isOutOfStock}
-                          className="px-4 py-2 bg-[#1b4332] hover:bg-[#143225] disabled:bg-stone-200 disabled:text-stone-400 text-white text-xs font-bold rounded-xl transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
+                          className="px-4 py-2 bg-[#1b4332] hover:bg-[#143225] text-white text-xs font-bold rounded-xl transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer active:scale-[0.98]"
                         >
                           <Scale className="w-3.5 h-3.5" />
-                          <span>Select &amp; Order (kg)</span>
+                          <span>Pre-Order Variety</span>
                         </button>
                       </div>
                     </div>
@@ -494,7 +569,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
             {userOrders.length > 0 ? (
               <div className="space-y-3">
-                {userOrders.map(order => (
+                {userOrders.map(order => {
+                  const isPreorder = order.isPreOrder || order.status === 'preorder_awaiting_price';
+                  return (
                   <div
                     key={order.id}
                     className="p-5 bg-white rounded-2xl border border-stone-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -516,15 +593,22 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                             <span>Free Farm Delivery</span>
                           </span>
                         )}
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
-                          order.status === 'confirmed' || order.status === 'completed'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : order.status === 'ready_for_pickup'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {order.status.replace('_', ' ')}
-                        </span>
+                        {isPreorder ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-300">
+                            <Clock className="w-3 h-3 text-amber-800" />
+                            <span>Pre-Order &bull; Awaiting Official Price</span>
+                          </span>
+                        ) : (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                            order.status === 'confirmed' || order.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : order.status === 'ready_for_pickup'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {order.status.replace('_', ' ')}
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                           order.paymentStatus === 'paid'
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
@@ -542,7 +626,17 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         <span>Location: {order.lga}, {order.state}</span>
                       </p>
 
-                      {order.isCommitmentOrder && (
+                      {isPreorder ? (
+                        <div className="mt-2.5 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-amber-50 border border-emerald-300 text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-[11px]">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>IAR Official Price Aggregation &bull; Balance Refund Guarantee</span>
+                          </div>
+                          <p className="text-[11px] text-stone-700 leading-relaxed">
+                            When official prices are released by IAR, your deposit of <strong>₦{(order.depositAmountNgn || order.totalPrice).toLocaleString()}</strong> will be aggregated against your <strong>{order.quantityKg} kg</strong> order. <strong>If there is an excess balance, SoilWise AI will definitely refund the balance</strong> to you. Any balance due will be settled at farm delivery.
+                          </p>
+                        </div>
+                      ) : order.isCommitmentOrder ? (
                         <div className="mt-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60 flex flex-wrap items-center justify-between gap-2 text-xs">
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] text-amber-900 font-semibold">
@@ -561,14 +655,16 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                             </span>
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-stone-100 flex sm:flex-col justify-between items-center sm:items-end">
                       <div>
-                        <span className="text-[10px] text-stone-400 uppercase tracking-wider block">Total Order Value</span>
+                        <span className="text-[10px] text-stone-400 uppercase tracking-wider block">
+                          {isPreorder ? 'Pre-Order Deposit Paid' : 'Total Order Value'}
+                        </span>
                         <span className="text-base sm:text-lg font-black text-[#1b4332] font-mono">
-                          ₦{order.totalPrice.toLocaleString()}
+                          ₦{(isPreorder ? (order.depositAmountNgn || order.totalPrice) : order.totalPrice).toLocaleString()}
                         </span>
                       </div>
                       <span className="text-[10px] text-stone-400 mt-1 block">
@@ -576,14 +672,15 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="p-12 bg-white rounded-3xl border border-stone-200 text-center space-y-3">
                 <Package className="w-10 h-10 text-stone-400 mx-auto" />
-                <h3 className="text-base font-bold text-stone-900">You haven't placed any seed orders yet</h3>
+                <h3 className="text-base font-bold text-stone-900">You haven't placed any seed pre-orders yet</h3>
                 <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                  Browse our certified crop seed catalogue, choose a variety, and specify the kilograms required for your farm.
+                  Browse our certified crop seed catalogue, select any variety, and place a pre-order with any deposit (minimum ₦1,000).
                 </p>
                 <button
                   onClick={() => setActiveTab('browse')}
@@ -606,6 +703,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           setSelectedSeedForOrder(null);
         }}
         onOrderSuccess={handleOrderSuccess}
+        onNavigateToLogin={onNavigateToLogin}
+        onNavigateToRegister={onNavigateToRegister}
       />
     </div>
   );

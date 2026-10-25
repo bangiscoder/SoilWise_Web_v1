@@ -219,10 +219,14 @@ export const PaymentSuccessView: React.FC<PaymentSuccessViewProps> = ({
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-            Certified Seed Order Confirmed!
+            {order.isPreOrder || order.status === 'preorder_awaiting_price' 
+              ? 'IAR Certified Seed Pre-Order Confirmed!' 
+              : 'Certified Seed Order Confirmed!'}
           </h1>
           <p className="text-xs sm:text-sm text-stone-600 max-w-lg mx-auto">
-            Your payment was successfully received and verified. Your certified seed allocation has been reserved in the SoilWise inventory.
+            {order.isPreOrder || order.status === 'preorder_awaiting_price'
+              ? 'Your pre-order deposit has been verified via Paystack. Your seed quantity has been registered in the priority allocation queue for official IAR breeder price release.'
+              : 'Your payment was successfully received and verified. Your certified seed allocation has been reserved in the SoilWise inventory.'}
           </p>
         </div>
       </div>
@@ -293,14 +297,32 @@ export const PaymentSuccessView: React.FC<PaymentSuccessViewProps> = ({
               </div>
 
               <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-0 border-stone-200 pt-2 sm:pt-0">
-                <span className="font-mono text-base font-extrabold text-stone-900">
-                  {order.quantityKg} kg &times; ₦{order.pricePerKg.toLocaleString()}
+                <span className="font-mono text-xs sm:text-sm font-semibold text-stone-500">
+                  {order.quantityKg} kg booked &bull; {order.isPreOrder || order.status === 'preorder_awaiting_price' ? 'Deposit Paid' : 'Total Price'}:
                 </span>
                 <span className="text-base sm:text-lg font-black text-[#1b4332] font-mono">
-                  ₦{order.totalPrice.toLocaleString()}
+                  ₦{(order.depositAmountNgn || order.totalPrice).toLocaleString()}
                 </span>
               </div>
             </div>
+
+            {/* Price Aggregation & Definite Balance Refund Guarantee */}
+            {(order.isPreOrder || order.status === 'preorder_awaiting_price') && (
+              <div className="p-4 bg-gradient-to-r from-emerald-50 to-amber-50 rounded-2xl border-2 border-emerald-300 text-xs space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0" />
+                  <h4 className="font-bold text-emerald-950 text-xs sm:text-sm">
+                    Awaiting Official Price (IAR Partnership) &bull; Definite Balance Refund Guarantee
+                  </h4>
+                </div>
+                <p className="text-stone-700 leading-relaxed text-[11px]">
+                  As we await official partnership seasonal breeder prices from the <strong>Institute for Agricultural Research (IAR), Samaru / ABU Zaria</strong>, your deposit of <strong>₦{(order.depositAmountNgn || order.totalPrice).toLocaleString()}</strong> has been securely logged.
+                </p>
+                <div className="bg-white/90 p-2.5 rounded-xl border border-emerald-200 text-emerald-950 text-[11px] font-semibold leading-relaxed">
+                  When official prices are released, your money will be aggregated against the actual price of your <strong>{order.quantityKg} kg</strong> order. <strong>If there is an excess balance, SoilWise AI will definitely refund the balance</strong> to you. Any remaining balance due will simply be settled prior to or upon farm delivery.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Farmer & Dispatch Information */}

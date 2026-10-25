@@ -169,12 +169,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => {
               if (isDrawer) setIsMobileMenuOpen(false);
-              onOpenCommitmentModal();
+              if (!currentUser) {
+                try {
+                  sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                } catch {}
+                onNavigate('register');
+              } else {
+                onOpenCommitmentModal();
+              }
             }}
-            className="w-full py-1.5 px-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs transition-all shadow-xs active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full py-2 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs transition-all shadow-xs active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Crown className="w-3.5 h-3.5" />
-            <span>Claim VIP (₦1,000)</span>
+            <span>{currentUser ? 'Upgrade Account (₦1,000)' : 'Sign Up to Upgrade (₦1,000)'}</span>
           </button>
         </div>
       )}
@@ -335,16 +342,35 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-xs font-black text-stone-900 truncate leading-snug group-hover:text-[#1b4332] transition-colors">
                   {displayName}
                 </span>
-                {userProfile?.isVipFarmer && (
-                  <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-900 bg-amber-200 px-1.5 py-0.2 rounded-full border border-amber-400">
+                {userProfile?.isVipFarmer ? (
+                  <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-950 bg-amber-200 px-1.5 py-0.2 rounded-full border border-amber-400">
                     <Crown className="w-2.5 h-2.5 text-amber-700 fill-amber-500" />
                     <span>VIP</span>
                   </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!currentUser) {
+                        try {
+                          sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                        } catch {}
+                        onNavigate('register');
+                      } else if (onOpenCommitmentModal) {
+                        onOpenCommitmentModal();
+                      }
+                    }}
+                    className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-full border border-amber-500 shadow-2xs cursor-pointer active:scale-95"
+                  >
+                    <Crown className="w-2.5 h-2.5 text-stone-900" />
+                    <span>Upgrade</span>
+                  </button>
                 )}
               </div>
               <span className="text-[10px] text-stone-500 font-medium truncate block">
                 {currentUser 
-                  ? (userProfile?.isVipFarmer ? 'VIP Gold • Free Delivery' : isOnline ? 'Verified Farmer' : 'Offline Mode') 
+                  ? (userProfile?.isVipFarmer ? 'VIP Gold • Free Delivery' : isOnline ? 'Verified Farmer • Tap to Upgrade' : 'Offline Mode') 
                   : 'Tap to sign in'}
               </span>
             </div>
@@ -428,8 +454,28 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* Right: User Profile Quick Access / Sync Status */}
+          {/* Right: User Profile Quick Access / Upgrade / Sync Status */}
           <div className="flex items-center gap-2">
+            {!userProfile?.isVipFarmer && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!currentUser) {
+                    try {
+                      sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                    } catch {}
+                    onNavigate('register');
+                  } else if (onOpenCommitmentModal) {
+                    onOpenCommitmentModal();
+                  }
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-400 hover:bg-amber-300 text-stone-950 border border-amber-500 shadow-2xs cursor-pointer active:scale-95"
+              >
+                <Crown className="w-3 h-3 text-stone-900" />
+                <span>Upgrade</span>
+              </button>
+            )}
+
             {pendingCount > 0 && (
               <span 
                 onClick={() => setIsMobileMenuOpen(true)}

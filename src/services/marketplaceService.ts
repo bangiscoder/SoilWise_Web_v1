@@ -236,7 +236,9 @@ export async function deleteCropSeed(seedId: string): Promise<void> {
  * Automatically records the order and decrements available stock.
  */
 export async function placeSeedOrder(
-  orderPayload: Omit<SeedOrder, 'id' | 'orderNumber' | 'status' | 'createdAt' | 'updatedAt'>
+  orderPayload: Omit<SeedOrder, 'id' | 'orderNumber' | 'status' | 'createdAt' | 'updatedAt'> & {
+    status?: SeedOrderStatus;
+  }
 ): Promise<SeedOrder> {
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   const orderNumber = `SW-SEED-${new Date().getFullYear()}-${randomSuffix}`;
@@ -244,12 +246,15 @@ export async function placeSeedOrder(
   const nowIso = new Date().toISOString();
 
   const isPaid = orderPayload.paymentStatus === 'paid';
+  const defaultStatus: SeedOrderStatus = orderPayload.isPreOrder 
+    ? 'preorder_awaiting_price' 
+    : (isPaid ? 'confirmed' : 'pending');
 
   const newOrder: SeedOrder = {
     ...orderPayload,
     id: orderId,
     orderNumber,
-    status: isPaid ? 'confirmed' : 'pending',
+    status: orderPayload.status || defaultStatus,
     paymentStatus: orderPayload.paymentStatus || 'unpaid',
     paymentMethod: orderPayload.paymentMethod || 'paystack',
     createdAt: nowIso,

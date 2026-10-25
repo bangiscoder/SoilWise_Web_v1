@@ -14,6 +14,7 @@ export type CropType =
 export type CropCategory = 'cereals' | 'legumes' | 'roots-tubers' | 'vegetables';
 
 export type SeedOrderStatus = 
+  | 'preorder_awaiting_price'
   | 'pending'
   | 'confirmed'
   | 'ready_for_pickup'
@@ -84,6 +85,12 @@ export interface SeedOrder {
   isCommitmentOrder?: boolean;
   commitmentDepositNgn?: number;
   balanceDueNgn?: number;
+  isPreOrder?: boolean;
+  isAwaitingOfficialPrice?: boolean;
+  depositAmountNgn?: number;
+  excessRefundGuaranteed?: boolean;
+  refundPolicyNotice?: string;
+  iarPartnershipStatus?: string;
   isVipDelivery?: boolean;
   freeDeliveryApplied?: boolean;
   vipTier?: string;

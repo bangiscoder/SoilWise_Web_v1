@@ -20,15 +20,25 @@ import {
   MapPin,
   Crown,
   Truck,
+  ShoppingBag,
+  Clock,
+  Package,
+  Coins,
+  FileText,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { calculateProfileCompletion } from '../../services/farmService';
+import { fetchUserSeedOrders } from '../../services/marketplaceService';
+import { SeedOrder } from '../../types/marketplace';
 import { UpdateProfileInput } from '../../types/auth';
 
 interface UserProfileViewProps {
   onNavigateToFarms: () => void;
   onNavigateToHistory: () => void;
   onNavigateToAnalysis: () => void;
+  onOpenCommitmentModal?: () => void;
+  onNavigateToMarketplace?: () => void;
 }
 
 const SUPPORTED_LANGUAGES = [
@@ -72,6 +82,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   onNavigateToFarms,
   onNavigateToHistory,
   onNavigateToAnalysis,
+  onOpenCommitmentModal,
+  onNavigateToMarketplace,
 }) => {
   const { currentUser, userProfile, updateUserProfile } = useAuth();
 
@@ -88,8 +100,36 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [preferredCrops, setPreferredCrops] = useState<string[]>([]);
 
+  // Seed orders / IAR Pre-orders state
+  const [userOrders, setUserOrders] = useState<SeedOrder[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState<boolean>(true);
+
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Load user seed orders and pre-orders
+  useEffect(() => {
+    let isMounted = true;
+    const loadOrders = async () => {
+      if (currentUser?.uid) {
+        try {
+          setIsLoadingOrders(true);
+          const orders = await fetchUserSeedOrders(currentUser.uid);
+          if (isMounted) setUserOrders(orders);
+        } catch (e) {
+          console.warn('Failed to load user seed orders:', e);
+        } finally {
+          if (isMounted) setIsLoadingOrders(false);
+        }
+      } else {
+        setIsLoadingOrders(false);
+      }
+    };
+    loadOrders();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.uid]);
 
   // Initialize form state from loaded profile
   useEffect(() => {
@@ -282,56 +322,206 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </div>
       </div>
 
-      {/* Active Seed Demand & Early-Bird Pre-Order Record Card */}
-      {userProfile?.lastDemand && (
-        <div className="bg-gradient-to-br from-amber-50 to-emerald-50/50 rounded-3xl p-6 border-2 border-amber-300 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black shadow-xs">
-                <Crown className="w-5 h-5 text-stone-950" />
-              </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full border border-amber-300">
-                  First 50 Early-Bird Pre-Order Record
+      {/* Direct VIP Account Upgrade Card (If not yet VIP) */}
+      {!userProfile?.isVipFarmer && onOpenCommitmentModal && (
+        <div className="bg-gradient-to-br from-amber-500 via-amber-400 to-yellow-400 rounded-3xl p-6 sm:p-7 text-stone-950 shadow-md border border-amber-500/50 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="flex items-start md:items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-stone-950 text-amber-400 flex items-center justify-center font-black shrink-0 shadow-xs">
+              <Crown className="w-6 h-6 text-amber-400" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider bg-stone-950 text-amber-300 px-2.5 py-0.5 rounded-full">
+                  Founding VIP Offer
                 </span>
-                <h3 className="text-base sm:text-lg font-black text-stone-900">
-                  {userProfile.lastDemand.quantityKg} kg of {userProfile.lastDemand.seedName}
-                </h3>
+                <span className="text-xs font-bold text-stone-900">
+                  100% Refundable Commitment
+                </span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                <Truck className="w-3.5 h-3.5 text-emerald-700" />
-                <span>100% Free Farm Delivery</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-white/90 rounded-2xl border border-amber-200/80 text-xs">
-            <div>
-              <span className="text-stone-400 text-[10px] uppercase font-bold block">Variety Demanded</span>
-              <span className="font-bold text-stone-900">{userProfile.lastDemand.seedName}</span>
-            </div>
-            <div>
-              <span className="text-stone-400 text-[10px] uppercase font-bold block">Quantity Demanded</span>
-              <span className="font-bold text-stone-900">{userProfile.lastDemand.quantityKg} kg</span>
-            </div>
-            <div>
-              <span className="text-stone-400 text-[10px] uppercase font-bold block">Commitment Paid</span>
-              <span className="font-black text-emerald-700">₦{userProfile.lastDemand.commitmentAmountNgn?.toLocaleString()}</span>
-            </div>
-            <div>
-              <span className="text-stone-400 text-[10px] uppercase font-bold block">Official Price List</span>
-              <span className="font-bold text-amber-800">Awaiting Release</span>
+              <h3 className="text-lg font-black text-stone-950">
+                Upgrade Your Account to VIP Gold Farmer
+              </h3>
+              <p className="text-xs text-stone-900 max-w-xl leading-relaxed font-medium">
+                Deposit <strong>₦1,000</strong> to unlock <strong>35% off your first certified seed order</strong> and <strong>100% free nationwide farm delivery</strong>.
+              </p>
             </div>
           </div>
 
-          <p className="text-[11px] text-stone-600 leading-relaxed">
-            Your seed demand has been recorded on your SoilWise profile. Official price lists from certified breeders and NASC are currently being finalized. Any remaining balance will simply be settled at farm gate upon delivery.
-          </p>
+          <button
+            type="button"
+            onClick={onOpenCommitmentModal}
+            className="px-6 py-3 bg-stone-950 hover:bg-stone-900 text-amber-300 font-black text-xs sm:text-sm rounded-xl transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 shrink-0"
+          >
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span>Upgrade Account to VIP (₦1,000)</span>
+          </button>
         </div>
       )}
+
+      {/* SECTION: Certified Seed Orders & IAR Pre-Orders */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/90 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-5 h-5 text-emerald-700" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-stone-900">
+                  My Certified Seed Orders &amp; Pre-Orders
+                </h2>
+                {userOrders.length > 0 && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    {userOrders.length}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Track your seed reservations, IAR official price releases, and guaranteed balance refunds.
+              </p>
+            </div>
+          </div>
+
+          {onNavigateToMarketplace && (
+            <button
+              type="button"
+              onClick={onNavigateToMarketplace}
+              className="px-4 py-2 bg-[#1b4332] hover:bg-[#143225] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
+            >
+              <Sprout className="w-3.5 h-3.5" />
+              <span>Pre-Order Seeds</span>
+            </button>
+          )}
+        </div>
+
+        {isLoadingOrders ? (
+          <div className="py-8 text-center text-xs text-stone-400 flex items-center justify-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-emerald-700" />
+            <span>Loading your seed orders &amp; pre-orders...</span>
+          </div>
+        ) : userOrders.length > 0 ? (
+          <div className="space-y-4">
+            {userOrders.map((order) => {
+              const isPreorder = order.isPreOrder || order.status === 'preorder_awaiting_price';
+              const depositPaid = order.depositAmountNgn || order.totalPrice;
+
+              return (
+                <div
+                  key={order.id}
+                  className="p-5 rounded-2xl border border-stone-200/90 bg-[#fcfcfb] space-y-3.5 shadow-2xs hover:border-emerald-300 transition-colors"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-[#1b4332] bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                        {order.orderNumber}
+                      </span>
+
+                      {/* Official Pre-Order / Price Release Status Badge */}
+                      {isPreorder ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-300">
+                          <Clock className="w-3.5 h-3.5 text-amber-800" />
+                          <span>Pre-Order &bull; Awaiting Official Price</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 capitalize">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>{order.status.replace('_', ' ')}</span>
+                        </span>
+                      )}
+
+                      {order.freeDeliveryApplied && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <Truck className="w-3 h-3 text-emerald-700" />
+                          <span>Free Farm Delivery</span>
+                        </span>
+                      )}
+
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 uppercase">
+                        {order.paymentStatus === 'paid' ? 'Deposit Paid via Paystack' : 'Pay on Delivery'}
+                      </span>
+                    </div>
+
+                    <span className="text-[11px] text-stone-400">
+                      Booked on {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+
+                  {/* Seed Variety & Quantity */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-white rounded-xl border border-stone-200/80 text-xs">
+                    <div>
+                      <span className="text-stone-400 text-[10px] uppercase font-bold block">Variety</span>
+                      <span className="font-extrabold text-stone-900">{order.seedName}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 text-[10px] uppercase font-bold block">Reserved Quantity</span>
+                      <span className="font-black text-stone-900 font-mono text-sm">{order.quantityKg} kg</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 text-[10px] uppercase font-bold block">Deposit Paid</span>
+                      <span className="font-black text-emerald-700 font-mono text-sm">
+                        ₦{depositPaid.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 text-[10px] uppercase font-bold block">Delivery Location</span>
+                      <span className="font-semibold text-stone-800 truncate block">
+                        {order.lga}, {order.state}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Definitive SoilWise AI Refund Guarantee Notice */}
+                  {isPreorder && (
+                    <div className="p-3.5 bg-gradient-to-r from-emerald-50/90 to-amber-50/90 rounded-xl border border-emerald-300 text-xs space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <strong className="text-emerald-950 font-bold text-xs">
+                          Awaiting Official Price (IAR Partnership) &bull; Definite Refund Guarantee
+                        </strong>
+                      </div>
+                      <p className="text-stone-700 leading-relaxed text-[11px]">
+                        As we await official partnership and price release from the <strong>Institute for Agricultural Research (IAR), Samaru / ABU Zaria</strong>, your seed pre-order has been registered with your deposit of <strong>₦{depositPaid.toLocaleString()}</strong>.
+                      </p>
+                      <div className="bg-white/90 p-2.5 rounded-lg border border-emerald-200 text-emerald-950 text-[11px] font-semibold leading-relaxed">
+                        When the official price is released by IAR, your deposited funds will be aggregated against the actual price of your <strong>{order.quantityKg} kg</strong> order. <strong>If there is an excess balance, SoilWise AI will definitely refund the balance</strong> to you. Any remaining balance due will be settled prior to or upon farm delivery.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Empty Pre-Orders State with Informative IAR Banner */
+          <div className="p-6 bg-stone-50 rounded-2xl border border-stone-200/90 space-y-3 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold">
+                  <Clock className="w-3 h-3 text-amber-800" />
+                  <span>IAR Partnership Pre-Order Season Active</span>
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-stone-900">
+                  You haven't placed any certified seed pre-orders yet
+                </h3>
+                <p className="text-xs text-stone-600 max-w-xl leading-relaxed">
+                  Every order is currently placed as a pre-order awaiting official IAR seasonal prices. You can order <strong>any kilogram quantity</strong> of certified seeds with <strong>any deposit of your choice (minimum ₦1,000)</strong>. SoilWise AI guarantees that once prices are released, any excess balance will definitely be refunded to you.
+                </p>
+              </div>
+
+              {onNavigateToMarketplace && (
+                <button
+                  type="button"
+                  onClick={onNavigateToMarketplace}
+                  className="px-5 py-2.5 bg-[#1b4332] hover:bg-[#143225] text-white text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 flex items-center justify-center gap-2 cursor-pointer self-center sm:self-auto"
+                >
+                  <Sprout className="w-4 h-4 text-emerald-300" />
+                  <span>Browse Seeds to Pre-Order</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Feedback Alert */}
       {feedbackMessage && (

@@ -39,6 +39,7 @@ interface CommitmentRequestModalProps {
   onSuccessUpgrade?: () => void;
   onNavigateToRegister?: () => void;
   onNavigateToLogin?: () => void;
+  initialStep?: 'question' | 'offer';
 }
 
 export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
@@ -48,11 +49,20 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
   onSuccessUpgrade,
   onNavigateToRegister,
   onNavigateToLogin,
+  initialStep = 'offer',
 }) => {
   const { currentUser, userProfile, updateUserProfile } = useAuth();
 
-  // Modal Step State: 'question' | 'offer' | 'declined' | 'success'
-  const [step, setStep] = useState<'question' | 'offer' | 'declined' | 'success'>('question');
+  // Modal Step State: default directly to 'offer' so farmers can make commitment directly without extra steps
+  const [step, setStep] = useState<'question' | 'offer' | 'declined' | 'success'>(initialStep || 'offer');
+
+  // Reset to initialStep (default 'offer') whenever modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setStep(initialStep || 'offer');
+      setErrorMessage(null);
+    }
+  }, [isOpen, initialStep]);
 
   // Form State
   const [amountNgn, setAmountNgn] = useState<number>(1000);
@@ -473,6 +483,9 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        try {
+                          sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                        } catch {}
                         onClose();
                         onNavigateToRegister?.();
                       }}
@@ -484,6 +497,9 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        try {
+                          sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                        } catch {}
                         onClose();
                         onNavigateToLogin?.();
                       }}
@@ -609,6 +625,9 @@ export const CommitmentRequestModal: React.FC<CommitmentRequestModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      try {
+                        sessionStorage.setItem('soilwise_pending_action', 'open_commitment');
+                      } catch {}
                       onClose();
                       onNavigateToRegister?.();
                     }}

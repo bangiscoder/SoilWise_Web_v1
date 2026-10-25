@@ -15,6 +15,7 @@ import {
   Compass,
   Globe,
   Settings,
+  Crown,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { calculateProfileCompletion } from '../../services/farmService';
@@ -25,6 +26,7 @@ interface UserAreaViewProps {
   onNavigateToProfile: () => void;
   onNavigateToFarms: () => void;
   onLogout: () => void;
+  onOpenCommitmentModal?: () => void;
 }
 
 export const UserAreaView: React.FC<UserAreaViewProps> = ({
@@ -33,6 +35,7 @@ export const UserAreaView: React.FC<UserAreaViewProps> = ({
   onNavigateToProfile,
   onNavigateToFarms,
   onLogout,
+  onOpenCommitmentModal,
 }) => {
   const { currentUser, userProfile, isAdmin, logout } = useAuth();
 
@@ -132,6 +135,42 @@ export const UserAreaView: React.FC<UserAreaViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Direct VIP Account Upgrade Card (If not yet VIP) */}
+      {!userProfile?.isVipFarmer && onOpenCommitmentModal && (
+        <div className="bg-gradient-to-br from-amber-500 via-amber-400 to-yellow-400 rounded-3xl p-6 sm:p-7 text-stone-950 shadow-md border border-amber-500/50 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="flex items-start md:items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-stone-950 text-amber-400 flex items-center justify-center font-black shrink-0 shadow-xs">
+              <Crown className="w-6 h-6 text-amber-400" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider bg-stone-950 text-amber-300 px-2.5 py-0.5 rounded-full">
+                  Founding VIP Offer
+                </span>
+                <span className="text-xs font-bold text-stone-900">
+                  100% Refundable Commitment
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-stone-950">
+                Upgrade Your Account to VIP Gold Farmer
+              </h3>
+              <p className="text-xs text-stone-900 max-w-xl leading-relaxed font-medium">
+                Deposit <strong>₦1,000</strong> to unlock <strong>35% off certified seed varieties</strong> and <strong>100% free nationwide farm delivery</strong>.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenCommitmentModal}
+            className="px-6 py-3 bg-stone-950 hover:bg-stone-900 text-amber-300 font-black text-xs sm:text-sm rounded-xl transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 shrink-0"
+          >
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span>Upgrade Account to VIP (₦1,000)</span>
+          </button>
+        </div>
+      )}
 
       {/* Stage 3 Personalisation & Farm Overview Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

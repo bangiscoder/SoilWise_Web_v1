@@ -418,6 +418,10 @@ export default function App() {
           <FarmDataForm
             onSubmit={handleFormSubmit}
             isSubmitting={isSubmitting}
+            preselectedFarm={preselectedFarm}
+            onOpenCommitmentModal={() => setIsCommitmentRequestOpen(true)}
+            onNavigateToRegister={() => navigateToView('register')}
+            onNavigateToLogin={() => navigateToView('login')}
           />
         )}
 
@@ -489,6 +493,9 @@ export default function App() {
               navigateToView('payment-success');
             }}
             initialCropFilter={marketplaceCropFilter}
+            onOpenCommitmentModal={() => setIsCommitmentRequestOpen(true)}
+            onNavigateToRegister={() => navigateToView('register')}
+            onNavigateToLogin={() => navigateToView('login')}
           />
         )}
 
@@ -510,7 +517,16 @@ export default function App() {
         {/* 3. Public Login Page */}
         {currentView === 'login' && (
           <LoginPage
-            onSuccess={() => navigateToView('account')}
+            onSuccess={() => {
+              navigateToView('account');
+              const pending = typeof window !== 'undefined' ? sessionStorage.getItem('soilwise_pending_action') : null;
+              if (pending === 'open_commitment') {
+                sessionStorage.removeItem('soilwise_pending_action');
+                setTimeout(() => {
+                  setIsCommitmentRequestOpen(true);
+                }, 300);
+              }
+            }}
             onNavigateToRegister={() => navigateToView('register')}
             onNavigateToForgotPassword={() => navigateToView('forgot-password')}
             onBackToApp={navigateToHome}
@@ -522,12 +538,14 @@ export default function App() {
           <RegisterPage
             onSuccess={() => {
               navigateToView('account');
+              const pending = typeof window !== 'undefined' ? sessionStorage.getItem('soilwise_pending_action') : null;
+              sessionStorage.removeItem('soilwise_pending_action');
               setTimeout(() => {
                 const isVip = localStorage.getItem('soilwise_vip_commitment_completed') === 'true';
                 if (!isVip) {
                   setIsCommitmentRequestOpen(true);
                 }
-              }, 1200);
+              }, 400);
             }}
             onNavigateToLogin={() => navigateToView('login')}
             onBackToApp={navigateToHome}
@@ -568,6 +586,7 @@ export default function App() {
               onNavigateToProfile={() => navigateToView('profile')}
               onNavigateToFarms={() => navigateToView('my-farms')}
               onLogout={navigateToHome}
+              onOpenCommitmentModal={() => setIsCommitmentRequestOpen(true)}
             />
           ) : (
             <LoginPage
@@ -589,6 +608,8 @@ export default function App() {
                 setPreselectedFarm(null);
                 navigateToView('farm-data');
               }}
+              onOpenCommitmentModal={() => setIsCommitmentRequestOpen(true)}
+              onNavigateToMarketplace={() => navigateToView('marketplace')}
             />
           ) : (
             <LoginPage
