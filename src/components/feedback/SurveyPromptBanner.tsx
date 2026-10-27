@@ -13,21 +13,45 @@ const SNOOZE_STORAGE_KEY = 'soilwise_survey_snoozed_at';
 const COMPLETED_STORAGE_KEY = 'soilwise_feedback_submitted';
 
 export const SurveyPromptBanner: React.FC<SurveyPromptBannerProps> = ({ onOpenSurvey }) => {
-  const { userProfile } = useAuth();
+  const { userProfile, currentUser } = useAuth();
   const [isVisible, setIsVisible] = useState<boolean>(false);
 
   const checkEligibility = useCallback((): boolean => {
-    // 1. If user already submitted, never show
+    // 1. If user already submitted feedback, never show
     if (userProfile?.feedbackSurveyCompleted) return false;
     try {
-      if (localStorage.getItem(COMPLETED_STORAGE_KEY) === 'true') {
+      if (localStorage.getItem(COMPLETED_STORAGE_KEY) === 'true') return false;
+      if (localStorage.getItem('soilwise_survey_completed') === 'true') return false;
+      if (currentUser?.uid && localStorage.getItem(`soilwise_feedback_submitted_${currentUser.uid}`) === 'true') {
         return false;
       }
     } catch {
       // Storage unavailable, proceed cautiously
     }
 
-    // 2. Check snooze timestamp
+    // 2. An actual farm analysis must have been completed
+    let lastAnalysisTime = 0;
+    try {
+      const stored = sessionStorage.getItem('soilwise_last_analysis_timestamp') || localStorage.getItem('soilwise_last_analysis_timestamp');
+      if (stored) {
+        lastAnalysisTime = parseInt(stored, 10);
+      }
+    } catch {
+      // Storage unavailable
+    }
+
+    if (!lastAnalysisTime || isNaN(lastAnalysisTime)) {
+      return false; // No actual analysis has been conducted yet
+    }
+
+    // 3. Exactly 5 minutes must have elapsed since the actual analysis
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    const elapsed = Date.now() - lastAnalysisTime;
+    if (elapsed < FIVE_MINUTES_MS) {
+      return false; // Still within 5 minutes of analysis
+    }
+
+    // 4. Check snooze timestamp
     try {
       const snoozedAtStr = localStorage.getItem(SNOOZE_STORAGE_KEY);
       if (snoozedAtStr) {
@@ -41,22 +65,49 @@ export const SurveyPromptBanner: React.FC<SurveyPromptBannerProps> = ({ onOpenSu
     }
 
     return true;
-  }, [userProfile?.feedbackSurveyCompleted]);
+  }, [userProfile?.feedbackSurveyCompleted, currentUser?.uid]);
 
   useEffect(() => {
-    // Initial delay before first appearance (12 seconds)
-    const initialTimer = setTimeout(() => {
+    // Determine when 5 minutes after analysis will arrive
+    let remainingTime = 0;
+    try {
+      const stored = sessionStorage.getItem('soilwise_last_analysis_timestamp') || localStorage.getItem('soilwise_last_analysis_timestamp');
+      if (stored) {
+        const analysisTime = parseInt(stored, 10);
+        if (!isNaN(analysisTime)) {
+          const elapsed = Date.now() - analysisTime;
+          const FIVE_MINUTES_MS = 5 * 60 * 1000;
+          if (elapsed < FIVE_MINUTES_MS) {
+            remainingTime = FIVE_MINUTES_MS - elapsed;
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    let initialTimer: any = null;
+
+    if (remainingTime > 0) {
+      // Wait exactly until the 5-minute mark after the analysis
+      initialTimer = setTimeout(() => {
+        if (checkEligibility()) {
+          setIsVisible(true);
+        }
+      }, remainingTime);
+    } else {
+      // Either already past 5 minutes or awaiting analysis
       if (checkEligibility()) {
         setIsVisible(true);
       }
-    }, 12000);
+    }
 
-    // Periodic check every 30 seconds to show frequently if snooze elapsed
+    // Periodic check every 15 seconds to react when 5 minutes elapses or snooze expires
     const intervalTimer = setInterval(() => {
       if (!isVisible && checkEligibility()) {
         setIsVisible(true);
       }
-    }, 30000);
+    }, 15000);
 
     // Listen for custom event when feedback is submitted anywhere in the app
     const handleSurveySubmitted = () => {
@@ -65,7 +116,7 @@ export const SurveyPromptBanner: React.FC<SurveyPromptBannerProps> = ({ onOpenSu
     window.addEventListener('soilwise_feedback_submitted', handleSurveySubmitted);
 
     return () => {
-      clearTimeout(initialTimer);
+      if (initialTimer) clearTimeout(initialTimer);
       clearInterval(intervalTimer);
       window.removeEventListener('soilwise_feedback_submitted', handleSurveySubmitted);
     };

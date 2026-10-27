@@ -52,6 +52,7 @@ export interface CropRecommendationInput {
     expectedCessation?: string | null;
     meanAnnualTemperatureC?: number | null;
   };
+  intendedCrop?: string;
 }
 
 /**
@@ -60,7 +61,7 @@ export interface CropRecommendationInput {
 export async function generateGeminiCropRecommendations(
   input: CropRecommendationInput
 ): Promise<GeminiRecommendedCropsResponse> {
-  const { location, soilData, soilTexture, climate } = input;
+  const { location, soilData, soilTexture, climate, intendedCrop } = input;
 
   const phVal = soilData.ph != null ? soilData.ph.toFixed(1) : '6.2 (Neutral-Slightly Acidic)';
   const textClass = soilTexture.texturalClass || 'Sandy Loam';
@@ -78,9 +79,10 @@ Your duty is to analyze smallholder farm soil-test data and retrieved climate pa
 Crucial Guidelines:
 1. Soil-test data alignment: Directly account for soil pH (${phVal}), texture (${textClass}), and nutrient profile (N, P, K, Organic Carbon). If soil is acidic (pH < 5.8), recommend acid-tolerant crops (e.g., groundnut, cowpea, cassava, adapted maize) or specify lime/ash management. If soil is sandy, favor drought-hardy deep rooters with organic mulching.
 2. Climate parameters alignment: Match crop maturity duration to the estimated rainy season of ${rainDays} days (onset: ${onset}, cessation: ${cessation}, annual rainfall: ${annualRainMm} mm). Never recommend a 130-day crop in a 90-day short rainfall zone unless irrigated.
-3. Authentic certified Nigerian/West African varieties: Reference real, released cultivars (e.g. SAMMAZ-52, SAMMAZ-15, SAMMAZ-16, CSR-01, KSV-8, SOSAT-C88, SAMPEA-14, SAMPEA-20-T PBR, FARO-44, FARO-52, TGx 1448-2E, SAMNUT-24, TME 419).
-4. Output Format: Return strictly valid JSON adhering to the exact requested schema. No markdown formatting, no code fences, just clean raw JSON.
-5. Conciseness: Keep each textual explanation concise (1 to 2 direct sentences max per field). Keep management practices to 2-3 brief bullet items. This ensures all JSON tokens are crisp, fast, and completely closed.`;
+3. Farmer Intended Crop: If the farmer provided an intended crop (e.g. Maize, Rice, Cassava, Soybeans), evaluate that crop directly as the primary recommendation or provide best certified varieties for it, alongside ideal agronomic complementary options.
+4. Authentic certified Nigerian/West African varieties: Reference real, released cultivars (e.g. SAMMAZ-52, SAMMAZ-15, SAMMAZ-16, CSR-01, KSV-8, SOSAT-C88, SAMPEA-14, SAMPEA-20-T PBR, FARO-44, FARO-52, TGx 1448-2E, SAMNUT-24, TME 419).
+5. Output Format: Return strictly valid JSON adhering to the exact requested schema. No markdown formatting, no code fences, just clean raw JSON.
+6. Conciseness: Keep each textual explanation concise (1 to 2 direct sentences max per field). Keep management practices to 2-3 brief bullet items. This ensures all JSON tokens are crisp, fast, and completely closed.`;
 
   const userPrompt = `Analyze the following retrieved farm soil and climate parameters and suggest optimal crops:
 
@@ -89,6 +91,9 @@ FARM GEOGRAPHY:
 - Agroecological Zone: ${location.agroecologicalZone || 'Northern Guinea / Sudan Savanna'}
 - Coordinates: Lat ${location.latitude ?? 11.1}, Lon ${location.longitude ?? 7.7}
 - Elevation: ${location.elevationMeters ? `${location.elevationMeters}m` : 'savanna lowland/plateau'}
+
+FARMER INTENDED CROP:
+- Plan: ${intendedCrop || 'Not specified (recommend optimal crops for this soil)'}
 
 SOIL TEST DATA:
 - pH: ${soilData.ph ?? '6.2'}

@@ -169,6 +169,8 @@ export async function syncAllPending(): Promise<{ synced: number; failed: number
           await syncLearningProgressItem(item.payload as UserLearningProgress, item.userId);
         } else if (item.type === 'user_profile') {
           await syncUserProfileItem(item.payload, item.userId);
+        } else if (item.type === 'farm_analysis') {
+          await syncFarmAnalysisItem(item.payload, item.userId);
         }
 
         item.status = 'synced';
@@ -290,6 +292,20 @@ async function syncUserProfileItem(
     },
     { merge: true }
   );
+}
+
+/**
+ * Synchronizes a saved farm analysis snapshot to Firestore
+ */
+async function syncFarmAnalysisItem(analysisPayload: any, userId?: string | null): Promise<void> {
+  const targetUid = userId || analysisPayload?.userId;
+  const analysisDoc = analysisPayload?.sanitizedDoc || analysisPayload;
+  const analysisId = analysisPayload?.analysisId || analysisDoc?.analysisId;
+
+  if (!isFirebaseConfigured || !db || !targetUid || !analysisId) return;
+
+  const docRef = doc(db, 'users', targetUid, 'analyses', analysisId);
+  await setDoc(docRef, analysisDoc, { merge: true });
 }
 
 // Automatically listen for network connectivity restore

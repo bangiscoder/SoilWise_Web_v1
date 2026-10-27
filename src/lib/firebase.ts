@@ -4,6 +4,9 @@ import { getAuth } from 'firebase/auth';
 import type { Auth } from 'firebase/auth';
 import { 
   getFirestore, 
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection, 
   addDoc, 
   serverTimestamp, 
@@ -100,7 +103,23 @@ if (isFirebaseConfigured) {
     const dbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
       ? firebaseConfig.firestoreDatabaseId
       : undefined;
-    db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+
+    // Use initializeFirestore with auto-detect long polling and persistent local cache
+    // so offline queries and writes succeed seamlessly across network disruptions and proxy environments
+    try {
+      db = initializeFirestore(app, {
+        experimentalAutoDetectLongPolling: true,
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      }, dbId);
+    } catch {
+      try {
+        db = initializeFirestore(app, {
+          experimentalAutoDetectLongPolling: true,
+        }, dbId);
+      } catch {
+        db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+      }
+    }
   } catch (error) {
     console.error('Error initializing Firebase services:', error);
   }
@@ -108,7 +127,20 @@ if (isFirebaseConfigured) {
   console.warn('Firebase configuration missing or using placeholders. Feedback submission will display graceful notice.');
 }
 
-export { app, auth, db };
+// Skill-recommended connection verification on startup
+if (typeof window !== 'undefined' && db) {
+  setTimeout(async () => {
+    try {
+      await getDocFromServer(doc(db!, 'test', 'connection'));
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('the client is offline')) {
+        console.warn('[Firebase] Connection notice: Firestore client is operating in offline mode. Local cache and sync are active.');
+      }
+    }
+  }, 1000);
+}
+
+export { app, auth, db, firebaseConfig };
 
 export enum OperationType {
   CREATE = 'create',

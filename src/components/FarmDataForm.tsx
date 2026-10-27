@@ -19,6 +19,10 @@ import {
   RefreshCw,
   Compass,
   Crown,
+  Sprout,
+  Search,
+  Sparkles,
+  Wheat,
 } from 'lucide-react';
 import { SoilData } from '../types/soilwise';
 import { NIGERIA_STATES_LGAS } from '../data/nigeriaStatesLga';
@@ -35,6 +39,151 @@ import { validateLocationApi } from '../services/soilDataValidationService';
 import { LocationValidationResult } from '../types/soilDataValidation';
 import { LocationPermissionModal } from './location/LocationPermissionModal';
 import heroBackground from '../assets/images/farm_analysis_hero_1790600561723.jpg';
+
+export interface AvailableCrop {
+  id: string;
+  name: string; // Plain crop name only (e.g. "Maize", "Rice", "Cassava")
+  altHint?: string; // Informative common alias
+  category: 'cereals' | 'legumes' | 'tubers' | 'vegetables' | 'cash';
+  categoryLabel: string;
+  emoji: string;
+  description: string;
+  popular?: boolean;
+}
+
+export const AVAILABLE_CROPS: AvailableCrop[] = [
+  {
+    id: 'maize',
+    name: 'Maize',
+    altHint: 'Corn',
+    category: 'cereals',
+    categoryLabel: 'Cereal / Grain',
+    emoji: '🌽',
+    description: 'High-demand staple grain responsive to nitrogen and balanced soil pH.',
+    popular: true,
+  },
+  {
+    id: 'rice',
+    name: 'Rice',
+    category: 'cereals',
+    categoryLabel: 'Cereal / Grain',
+    emoji: '🌾',
+    description: 'Staple grain thriving in lowland fadama, river basins, and rainfed uplands.',
+    popular: true,
+  },
+  {
+    id: 'cassava',
+    name: 'Cassava',
+    category: 'tubers',
+    categoryLabel: 'Root / Tuber',
+    emoji: '🥔',
+    description: 'Hardy drought-tolerant root crop with exceptional food security value.',
+    popular: true,
+  },
+  {
+    id: 'cowpea',
+    name: 'Cowpea',
+    altHint: 'Beans',
+    category: 'legumes',
+    categoryLabel: 'Legume / Pulse',
+    emoji: '🫘',
+    description: 'High-protein staple legume that fixes nitrogen naturally into farmland.',
+    popular: true,
+  },
+  {
+    id: 'soybeans',
+    name: 'Soybeans',
+    category: 'legumes',
+    categoryLabel: 'Legume / Pulse',
+    emoji: '🌱',
+    description: 'Commercial cash legume high in protein, excellent for soil fertility.',
+    popular: true,
+  },
+  {
+    id: 'sorghum',
+    name: 'Sorghum',
+    altHint: 'Guinea Corn',
+    category: 'cereals',
+    categoryLabel: 'Cereal / Grain',
+    emoji: '🌾',
+    description: 'Resilient dryland savanna grain with exceptional heat and drought tolerance.',
+    popular: true,
+  },
+  {
+    id: 'groundnut',
+    name: 'Groundnut',
+    altHint: 'Peanut',
+    category: 'legumes',
+    categoryLabel: 'Legume / Oilseed',
+    emoji: '🥜',
+    description: 'Drought-hardy oilseed and protein crop well suited for sandy-loam soils.',
+    popular: true,
+  },
+  {
+    id: 'yam',
+    name: 'Yam',
+    category: 'tubers',
+    categoryLabel: 'Root / Tuber',
+    emoji: '🍠',
+    description: 'High-value staple tuber demanding deep, well-drained fertile soils.',
+  },
+  {
+    id: 'millet',
+    name: 'Millet',
+    category: 'cereals',
+    categoryLabel: 'Cereal / Grain',
+    emoji: '🌾',
+    description: 'Fast-maturing dryland grain ideal for low rainfall and short savanna seasons.',
+  },
+  {
+    id: 'wheat',
+    name: 'Wheat',
+    category: 'cereals',
+    categoryLabel: 'Cereal / Grain',
+    emoji: '🌾',
+    description: 'Cool-season irrigated cereal suited for northern savanna winters.',
+  },
+  {
+    id: 'tomato',
+    name: 'Tomato',
+    category: 'vegetables',
+    categoryLabel: 'Vegetable',
+    emoji: '🍅',
+    description: 'High-value fresh market crop requiring fertile, friable soils and sunshine.',
+  },
+  {
+    id: 'pepper',
+    name: 'Pepper',
+    category: 'vegetables',
+    categoryLabel: 'Vegetable',
+    emoji: '🌶️',
+    description: 'Staple culinary spice vegetable widely cultivated across Nigeria.',
+  },
+  {
+    id: 'onion',
+    name: 'Onion',
+    category: 'vegetables',
+    categoryLabel: 'Vegetable',
+    emoji: '🧅',
+    description: 'Savanna dry-season bulb vegetable suited for friable, well-drained soils.',
+  },
+  {
+    id: 'ginger',
+    name: 'Ginger',
+    category: 'cash',
+    categoryLabel: 'Cash Crop',
+    emoji: '🫚',
+    description: 'High-value export cash rhizome thriving in rich, friable loamy soil.',
+  },
+  {
+    id: 'sunflower',
+    name: 'Sunflower',
+    category: 'cash',
+    categoryLabel: 'Oilseed / Cash Crop',
+    emoji: '🌻',
+    description: 'Drought-tolerant oilseed crop with deep roots and high commercial value.',
+  },
+];
 
 interface FarmDataFormProps {
   onSubmit: (
@@ -53,6 +202,7 @@ interface FarmDataFormProps {
       locationValidation?: LocationValidationResult | null;
       farmId?: string;
       farmName?: string;
+      intendedCrop?: string;
     }
   ) => void;
   isSubmitting: boolean;
@@ -77,8 +227,14 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
   const [userFarms, setUserFarms] = useState<FarmProfileDocument[]>([]);
   const [selectedFarm, setSelectedFarm] = useState<FarmProfileDocument | null>(preselectedFarm || null);
 
-  // Active form section: 1 = Soil Analysis Data, 2 = Soil Photo, 3 = Farm Location
-  const [currentSection, setCurrentSection] = useState<1 | 2 | 3>(1);
+  // Active form section: 1 = Soil Analysis Data, 2 = Soil Photo, 3 = Farm Location, 4 = Intended Crop
+  const [currentSection, setCurrentSection] = useState<1 | 2 | 3 | 4>(1);
+
+  // Step 4: Intended Crop Selection
+  const [selectedCrop, setSelectedCrop] = useState<string>('Maize');
+  const [otherCropName, setOtherCropName] = useState<string>('');
+  const [cropSearch, setCropSearch] = useState<string>('');
+  const [cropCategoryFilter, setCropCategoryFilter] = useState<string>('all');
 
   // Soil test availability state (null = not selected yet, true = Yes, false = No)
   const [hasSoilTest, setHasSoilTest] = useState<boolean | null>(null);
@@ -531,6 +687,57 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
     formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const handleContinueToCrop = async () => {
+    if (!validateLocation()) return;
+
+    let currentValidation = locationValidation;
+    if (!currentValidation) {
+      currentValidation = await triggerLocationValidation(
+        selectedState,
+        selectedLga,
+        latitude,
+        longitude,
+        gpsAccuracy
+      );
+    }
+
+    if (currentValidation) {
+      const status = currentValidation.validation.status;
+      if (status === 'match') {
+        // Confirmed match - proceed
+      } else if (status === 'boundary_uncertain') {
+        if (!boundaryConfirmed) {
+          setErrors((prev) => ({
+            ...prev,
+            boundary: 'Please confirm your farm location near the boundary before continuing.',
+          }));
+          const cardEl = document.getElementById('locationValidationCard');
+          cardEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+      } else {
+        // Conflicting or invalid location: do not silently proceed
+        setErrors((prev) => ({
+          ...prev,
+          locationConflict: 'Please resolve the location mismatch before continuing.',
+        }));
+        const cardEl = document.getElementById('locationValidationCard');
+        cardEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+
+    setCurrentSection(4);
+    const formEl = document.getElementById('farmAnalysisForm');
+    formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleBackToLocation = () => {
+    setCurrentSection(3);
+    const formEl = document.getElementById('farmAnalysisForm');
+    formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -605,6 +812,12 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
     // System automatically captures the analysis date internally
     const autoAnalysisDate = new Date().toISOString().split('T')[0];
 
+    const finalIntendedCrop = selectedCrop === 'recommend_for_me'
+      ? 'Not sure (Recommend for me)'
+      : selectedCrop === 'other'
+      ? (otherCropName.trim() || 'Other Crop')
+      : (selectedCrop || 'Not sure (Recommend for me)');
+
     onSubmit(
       soilData,
       {
@@ -627,6 +840,7 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
         locationValidation: currentValidation || null,
         farmId: selectedFarm?.farmId,
         farmName: selectedFarm?.name,
+        intendedCrop: finalIntendedCrop,
       }
     );
   };
@@ -857,9 +1071,9 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
           </div>
         )}
 
-        {/* 3-Section Stepper Indicator */}
+        {/* 4-Section Stepper Indicator */}
         <div className="bg-white rounded-2xl p-3 sm:p-4 border border-stone-200/90 shadow-xs mb-8">
-          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
             {/* Step 1: Soil Analysis Data */}
             <button
               type="button"
@@ -955,12 +1169,46 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
                 {latitude && longitude && currentSection !== 3 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '3'}
               </div>
               <div className="hidden sm:block min-w-0">
-                <span className="text-xs font-bold block truncate">3. Farm Location</span>
+                <span className="text-xs font-bold block truncate">3. Location</span>
                 <span className={`text-[10px] block truncate ${currentSection === 3 ? 'text-emerald-100' : 'text-stone-500'}`}>
                   {latitude && longitude ? 'GPS set' : 'Required'}
                 </span>
               </div>
               <span className="sm:hidden text-xs font-bold truncate">3. Location</span>
+            </button>
+
+            {/* Step 4: Intended Crop */}
+            <button
+              type="button"
+              onClick={() => {
+                if (validateSection1()) {
+                  handleContinueToCrop();
+                }
+              }}
+              className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentSection === 4
+                  ? 'bg-[#1b4332] text-white shadow-xs'
+                  : selectedCrop
+                  ? 'bg-stone-50 hover:bg-stone-100 text-stone-800'
+                  : 'bg-transparent hover:bg-stone-50 text-stone-500'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                currentSection === 4
+                  ? 'bg-white/20 text-white'
+                  : selectedCrop
+                  ? 'bg-[#1b4332] text-white'
+                  : 'bg-stone-200 text-stone-700'
+              }`}>
+                {selectedCrop && currentSection !== 4 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '4'}
+              </div>
+              <div className="hidden sm:block min-w-0">
+                <span className="text-xs font-bold block truncate">4. Intended Crop</span>
+                <span className={`text-[10px] block truncate ${currentSection === 4 ? 'text-emerald-100' : 'text-stone-500'}`}>
+                  {selectedCrop ? (selectedCrop === 'recommend_for_me' ? 'Recommend' : selectedCrop === 'other' ? (otherCropName || 'Other') : selectedCrop) : 'Required'}
+                </span>
+              </div>
+              <span className="sm:hidden text-xs font-bold truncate">4. Crop</span>
             </button>
           </div>
         </div>
@@ -1960,6 +2208,272 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
                 </button>
 
                 <button
+                  type="button"
+                  onClick={handleContinueToCrop}
+                  className="px-6 py-3 bg-[#1b4332] hover:bg-[#143225] text-white font-bold text-sm rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>{t('form.continueToCrop') || 'Continue to Intended Crop →'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 4: INTENDED CROP */}
+          {currentSection === 4 && (
+            <div id="intendedCropSection" className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
+              {/* Section Header */}
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#f0f5ee] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
+                  <Sprout className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-stone-900">
+                    4. Intended Crop Plan
+                  </h3>
+                  <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
+                    {t('form.cropPlanSubtitle') || "Tell us what crop you intend to plant this season. SoilWise AI will evaluate its agronomic suitability for your soil and local climate."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Main Question Box */}
+              <div className="p-5 sm:p-6 bg-[#fafaf7] rounded-2xl border border-stone-200/90 space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-base sm:text-lg font-bold text-stone-900">
+                    What crop do you intend to plant? <span className="text-red-500">*</span>
+                  </h4>
+                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                    Select one crop from the common crops below, or let SoilWise AI recommend the best match for your soil. Only understandable crop names are shown (not complicated seed variety numbers).
+                  </p>
+                </div>
+
+                {/* Search Bar & Category Filters */}
+                <div className="space-y-3 pt-2">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search crop name (e.g., Maize, Rice, Cassava, Soybeans)..."
+                      value={cropSearch}
+                      onChange={(e) => setCropSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332] shadow-2xs"
+                    />
+                    {cropSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setCropSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-stone-400 hover:text-stone-700 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+                    {[
+                      { id: 'all', label: 'All Crops' },
+                      { id: 'cereals', label: 'Cereals & Grains' },
+                      { id: 'legumes', label: 'Legumes & Pulses' },
+                      { id: 'tubers', label: 'Roots & Tubers' },
+                      { id: 'vegetables', label: 'Vegetables' },
+                      { id: 'cash', label: 'Cash Crops & Oilseeds' },
+                    ].map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setCropCategoryFilter(cat.id)}
+                        className={`px-3 py-1.5 rounded-full font-medium whitespace-nowrap transition-all cursor-pointer ${
+                          cropCategoryFilter === cat.id
+                            ? 'bg-[#1b4332] text-white font-bold shadow-2xs'
+                            : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Option: Recommend for Me (Special Card) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCrop('recommend_for_me');
+                  }}
+                  className={`w-full p-4 rounded-2xl border text-left transition-all flex items-start gap-3.5 cursor-pointer ${
+                    selectedCrop === 'recommend_for_me'
+                      ? 'border-[#1b4332] bg-[#f0f5ee] text-[#1b4332] ring-2 ring-[#1b4332]/25 shadow-xs'
+                      : 'border-stone-200 bg-white hover:border-emerald-300 text-stone-800'
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                    selectedCrop === 'recommend_for_me'
+                      ? 'border-[#1b4332] bg-[#1b4332] text-white'
+                      : 'border-stone-300 bg-stone-100'
+                  }`}>
+                    {selectedCrop === 'recommend_for_me' ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Sparkles className="w-3.5 h-3.5 text-stone-400" />}
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-stone-900">
+                        Not sure / Recommend best crop for my soil
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-[#1b4332] px-2 py-0.5 rounded-full">
+                        AI Matched
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      Let SoilWise AI evaluate all crop options against your soil pH, nutrients, and rainfall outlook to determine the most profitable crop.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Grid of Available Crops */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
+                  {AVAILABLE_CROPS.filter((c) => {
+                    const matchesCategory = cropCategoryFilter === 'all' || c.category === cropCategoryFilter;
+                    const matchesSearch = !cropSearch.trim() || 
+                      c.name.toLowerCase().includes(cropSearch.toLowerCase()) || 
+                      (c.altHint && c.altHint.toLowerCase().includes(cropSearch.toLowerCase())) ||
+                      c.categoryLabel.toLowerCase().includes(cropSearch.toLowerCase());
+                    return matchesCategory && matchesSearch;
+                  }).map((crop) => {
+                    const isSelected = selectedCrop === crop.name;
+                    return (
+                      <button
+                        key={crop.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCrop(crop.name);
+                        }}
+                        className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
+                          isSelected
+                            ? 'border-[#1b4332] bg-[#f0f5ee] ring-2 ring-[#1b4332]/25 shadow-xs'
+                            : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/50'
+                        }`}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xl shrink-0" role="img" aria-label={crop.name}>
+                                {crop.emoji}
+                              </span>
+                              <div className="min-w-0">
+                                <span className="text-sm font-bold text-stone-900 block truncate">
+                                  {crop.name}
+                                </span>
+                                {crop.altHint && (
+                                  <span className="text-[11px] text-stone-500 block truncate">
+                                    ({crop.altHint})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                              isSelected
+                                ? 'border-[#1b4332] bg-[#1b4332] text-white'
+                                : 'border-stone-300 bg-stone-100'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                          </div>
+
+                          <p className="text-[11px] text-stone-600 line-clamp-2 leading-snug">
+                            {crop.description}
+                          </p>
+                        </div>
+
+                        <div className="pt-2.5 mt-2 border-t border-stone-100 flex items-center justify-between text-[10px]">
+                          <span className="text-stone-500 font-medium">
+                            {crop.categoryLabel}
+                          </span>
+                          {crop.popular && (
+                            <span className="text-emerald-800 bg-emerald-50 font-bold px-1.5 py-0.5 rounded">
+                              Popular
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Option: Other Crop */}
+                <div className={`p-4 rounded-xl border transition-all ${
+                  selectedCrop === 'other'
+                    ? 'border-[#1b4332] bg-[#f0f5ee] ring-2 ring-[#1b4332]/25'
+                    : 'border-stone-200 bg-white'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCrop('other')}
+                    className="w-full flex items-center justify-between text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                        selectedCrop === 'other'
+                          ? 'border-[#1b4332] bg-[#1b4332] text-white'
+                          : 'border-stone-300 bg-stone-100'
+                      }`}>
+                        {selectedCrop === 'other' && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <span className="text-xs sm:text-sm font-bold text-stone-900">
+                        Other Crop (Not in list)
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-stone-500">
+                      Type your crop name
+                    </span>
+                  </button>
+
+                  {selectedCrop === 'other' && (
+                    <div className="mt-3 pt-3 border-t border-stone-200/80">
+                      <label htmlFor="otherCropInput" className="block text-xs font-semibold text-stone-700 mb-1">
+                        Enter the crop you plan to cultivate:
+                      </label>
+                      <input
+                        id="otherCropInput"
+                        type="text"
+                        placeholder="e.g. Sesame, Okra, Sweet Potato, Plantain, Cotton"
+                        value={otherCropName}
+                        onChange={(e) => setOtherCropName(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-white border border-stone-300 rounded-xl text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#1b4332]"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Choice Summary Bar */}
+                <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center gap-3 text-xs text-emerald-950">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div className="leading-relaxed">
+                    Selected intended planting plan:{' '}
+                    <strong className="font-extrabold text-[#1b4332]">
+                      {selectedCrop === 'recommend_for_me'
+                        ? 'Not sure (Recommend for me)'
+                        : selectedCrop === 'other'
+                        ? (otherCropName.trim() || 'Other Crop')
+                        : selectedCrop}
+                    </strong>
+                    . SoilWise AI will factor this into your soil chemistry evaluation.
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4 Navigation Actions */}
+              <div className="pt-4 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToLocation}
+                  className="px-5 py-2.5 border border-stone-300 hover:bg-stone-50 text-stone-700 font-semibold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>{t('form.backToLocation') || '← Back to Farm Location'}</span>
+                </button>
+
+                <button
                   type="submit"
                   disabled={isSubmitting}
                   className="py-3.5 px-8 bg-[#1b4332] hover:bg-[#143225] text-white font-bold text-base rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
@@ -1970,7 +2484,10 @@ export const FarmDataForm: React.FC<FarmDataFormProps> = ({
                       <span>{t('form.submittingButton')}</span>
                     </>
                   ) : (
-                    <span>{t('form.submitButton')}</span>
+                    <>
+                      <Sparkles className="w-4 h-4 text-emerald-300" />
+                      <span>{t('form.submitButton')}</span>
+                    </>
                   )}
                 </button>
               </div>

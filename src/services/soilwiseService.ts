@@ -32,6 +32,8 @@ import {
   normaliseFarmRecommendationInput,
   generateCropRecommendationDecision,
 } from './cropRecommendationService';
+import { fetch7DayWeatherForecast } from './openMeteoWeatherService';
+import { evaluateWeatherAlerts } from './weatherAlertService';
 
 /**
  * Communicates with the SoilWise backend to retrieve the full iSDAsoil location profile.
@@ -90,6 +92,7 @@ export async function performFarmAnalysis(
     locationValidation?: import('../types/soilDataValidation').LocationValidationResult | null;
     farmId?: string;
     farmName?: string;
+    intendedCrop?: string;
   }
 ): Promise<FarmAnalysisResult> {
   const { latitude, longitude } = coordinates;
@@ -115,6 +118,7 @@ export async function performFarmAnalysis(
       ? fetchLocationEstimatedSoilData(latitude, longitude)
       : Promise.resolve(null);
   const isdaSoilPromise = fetchIsdaSoilProfile(latitude, longitude);
+  const forecastPromise = fetch7DayWeatherForecast(latitude, longitude);
 
   // Step 3: Retrieving rainfall information...
   await new Promise((r) => setTimeout(r, 400));
@@ -133,6 +137,7 @@ export async function performFarmAnalysis(
     landmarkRes,
     locationSoilRes,
     isdaSoilRes,
+    forecastRes,
   ] = await Promise.allSettled([
     weatherPromise,
     elevationPromise,
@@ -141,6 +146,7 @@ export async function performFarmAnalysis(
     landmarkPromise,
     locationSoilPromise,
     isdaSoilPromise,
+    forecastPromise,
   ]);
 
   // Step 5: Combining data...
@@ -150,6 +156,7 @@ export async function performFarmAnalysis(
   // Resolve Weather / Climate Daily Series
   const weatherResult = weatherRes.status === 'fulfilled' ? weatherRes.value : null;
   const elevation = elevationRes.status === 'fulfilled' ? elevationRes.value : null;
+  const weatherForecast = forecastRes.status === 'fulfilled' ? forecastRes.value : null;
 
   // Perform SoilWise calculations on retrieved daily data
   let rainfallOutlook: RainfallOutlook;
@@ -279,15 +286,25 @@ export async function performFarmAnalysis(
   onStepChange?.('preparing_analysis');
   await new Promise((r) => setTimeout(r, 350));
 
+  const preferredCrop = soilTestMeta?.intendedCrop && 
+    !soilTestMeta.intendedCrop.toLowerCase().includes('not sure') && 
+    !soilTestMeta.intendedCrop.toLowerCase().includes('recommend')
+      ? soilTestMeta.intendedCrop
+      : undefined;
+
   const normalisedRecInput = normaliseFarmRecommendationInput({
     location: farmLocation,
     soilData: effectiveSoilData,
     rainfallOutlook,
     soilTexture,
     environmentalInfo,
+    preferredCrop,
     isUserMeasured,
   });
   const cropRecommendationDecision = generateCropRecommendationDecision(normalisedRecInput);
+
+  // Evaluate location-based extreme weather alerts using Open-Meteo forecast
+  const weatherAlerts = evaluateWeatherAlerts(weatherForecast, farmLocation);
 
   const result: FarmAnalysisResult = {
     id: `FA-${Date.now()}`,
@@ -312,6 +329,9 @@ export async function performFarmAnalysis(
     cropRecommendationDecision,
     farmId: soilTestMeta?.farmId,
     farmName: soilTestMeta?.farmName,
+    weatherAlerts,
+    weatherForecast,
+    intendedCrop: soilTestMeta?.intendedCrop,
   };
 
   onStepChange?.('completed');

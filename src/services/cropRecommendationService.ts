@@ -277,12 +277,20 @@ export function generateCropRecommendationDecision(
   const droughtRisk = rawInput.climate.drought_risk;
   const preferredCrop = rawInput.farmer_context?.preferred_crop?.trim().toLowerCase();
 
+  // Check if user's preferred crop matches varieties in the IAR certified compendium
+  const hasDirectIarMatches = preferredCrop && preferredCrop !== 'all' && preferredCrop !== 'any'
+    ? varieties.some((v) => {
+        const vLower = v.crop_type.toLowerCase();
+        return vLower.includes(preferredCrop) || preferredCrop.includes(vLower);
+      })
+    : false;
+
   // Evaluate each variety in the database
   for (const variety of varieties) {
     const ecologyEval = evaluateEcologyCompatibility(farmEcology, variety.ecology);
 
-    // Filter by preferred crop if user explicitly restricted preference
-    if (preferredCrop && preferredCrop !== 'all' && preferredCrop !== 'any') {
+    // Filter by preferred crop if user explicitly restricted preference AND varieties of that crop exist
+    if (hasDirectIarMatches && preferredCrop) {
       const varietyCropLower = variety.crop_type.toLowerCase();
       if (!varietyCropLower.includes(preferredCrop) && !preferredCrop.includes(varietyCropLower)) {
         excludedCandidates.push({

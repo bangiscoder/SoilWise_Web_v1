@@ -121,6 +121,39 @@ export function evaluateWeatherAlerts(
     ];
   }
 
+  if (simulatedScenario === 'drought') {
+    return [
+      {
+        id: 'sim-drought-01',
+        type: 'dry_spell',
+        severity: 'critical',
+        title: 'Prolonged Agricultural Drought & Severe Dry Spell Alert',
+        shortSummary: 'Zero precipitation (0.0mm) forecast over the 7-day window with severe atmospheric evapotranspiration demand (ET0 > 6.8 mm/day).',
+        detailedNotice: 'A severe mid-season agricultural drought is identified for this farm location. Root-zone moisture exhaustion threatens permanent wilting in cereals (maize, sorghum) and premature flower abortion in legumes.',
+        timeline: 'Full 7-Day Window (High Severity Drought)',
+        affectedDays: ['Day 1 through Day 7'],
+        metrics: [
+          { label: 'Forecast Rainfall', value: '0.0 mm', threshold: 'Critical < 2.0 mm' },
+          { label: 'Rainless Days', value: '7 / 7 Days', threshold: 'Drought >= 6 Days' },
+          { label: 'Evaporative Loss (ET0)', value: '6.9 mm/day', threshold: 'Severe > 5.0 mm' }
+        ],
+        mitigationSteps: [
+          'Apply 8-10cm thick organic mulch (sorghum/maize stover, dry grass) around crop roots immediately to halt evaporative loss.',
+          'Implement deficit drip or micro-basin irrigation exclusively at dusk or early dawn (05:00 - 07:30).',
+          'Remove weeds aggressively throughout crop rows to prevent moisture competition.',
+          'Suspend urea or chemical topdressing until soil moisture recharges to prevent fatal osmotic root burn.',
+          'Erect temporary shading over nursery seed beds and young horticultural transplants.'
+        ],
+        recommendedActions: [
+          'Monitor leaf rolling symptoms during morning inspections.',
+          'Prepare emergency borehole or community irrigation canal allocations.'
+        ],
+        locationContext: locationLabel,
+        timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ];
+  }
+
   if (!forecast || !forecast.days || forecast.days.length === 0) {
     return alerts;
   }
@@ -266,30 +299,44 @@ export function evaluateWeatherAlerts(
     });
   }
 
-  // 4. EXTENDED DRY SPELL EVALUATION
+  // 4. AGRICULTURAL DROUGHT & EXTENDED DRY SPELL EVALUATION
   const totalRainNext7Days = days.reduce((sum, d) => sum + d.precipitationMm, 0);
   const dryDaysCount = days.filter(d => d.precipitationMm < 1).length;
+  const avgEt0 = forecast.summary.totalEt0Mm ? forecast.summary.totalEt0Mm / days.length : 4.5;
 
-  if (dryDaysCount >= 6 && totalRainNext7Days < 3 && maxTemp >= 34) {
+  if (dryDaysCount >= 6 && totalRainNext7Days < 3.5) {
+    const isCriticalDrought = totalRainNext7Days < 1.0 && dryDaysCount >= 7 && (maxTemp >= 35 || avgEt0 >= 5.0);
+    const severity: AlertSeverity = isCriticalDrought ? 'critical' : 'warning';
+
     alerts.push({
       id: `alert-drought-spell-${days[0]?.date}`,
       type: 'dry_spell',
-      severity: 'advisory',
-      title: 'Extended Dry Spell Notice (Zero Rain in 7-Day Window)',
-      shortSummary: `Total rainfall forecast over next 7 days is only ${totalRainNext7Days.toFixed(1)} mm with ${dryDaysCount} dry days.`,
-      detailedNotice: `A prolonged mid-season dry spell can retard vegetative development and induce premature flowering. Irrigation and moisture preservation are critical.`,
-      timeline: 'Throughout the 7-day forecast cycle',
+      severity,
+      title: isCriticalDrought
+        ? 'Critical Agricultural Drought & Moisture Depletion Alert'
+        : 'Prolonged Dry Spell & Evaporative Crop Stress Warning',
+      shortSummary: isCriticalDrought
+        ? `Severe drought conditions: zero precipitation predicted across the next 7 days with intense evaporation (ET0: ${avgEt0.toFixed(1)} mm/day).`
+        : `Dry spell detected: only ${totalRainNext7Days.toFixed(1)} mm rainfall across the next 7 days with ${dryDaysCount} rainless days.`,
+      detailedNotice: `Persistent absence of rainfall for ${locationLabel} during this stage accelerates root-zone moisture exhaustion. Critical risk of wilting, flower drop, and poor seed filling for maize, sorghum, cowpea, and groundnut.`,
+      timeline: 'Next 7 Days (Persistent Rainless Window)',
       affectedDays: ['Full 7-Day Window'],
       metrics: [
-        { label: '7-Day Total Rain', value: `${totalRainNext7Days.toFixed(1)} mm`, threshold: 'Drought < 5 mm' },
-        { label: 'Consecutive Dry Days', value: `${dryDaysCount} Days`, threshold: 'Critical >= 5 Days' }
+        { label: '7-Day Total Rain', value: `${totalRainNext7Days.toFixed(1)} mm`, threshold: 'Drought < 3.5 mm' },
+        { label: 'Rainless Days', value: `${dryDaysCount} / 7 Days`, threshold: 'Critical >= 6 Days' },
+        { label: 'Daily Evaporation (ET0)', value: `${avgEt0.toFixed(1)} mm/day`, threshold: 'Severe Loss > 5.0 mm' }
       ],
       mitigationSteps: [
-        'Apply organic mulching to suppress soil evaporation.',
-        'Prioritize supplemental irrigation on high-value cash crops.',
-        'Weed aggressively to remove competition for scarce soil moisture.'
+        'Apply 8-10cm thick organic mulch (straw, sorghum stover, dried grass) over crop beds immediately.',
+        'Schedule emergency deficit irrigation strictly at early dawn or dusk to eliminate midday evaporative loss.',
+        'Weed field rows immediately to stop weeds from consuming residual subsoil moisture.',
+        'Suspend chemical nitrogen (Urea) application until rain resumes to avoid osmotic root dehydration.',
+        'Erect protective shade fronds over delicate seedlings and nursery seed beds.'
       ],
-      recommendedActions: ['Consider drought-tolerant foliar biostimulants.'],
+      recommendedActions: [
+        'Inspect morning leaf turgidity at 07:00 vs afternoon wilting at 14:00.',
+        'Prepare emergency water pumps and rainwater harvesting reserves.'
+      ],
       locationContext: locationLabel,
       timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });

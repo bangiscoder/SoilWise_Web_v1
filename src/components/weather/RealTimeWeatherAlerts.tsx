@@ -15,7 +15,10 @@ import {
   Sparkles,
   MapPin,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Copy,
+  Check,
+  Share2
 } from 'lucide-react';
 import { FarmLocation } from '../../types/soilwise';
 import { 
@@ -45,8 +48,24 @@ export const RealTimeWeatherAlerts: React.FC<RealTimeWeatherAlertsProps> = ({
   const [loading, setLoading] = useState<boolean>(!preloadedForecast);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
-  const [simulatedScenario, setSimulatedScenario] = useState<'flood' | 'heatwave' | null>(null);
+  const [simulatedScenario, setSimulatedScenario] = useState<'flood' | 'heatwave' | 'drought' | null>(null);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [copiedAlertId, setCopiedAlertId] = useState<string | null>(null);
+
+  const handleCopyAlert = (alert: WeatherAlert) => {
+    try {
+      const locationText = location.lga
+        ? `${location.lga}, ${location.state || 'Nigeria'}`
+        : location.state || 'Nigeria';
+      const steps = alert.mitigationSteps.map((s, i) => `${i + 1}. ${s}`).join('\n');
+      const text = `⚠️ [SOILWISE WEATHER ALERT - ${alert.severity.toUpperCase()}]\n${alert.title}\n📍 Location: ${locationText}\n⏳ Timeline: ${alert.timeline}\n📋 Summary: ${alert.shortSummary}\n\nKey Mitigations:\n${steps}\n\nPowered by Open-Meteo & SoilWise AI`;
+      navigator.clipboard.writeText(text);
+      setCopiedAlertId(alert.id);
+      setTimeout(() => setCopiedAlertId(null), 2500);
+    } catch (e) {
+      console.warn('Failed to copy alert:', e);
+    }
+  };
 
   // Load weather forecast for farm location
   const loadForecast = async (force = false) => {
@@ -246,6 +265,15 @@ export const RealTimeWeatherAlerts: React.FC<RealTimeWeatherAlertsProps> = ({
               >
                 Test Heat
               </button>
+              <button
+                onClick={() => setSimulatedScenario('drought')}
+                className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                  simulatedScenario === 'drought' ? 'bg-orange-600 text-white shadow-2xs font-black' : 'hover:text-stone-900'
+                }`}
+                title="Preview Agricultural Drought & Severe Dry Spell Mode"
+              >
+                Test Drought
+              </button>
             </div>
 
             {/* Live Refresh Button */}
@@ -298,13 +326,40 @@ export const RealTimeWeatherAlerts: React.FC<RealTimeWeatherAlertsProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setExpandedAlertId(isExpanded ? null : alert.id)}
-                      className="p-1.5 rounded-lg bg-white/80 hover:bg-white text-stone-600 transition-colors shrink-0 cursor-pointer"
-                      aria-label="Toggle alert details"
-                    >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyAlert(alert);
+                        }}
+                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold ${
+                          copiedAlertId === alert.id
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-white/80 hover:bg-white text-stone-700 border-stone-200/80 shadow-2xs'
+                        }`}
+                        title="Copy alert for SMS / WhatsApp broadcast to farm workers"
+                      >
+                        {copiedAlertId === alert.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-700" />
+                            <span className="text-[10px] hidden sm:inline text-emerald-700">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-3.5 h-3.5 text-stone-600" />
+                            <span className="text-[10px] hidden sm:inline">Share</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => setExpandedAlertId(isExpanded ? null : alert.id)}
+                        className="p-1.5 rounded-lg bg-white/80 hover:bg-white text-stone-600 transition-colors shrink-0 cursor-pointer border border-stone-200/60 shadow-2xs"
+                        aria-label="Toggle alert details"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Expandable Actionable Agroecological Mitigations & Metrics */}

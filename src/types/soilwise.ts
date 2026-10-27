@@ -1,5 +1,7 @@
 import { SoilWiseNormalisedProfile, LocationValidationResult } from './soilDataValidation';
 import { CropRecommendationDecision } from './cropRecommendation';
+import type { WeatherAlert } from '../services/weatherAlertService';
+import type { SevenDayForecastResult } from '../services/openMeteoWeatherService';
 
 export interface SoilData {
   ph: number | null;
@@ -174,6 +176,9 @@ export interface FarmAnalysisResult {
   cropRecommendationDecision?: CropRecommendationDecision;
   farmId?: string;
   farmName?: string;
+  weatherAlerts?: WeatherAlert[];
+  weatherForecast?: SevenDayForecastResult | null;
+  intendedCrop?: string;
 }
 
 export type AnalysisStep =

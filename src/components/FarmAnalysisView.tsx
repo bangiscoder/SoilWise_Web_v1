@@ -27,6 +27,7 @@ import {
   MessageSquareHeart,
   ChevronLeft,
   ChevronRight,
+  Sprout,
 } from 'lucide-react';
 import { FarmAnalysisResult } from '../types/soilwise';
 import { FarmMapPreview } from './FarmMapPreview';
@@ -309,6 +310,10 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
     </div>
   );
 
+  const hasWeatherAlert = (analysis.weatherAlerts || []).some(
+    (a) => a.severity === 'critical' || a.severity === 'warning'
+  );
+
   return (
     <div className="w-full pb-28 sm:pb-32 space-y-10 sm:space-y-14">
       {/* Fixed / Floating AI Assistant Entry Bar (Fixed near bottom across all scroll positions) */}
@@ -438,6 +443,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
         {/* Real-Time Extreme Climate & Weather Alerts (Location-Based Notification) */}
         <RealTimeWeatherAlerts
           location={location}
+          preloadedForecast={analysis.weatherForecast}
           onNavigateToWeatherTab={() => handleTabChange('weather')}
         />
 
@@ -450,7 +456,7 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
             {[
               { id: "ai-recommendations", label: "AI Crops", icon: Sparkles, badge: "Recommended" },
               { id: "soil-profile", label: "Soil Profile", icon: FlaskConical },
-              { id: "weather", label: "Weather & Climate", icon: CloudRain },
+              { id: "weather", label: "Weather & Climate", icon: CloudRain, alertBadge: hasWeatherAlert ? 'Alert' : undefined },
               { id: "location", label: "Farm Location", icon: MapPin },
               { id: "advisory", label: "Agronomist & Hub", icon: UserCheck },
               { id: "feedback", label: "Farmer Feedback", icon: MessageSquareHeart },
@@ -470,7 +476,12 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
                 >
                   <Icon className={"w-4 h-4 shrink-0 " + (isActive ? "text-emerald-300" : "text-stone-500")} />
                   <span className="whitespace-nowrap">{tab.label}</span>
-                  {tab.badge && (
+                  {tab.alertBadge && (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse">
+                      {tab.alertBadge}
+                    </span>
+                  )}
+                  {tab.badge && !tab.alertBadge && (
                     <span
                       className={"text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full " + (
                         isActive ? "bg-amber-400 text-stone-950" : "bg-emerald-100 text-emerald-800"
@@ -487,8 +498,45 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
         {/* TAB 1: AI RECOMMENDATIONS (FIRST TAP) */}
         <div className={activeTab === 'ai-recommendations' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
-        {/* 7. GEMINI AI POWERED RECOMMENDED CROPS SECTION */}
-        <GeminiRecommendedCropsSection
+          {/* 7a. FARMER INTENDED CROP BANNER */}
+          {analysis.intendedCrop && (
+            <div className="bg-emerald-50/90 border border-emerald-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-[#1b4332] text-emerald-300 flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <Sprout className="w-5 h-5 text-emerald-300" />
+                </div>
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-black uppercase tracking-wider bg-emerald-800 text-emerald-100 px-2.5 py-0.5 rounded-full">
+                      Farmer's Intended Crop
+                    </span>
+                    <span className="text-base font-extrabold text-stone-900">
+                      {analysis.intendedCrop}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-600 leading-relaxed">
+                    {analysis.intendedCrop.toLowerCase().includes('not sure') || analysis.intendedCrop.toLowerCase().includes('recommend')
+                      ? 'You requested SoilWise AI to recommend the optimal high-yielding crop tailored to your soil test values and agro-ecological zone.'
+                      : `Evaluating soil pH (${soilData?.ph != null ? soilData.ph.toFixed(1) : '6.5'}), nutrient reserves, and seasonal rainfall duration for ${analysis.intendedCrop}.`}
+                  </p>
+                </div>
+              </div>
+
+              {onNavigateToMarketplace && !analysis.intendedCrop.toLowerCase().includes('not sure') && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToMarketplace(analysis.intendedCrop)}
+                  className="px-4 py-2 bg-[#1b4332] hover:bg-[#143225] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                >
+                  <ShoppingBag className="w-4 h-4 text-emerald-300" />
+                  <span>View {analysis.intendedCrop} Seeds</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* 7. GEMINI AI POWERED RECOMMENDED CROPS SECTION */}
+          <GeminiRecommendedCropsSection
           analysis={analysis}
           onNavigateToMarketplace={onNavigateToMarketplace}
           onAskAiAboutCrop={(cropName, varietyName) => {
@@ -1211,7 +1259,13 @@ export const FarmAnalysisView: React.FC<FarmAnalysisViewProps> = ({
 
         {/* TAB 3: WEATHER & CLIMATE (THIRD TAP) */}
         <div className={activeTab === 'weather' ? 'space-y-8 block' : 'hidden print:block space-y-8'}>
-        {/* 4. RAINFALL OUTLOOK */}
+          {/* Automated Real-Time Weather Alert & Risk Assessment */}
+          <RealTimeWeatherAlerts
+            location={location}
+            preloadedForecast={analysis.weatherForecast}
+          />
+
+          {/* 4. RAINFALL OUTLOOK */}
         <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

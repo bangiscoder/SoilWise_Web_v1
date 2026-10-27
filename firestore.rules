@@ -52,25 +52,33 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // User can read their own profile; Admin can read all
-      allow read: if isOwner(uid) || isAdmin();
+      // User can read their own profile; Admin can read all; Assigned/Onboarding Extension Worker can read
+      allow read: if isOwner(uid) || isAdmin() || (isAuthenticated() && (
+        resource.data.onboardedByExtensionWorkerId == request.auth.uid || 
+        resource.data.assignedExtensionWorkerId == request.auth.uid
+      ));
 
-      // User can create their own profile on registration or initial sync
-      // Role defaults to 'user' for public users, or admin for designated admin email
+      // User can create their own profile on registration; Admin can create; Extension worker can onboard farmers
       allow create: if (isOwner(uid) &&
                        request.resource.data.uid == uid &&
                        ((!('role' in request.resource.data)) || request.resource.data.role == 'user' || isAdmin()) &&
                        ((!('admin' in request.resource.data)) || request.resource.data.admin == false || isAdmin())
-                      ) || isAdmin();
+                      ) || 
+                      (isAuthenticated() && request.resource.data.onboardedByExtensionWorkerId == request.auth.uid) ||
+                      isAdmin();
 
-      // User can update their own profile fields and preferences (displayName, photoURL, phoneNumber, state, lga, bio, farm details, profile, activeFarmId, etc.)
-      // Cannot elevate privileges (role, accountStatus, admin) or reassign uid
+      // User can update their own profile; Admin can update; Extension worker can update their farmer details
       allow update: if (isOwner(uid) &&
                         (!('uid' in request.resource.data) || request.resource.data.uid == uid) &&
                         (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isAdmin()) &&
                         (!('admin' in request.resource.data) || request.resource.data.admin == resource.data.admin || isAdmin()) &&
                         (!('accountStatus' in request.resource.data) || request.resource.data.accountStatus == resource.data.accountStatus || isAdmin())
-                       ) || isAdmin();
+                       ) || 
+                       (isAuthenticated() && (
+                         resource.data.onboardedByExtensionWorkerId == request.auth.uid || 
+                         resource.data.assignedExtensionWorkerId == request.auth.uid
+                       )) ||
+                       isAdmin();
 
       // Only admin can delete user profiles
       allow delete: if isAdmin();
@@ -94,14 +102,18 @@ service cloud.firestore {
 
       // User-owned analysis history subcollection
       match /analyses/{analysisId} {
-        // Owner can read and list their own analyses; Admin can read all
-        allow read: if isOwner(uid) || isAdmin();
+        // Owner can read and list their own analyses; Admin can read all; Extension worker can read their farmers' analyses
+        allow read: if isOwner(uid) || isAdmin() || (isAuthenticated() && (
+          get(/databases/$(database)/documents/users/$(uid)).data.onboardedByExtensionWorkerId == request.auth.uid ||
+          get(/databases/$(database)/documents/users/$(uid)).data.assignedExtensionWorkerId == request.auth.uid
+        ));
 
-        // Owner can save an analysis snapshot
-        // Must tie userId to their own auth UID and match analysisId
-        allow create: if isOwner(uid) &&
+        // Owner can save an analysis snapshot; Extension worker can save for their onboarded farmer
+        allow create: if (isOwner(uid) &&
                          request.resource.data.userId == uid &&
-                         request.resource.data.analysisId == analysisId;
+                         request.resource.data.analysisId == analysisId) ||
+                         (isAuthenticated() && get(/databases/$(database)/documents/users/$(uid)).data.onboardedByExtensionWorkerId == request.auth.uid) ||
+                         isAdmin();
 
         // Snapshots are immutable historical records; regular user updates are blocked
         allow update: if isAdmin();

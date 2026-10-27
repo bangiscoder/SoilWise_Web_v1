@@ -10,7 +10,8 @@ import {
   Sprout,
   CloudSun,
   MessageSquareHeart,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 import { FarmLocation } from '../types/soilwise';
 import { submitFarmerFeedback, isFirebaseConfigured } from '../lib/firebase';
@@ -142,6 +143,58 @@ export const FarmerFeedbackSection: React.FC<FarmerFeedbackSectionProps> = ({ lo
   const [submittedData, setSubmittedData] = useState<{ id: string; joinedWaitlist: boolean } | null>(null);
 
   const { currentUser, userProfile, updateUserProfile } = useAuth();
+
+  // Helper to verify if user (or guest browser) has already completed feedback submission
+  const isFeedbackAlreadyDone = React.useCallback((): boolean => {
+    if (userProfile?.feedbackSurveyCompleted) return true;
+    try {
+      if (localStorage.getItem('soilwise_feedback_submitted') === 'true') return true;
+      if (localStorage.getItem('soilwise_survey_completed') === 'true') return true;
+      if (currentUser?.uid && localStorage.getItem(`soilwise_feedback_submitted_${currentUser.uid}`) === 'true') {
+        return true;
+      }
+    } catch {
+      // Storage unavailable
+    }
+    return false;
+  }, [userProfile?.feedbackSurveyCompleted, currentUser?.uid]);
+
+  const [alreadySubmitted, setAlreadySubmitted] = useState<boolean>(() => isFeedbackAlreadyDone());
+  const [submissionDate, setSubmissionDate] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('soilwise_feedback_submitted_at') || null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Keep alreadySubmitted in sync with user profile & auth changes
+  React.useEffect(() => {
+    if (isFeedbackAlreadyDone()) {
+      setAlreadySubmitted(true);
+      try {
+        const storedDate = localStorage.getItem('soilwise_feedback_submitted_at') || userProfile?.feedbackSubmittedAt;
+        if (storedDate) setSubmissionDate(storedDate);
+      } catch {
+        // Ignore
+      }
+    }
+  }, [isFeedbackAlreadyDone, userProfile?.feedbackSubmittedAt]);
+
+  // Listen for feedback submission events across components
+  React.useEffect(() => {
+    const handleFeedbackDone = () => {
+      setAlreadySubmitted(true);
+      try {
+        const storedDate = localStorage.getItem('soilwise_feedback_submitted_at');
+        if (storedDate) setSubmissionDate(storedDate);
+      } catch {
+        // Ignore
+      }
+    };
+    window.addEventListener('soilwise_feedback_submitted', handleFeedbackDone);
+    return () => window.removeEventListener('soilwise_feedback_submitted', handleFeedbackDone);
+  }, []);
 
   // Prefill details if user is signed in
   React.useEffect(() => {
@@ -303,6 +356,11 @@ export const FarmerFeedbackSection: React.FC<FarmerFeedbackSectionProps> = ({ lo
     e.preventDefault();
     if (isSubmitting) return;
 
+    if (alreadySubmitted || isFeedbackAlreadyDone()) {
+      setStepError('You have already submitted feedback. To ensure research integrity, each user can only submit feedback once.');
+      return;
+    }
+
     if (!validateStep(currentStep)) {
       return;
     }
@@ -361,21 +419,36 @@ export const FarmerFeedbackSection: React.FC<FarmerFeedbackSectionProps> = ({ lo
         throw new Error(result.error || 'Failed to submit feedback.');
       }
 
-      // Record feedback survey completion permanently
+      const nowIso = new Date().toISOString();
+
+      // Record feedback survey completion permanently (one submission per user)
       try {
         localStorage.setItem('soilwise_feedback_submitted', 'true');
-        window.dispatchEvent(new CustomEvent('soilwise_feedback_submitted'));
+        localStorage.setItem('soilwise_survey_completed', 'true');
+        localStorage.setItem('soilwise_feedback_submitted_at', nowIso);
+        if (result.id) {
+          localStorage.setItem('soilwise_feedback_id', result.id);
+        }
+        if (currentUser?.uid) {
+          localStorage.setItem(`soilwise_feedback_submitted_${currentUser.uid}`, 'true');
+        }
+        window.dispatchEvent(new CustomEvent('soilwise_feedback_submitted', { detail: { id: result.id } }));
       } catch {
         // Ignore storage errors
       }
 
       // Update user profile in Firestore if signed in
       if (currentUser && updateUserProfile) {
-        updateUserProfile({ feedbackSurveyCompleted: true }).catch((err) => {
+        updateUserProfile({ 
+          feedbackSurveyCompleted: true,
+          feedbackSubmittedAt: nowIso
+        }).catch((err) => {
           console.warn('Could not record survey completion in profile:', err);
         });
       }
 
+      setAlreadySubmitted(true);
+      setSubmissionDate(nowIso);
       setSubmittedData({
         id: result.id || 'SUBMITTED',
         joinedWaitlist: joinWaitingList,
@@ -386,32 +459,6 @@ export const FarmerFeedbackSection: React.FC<FarmerFeedbackSectionProps> = ({ lo
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const resetForm = () => {
-    setCurrentStep(1);
-    setUserType('');
-    setName('');
-    setCropsGrown([]);
-    setOtherCrop('');
-    setSoilTested('');
-    setSoilTestMethod('');
-    setOtherSoilTestMethod('');
-    setWeatherInformationSource('');
-    setOtherWeatherInformationSource('');
-    setFarmDecisionChallenge('');
-    setLikesSoilwise('');
-    setWouldUse('');
-    setWillingnessToPay('');
-    setMostValuableFeature('');
-    setRemoveOrModify('');
-    setDesiredFeatures('');
-    setJoinWaitingList(true);
-    setPhone('');
-    setEmail('');
-    setConsent(false);
-    setSubmittedData(null);
-    setStepError(null);
   };
 
   return (
@@ -431,28 +478,45 @@ export const FarmerFeedbackSection: React.FC<FarmerFeedbackSectionProps> = ({ lo
         </p>
       </div>
 
-      {submittedData ? (
-        <div className="p-8 bg-[#f4f7f2] rounded-2xl border border-[#1b4332]/25 text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#1b4332] text-white flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-6 h-6 text-emerald-300" />
+      {(alreadySubmitted || submittedData) ? (
+        <div className="p-8 sm:p-10 bg-gradient-to-br from-[#f4f7f2] via-emerald-50/40 to-stone-50 rounded-3xl border border-[#1b4332]/25 text-center space-y-4 shadow-xs">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center mx-auto shadow-md">
+            <CheckCircle2 className="w-7 h-7 text-emerald-300" />
           </div>
-          <h3 className="text-xl font-bold text-stone-900">
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/90 border border-emerald-300/60 text-[#1b4332] text-xs font-bold uppercase tracking-wider">
+            <Check className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Feedback Recorded &bull; Single Submission Policy</span>
+          </div>
+
+          <h3 className="text-xl sm:text-2xl font-extrabold text-stone-900 tracking-tight">
             Thank You for Your Feedback!
           </h3>
-          <p className="text-sm text-stone-600 max-w-md mx-auto leading-relaxed">
-            Your responses have been recorded in the SoilWise AI research database.
-            {submittedData.joinedWaitlist && (
-              <span className="block mt-1 font-semibold text-[#1b4332]">
-                You have been registered for our early access and testing list.
+
+          <p className="text-xs sm:text-sm text-stone-600 max-w-lg mx-auto leading-relaxed">
+            Your responses have been successfully recorded in the SoilWise AI agricultural research database.
+            To guarantee research integrity and statistical balance across all farming communities, each user can only submit feedback once.
+          </p>
+
+          {((submittedData && submittedData.joinedWaitlist) || userProfile?.feedbackSurveyCompleted) && (
+            <div className="p-3.5 bg-white/90 rounded-2xl border border-emerald-200/70 max-w-md mx-auto text-xs text-stone-700 space-y-1">
+              <span className="font-bold text-[#1b4332] flex items-center justify-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Early Access &amp; Testing Cohort
+              </span>
+              <p className="text-stone-500 text-[11px]">
+                You are registered to receive notifications for new regional crop recommendations and high-yield seed releases.
+              </p>
+            </div>
+          )}
+
+          <div className="pt-2 text-[11px] text-stone-400 font-mono">
+            Status: 1 of 1 Response Recorded
+            {submissionDate && (
+              <span className="block mt-0.5 text-stone-400">
+                Submitted on {new Date(submissionDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
               </span>
             )}
-          </p>
-          <button
-            onClick={resetForm}
-            className="px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-          >
-            Submit Another Response
-          </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-7">

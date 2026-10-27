@@ -117,6 +117,83 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [currentUser, userProfile, isAuthLoading]);
 
+  // Prompt user for feedback survey strictly 5 minutes after an actual analysis has completed
+  // Enforces single feedback submission per user across sessions
+  useEffect(() => {
+    const isFeedbackCompleted = (): boolean => {
+      if (userProfile?.feedbackSurveyCompleted) return true;
+      try {
+        if (localStorage.getItem('soilwise_feedback_submitted') === 'true') return true;
+        if (localStorage.getItem('soilwise_survey_completed') === 'true') return true;
+        if (currentUser?.uid && localStorage.getItem(`soilwise_feedback_submitted_${currentUser.uid}`) === 'true') {
+          return true;
+        }
+      } catch {
+        // Storage unavailable
+      }
+      return false;
+    };
+
+    if (isFeedbackCompleted()) return;
+
+    let lastAnalysisTime = 0;
+    try {
+      const stored = sessionStorage.getItem('soilwise_last_analysis_timestamp') || localStorage.getItem('soilwise_last_analysis_timestamp');
+      if (stored) {
+        lastAnalysisTime = parseInt(stored, 10);
+      }
+    } catch {
+      // Storage unavailable
+    }
+
+    if (!lastAnalysisTime || isNaN(lastAnalysisTime)) {
+      return; // No actual analysis has been conducted yet
+    }
+
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    const now = Date.now();
+    const elapsed = now - lastAnalysisTime;
+
+    let alreadyPrompted = false;
+    try {
+      alreadyPrompted = sessionStorage.getItem('soilwise_survey_modal_prompted') === 'true';
+    } catch {
+      // Ignore
+    }
+
+    if (alreadyPrompted) return;
+
+    if (elapsed >= FIVE_MINUTES_MS) {
+      if (!isFeedbackCompleted()) {
+        setIsSurveyModalOpen(true);
+        try {
+          sessionStorage.setItem('soilwise_survey_modal_prompted', 'true');
+        } catch {}
+      }
+    } else {
+      const remainingTime = FIVE_MINUTES_MS - elapsed;
+      const timer = setTimeout(() => {
+        if (!isFeedbackCompleted()) {
+          setIsSurveyModalOpen(true);
+          try {
+            sessionStorage.setItem('soilwise_survey_modal_prompted', 'true');
+          } catch {}
+        }
+      }, remainingTime);
+
+      return () => clearTimeout(timer);
+    }
+  }, [analysisResult, userProfile?.feedbackSurveyCompleted, currentUser?.uid]);
+
+  // Dismiss survey modal if feedback is completed anywhere in app
+  useEffect(() => {
+    const handleFeedbackDone = () => {
+      setIsSurveyModalOpen(false);
+    };
+    window.addEventListener('soilwise_feedback_submitted', handleFeedbackDone);
+    return () => window.removeEventListener('soilwise_feedback_submitted', handleFeedbackDone);
+  }, []);
+
   // Monitor URL routes on mount and popstate
   useEffect(() => {
     const handleLocationChange = () => {
@@ -212,6 +289,7 @@ export default function App() {
       locationValidation?: import('./types/soilDataValidation').LocationValidationResult | null;
       farmId?: string;
       farmName?: string;
+      intendedCrop?: string;
     }
   ) => {
     setIsSubmitting(true);
@@ -233,6 +311,16 @@ export default function App() {
 
       setAnalysisResult(result);
 
+      // Record timestamp of actual analysis execution to trigger the 5-minute survey modal
+      const analysisCompletedTimestamp = Date.now();
+      try {
+        sessionStorage.setItem('soilwise_last_analysis_timestamp', String(analysisCompletedTimestamp));
+        localStorage.setItem('soilwise_last_analysis_timestamp', String(analysisCompletedTimestamp));
+        sessionStorage.removeItem('soilwise_survey_modal_prompted');
+      } catch {
+        // Ignore storage errors
+      }
+
       // If user is authenticated, save analysis snapshot to their account history
       if (currentUser) {
         try {
@@ -248,18 +336,12 @@ export default function App() {
         }
       }
 
-      // Small pause to let user see completion
+      // Transition smoothly into analysis results without any immediate early-bird popups
       setTimeout(() => {
         setIsSubmitting(false);
         setAnalysisStep('idle');
         setCurrentView('analysis');
         window.scrollTo({ top: 0, behavior: 'smooth' });
-
-        // Prompt user after analysing farm to make purchase and lock in VIP free delivery
-        setTimeout(() => {
-          setVipModalSource('farm_analysis');
-          setIsVipCommitmentModalOpen(true);
-        }, 1200);
       }, 350);
     } catch (err: any) {
       console.error('Analysis execution error:', err);

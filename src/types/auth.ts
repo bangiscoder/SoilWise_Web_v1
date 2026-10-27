@@ -2,7 +2,7 @@
  * SoilWise AI Authentication & User Account Types (Stage 1)
  */
 
-export type UserRole = 'user' | 'admin' | 'agronomist';
+export type UserRole = 'user' | 'admin' | 'agronomist' | 'extension_worker';
 
 export type AccountStatus = 'active' | 'suspended';
 
@@ -54,6 +54,7 @@ export interface SoilWiseUserProfile {
   refundableDepositNgn?: number;
   hasCompletedCommitmentModal?: boolean;
   feedbackSurveyCompleted?: boolean;
+  feedbackSubmittedAt?: string;
   lastDemand?: {
     orderId?: string;
     orderNumber?: string;
@@ -74,6 +75,11 @@ export interface SoilWiseUserProfile {
   adminUpgradedBy?: string;
   prePaidCreditApplied?: boolean;
   prePaidCreditRef?: string | null;
+  onboardedByExtensionWorkerId?: string;
+  onboardedByExtensionWorkerName?: string;
+  assignedExtensionWorkerId?: string;
+  assignedExtensionWorkerName?: string;
+  extensionWorkerStaffId?: string;
 }
 
 export interface PendingVipCredit {
@@ -117,6 +123,7 @@ export interface UpdateProfileInput {
   refundableDepositNgn?: number;
   hasCompletedCommitmentModal?: boolean;
   feedbackSurveyCompleted?: boolean;
+  feedbackSubmittedAt?: string;
   lastDemand?: SoilWiseUserProfile['lastDemand'];
 }
 

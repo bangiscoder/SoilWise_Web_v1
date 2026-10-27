@@ -58,6 +58,7 @@ export async function fetchGeminiCropRecommendations(
       expectedCessation: analysis.rainfallOutlook?.expectedCessation,
       meanAnnualTemperatureC: analysis.environmentalInfo?.meanAnnualTemperatureC,
     },
+    intendedCrop: analysis.intendedCrop,
   };
 
   try {

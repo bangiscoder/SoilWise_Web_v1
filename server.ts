@@ -12,6 +12,10 @@ import {
   verifyPaystackReference, 
   verifyAndProcessPaystackWebhook 
 } from './server/services/paystackServerService.ts';
+import { 
+  sendExtensionWorkerWelcomeEmail, 
+  generateExtensionWorkerWelcomeHtml 
+} from './server/services/emailService.ts';
 
 const containerPort = process.env.PORT;
 dotenv.config({ override: true });
@@ -314,12 +318,13 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
 // Gemini AI Powered Crop Recommendations Endpoint based on soil-test data and climate parameters
 app.post('/api/ai/recommended-crops', async (req: Request, res: Response) => {
   try {
-    const { location, soilData, soilTexture, climate } = req.body || {};
+    const { location, soilData, soilTexture, climate, intendedCrop } = req.body || {};
     const result = await generateGeminiCropRecommendations({
       location: location || {},
       soilData: soilData || {},
       soilTexture: soilTexture || {},
       climate: climate || {},
+      intendedCrop: intendedCrop || undefined,
     });
     res.json(result);
   } catch (err: any) {
@@ -577,6 +582,54 @@ app.post('/api/paystack/webhook', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[Paystack Webhook Handler Error]:', err);
     return res.status(500).json({ status: 'error', error: err.message });
+  }
+});
+
+/**
+ * Admin Endpoint: Dispatches the congratulatory appointment and login credentials email
+ * to an appointed Extension Worker.
+ */
+app.post('/api/admin/extension-worker/send-welcome-email', async (req: Request, res: Response) => {
+  try {
+    const { name, email, temporaryPassword, staffId, organization, coverageState, coverageLgas, portalUrl } = req.body;
+
+    if (!name || !email || !temporaryPassword || !staffId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: name, email, temporaryPassword, and staffId are required.',
+      });
+    }
+
+    const result = await sendExtensionWorkerWelcomeEmail({
+      name,
+      email,
+      temporaryPassword,
+      staffId,
+      organization,
+      coverageState,
+      coverageLgas,
+      portalUrl,
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[Extension Worker Welcome Email Error]:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to dispatch welcome email',
+    });
+  }
+});
+
+/**
+ * Preview Endpoint: Allows admin to view the styled HTML template before sending
+ */
+app.post('/api/admin/extension-worker/preview-email', (req: Request, res: Response) => {
+  try {
+    const html = generateExtensionWorkerWelcomeHtml(req.body);
+    return res.send(html);
+  } catch (err: any) {
+    return res.status(500).send(`<p>Error generating preview: ${err.message}</p>`);
   }
 });
 
